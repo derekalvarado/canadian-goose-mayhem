@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { PALETTE } from "./palette.ts";
-import { toonMaterial } from "./toonMaterial.ts";
+import { PALETTE } from "./palette";
+import { toonMaterial } from "./toonMaterial";
 
 interface GooseParts {
   visual: THREE.Group;
@@ -20,19 +20,6 @@ interface GooseParts {
 // World units are meter-like in the plaza. Keep the authored goose proportions,
 // but make its standing height read as roughly one world unit beside the props.
 const GOOSE_VISUAL_SCALE = 0.4;
-const GOOSE_RENDER_ORDER = 1;
-
-function renderWithoutSelfOcclusion(goose: THREE.Object3D): void {
-  goose.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    object.renderOrder = GOOSE_RENDER_ORDER;
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    // The world has already written its depth before this higher-priority
-    // character layer renders. Keeping its own meshes out of that buffer lets
-    // both feet remain visible without making the goose draw through scenery.
-    for (const material of materials) material.depthWrite = false;
-  });
-}
 
 function characterMesh(mesh: THREE.Mesh): THREE.Mesh {
   mesh.castShadow = true;
@@ -283,7 +270,6 @@ export class Goose extends THREE.Group {
     super();
     this.parts = createGooseParts();
     this.parts.visual.scale.setScalar(GOOSE_VISUAL_SCALE);
-    renderWithoutSelfOcclusion(this.parts.visual);
     this.add(this.parts.visual);
   }
 
