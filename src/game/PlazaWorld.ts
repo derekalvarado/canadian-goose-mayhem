@@ -7,15 +7,16 @@ import {
   PLAZA_STATIC_COLLIDERS,
   SPLASH_PAD_RADIUS,
   type PlazaBoxCollider,
-} from "./plazaLevel";
+} from "./plazaLevel.ts";
 import {
   CANONICAL_PLAZA_LAYOUT,
   PLAZA_GROUP_IDS,
   type PlazaGroupId,
   type PlazaLayout,
-} from "./plazaLayout";
-import { PALETTE } from "./palette";
-import { toonMaterial } from "./toonMaterial";
+} from "./plazaLayout.ts";
+import { PALETTE } from "./palette.ts";
+import { toonMaterial } from "./toonMaterial.ts";
+import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 
 function finishMesh(mesh: THREE.Mesh, castShadow = true, receiveShadow = true): THREE.Mesh {
   mesh.castShadow = castShadow;
@@ -270,21 +271,26 @@ function createPlayArea(): THREE.Group {
   return group;
 }
 
-function createPavilion(): THREE.Group {
+function createPavilion(groups: OcclusionFadeGroupRegistry): THREE.Group {
   const group = new THREE.Group();
   group.add(box(PAVILION_SIZE.halfWidth * 2, 0.52, PAVILION_SIZE.halfDepth * 2, PALETTE.earth.woodDark, 0, 0.26, 0));
   group.add(box(PAVILION_SIZE.halfWidth * 2 - 0.5, 0.08, PAVILION_SIZE.halfDepth * 2 - 0.35, PALETTE.earth.woodLight, 0, 0.56, 0));
 
+  const canopy = new THREE.Group();
   const columnMaterial = toonMaterial(PALETTE.plaza.iron);
   for (const x of [-6.15, 6.15]) {
     for (const z of [-1.75, 1.75]) {
       const column = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 4.1, 10), columnMaterial));
       column.position.set(x, 2.55, z);
-      group.add(column);
+      canopy.add(column);
     }
   }
-  group.add(box(14.8, 0.28, 5.45, PALETTE.plaza.iron, 0, 4.58, 0));
-  group.add(box(13.8, 0.17, 4.8, PALETTE.earth.woodDark, 0, 4.38, 0));
+  canopy.add(
+    box(14.8, 0.28, 5.45, PALETTE.plaza.iron, 0, 4.58, 0),
+    box(13.8, 0.17, 4.8, PALETTE.earth.woodDark, 0, 4.38, 0),
+  );
+  group.add(canopy);
+  groups.register("plaza.pavilion-stage.canopy", canopy);
   return group;
 }
 
@@ -334,7 +340,7 @@ function createLongSideFacade(spec: LongSideFacadeSpec, side: -1 | 1): THREE.Gro
   return group;
 }
 
-function createLongSideBuildings(): THREE.Group {
+function createLongSideBuildings(groups: OcclusionFadeGroupRegistry): THREE.Group {
   const group = new THREE.Group();
   const north: readonly LongSideFacadeSpec[] = [
     { centerX: -17.6, width: 8.4, height: 7.8, color: PALETTE.plaza.brickDark, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningBlue },
@@ -350,8 +356,16 @@ function createLongSideBuildings(): THREE.Group {
     { centerX: 9.1, width: 8.7, height: 7.9, color: PALETTE.plaza.brickLight, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningBlue },
     { centerX: 17.8, width: 8.3, height: 8.9, color: PALETTE.plaza.brick, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningGreen },
   ];
-  for (const spec of north) group.add(createLongSideFacade(spec, -1));
-  for (const spec of south) group.add(createLongSideFacade(spec, 1));
+  for (const [index, spec] of north.entries()) {
+    const facade = createLongSideFacade(spec, -1);
+    groups.register(`plaza.building.north.${index + 1}`, facade);
+    group.add(facade);
+  }
+  for (const [index, spec] of south.entries()) {
+    const facade = createLongSideFacade(spec, 1);
+    groups.register(`plaza.building.south.${index + 1}`, facade);
+    group.add(facade);
+  }
   return group;
 }
 
@@ -395,7 +409,7 @@ function createPlanter(obstacle: PlazaBoxCollider): THREE.Group {
   return group;
 }
 
-function createTree(x: number, z: number, height: number): THREE.Group {
+function createTree(id: string, x: number, z: number, height: number, groups: OcclusionFadeGroupRegistry): THREE.Group {
   const group = new THREE.Group();
   const trunk = finishMesh(new THREE.Mesh(
     new THREE.CylinderGeometry(0.28, 0.4, height * 0.62, 12),
@@ -412,6 +426,7 @@ function createTree(x: number, z: number, height: number): THREE.Group {
     crown.scale.set(scale, scale * 0.82, scale);
     group.add(crown);
   }
+  groups.register(id, group);
   return group;
 }
 
@@ -434,16 +449,16 @@ function createCafeTable(): THREE.Group {
   return group;
 }
 
-function createFurnitureAndPlanting(): THREE.Group {
+function createFurnitureAndPlanting(groups: OcclusionFadeGroupRegistry): THREE.Group {
   const group = new THREE.Group();
   for (const planter of PLAZA_STATIC_COLLIDERS) {
     group.add(createPlanter(planter));
   }
   group.add(
-    createTree(19.35, -7.2, 6.7),
-    createTree(19.35, 6.2, 6.2),
-    createTree(7.8, 16.7, 6.8),
-    createTree(-17.5, 13.5, 7.2),
+    createTree("plaza.tree.east-north", 19.35, -7.2, 6.7, groups),
+    createTree("plaza.tree.east-south", 19.35, 6.2, 6.2, groups),
+    createTree("plaza.tree.south", 7.8, 16.7, 6.8, groups),
+    createTree("plaza.tree.north-west", -17.5, 13.5, 7.2, groups),
   );
   return group;
 }
@@ -485,6 +500,7 @@ function createStringLights(): THREE.Group {
 /** A camera-safe interpretation of Fort Collins' central Old Town plaza. */
 export class PlazaWorld extends THREE.Group {
   readonly editableGroups = new Map<PlazaGroupId, THREE.Group>();
+  readonly occlusionFadeGroups = new OcclusionFadeGroupRegistry();
 
   constructor(layout: PlazaLayout = CANONICAL_PLAZA_LAYOUT) {
     super();
@@ -492,7 +508,7 @@ export class PlazaWorld extends THREE.Group {
       "plaza.goose-fountain": createFountain(),
       "plaza.splash-pad": createSplashPad(),
       "plaza.play-area": createPlayArea(),
-      "plaza.pavilion-stage": createPavilion(),
+      "plaza.pavilion-stage": createPavilion(this.occlusionFadeGroups),
       "plaza.cafe-table-1": createCafeTable(),
       "plaza.cafe-table-2": createCafeTable(),
       "plaza.cafe-table-3": createCafeTable(),
@@ -504,8 +520,8 @@ export class PlazaWorld extends THREE.Group {
     }
     this.add(
       createPaving(),
-      createLongSideBuildings(),
-      createFurnitureAndPlanting(),
+      createLongSideBuildings(this.occlusionFadeGroups),
+      createFurnitureAndPlanting(this.occlusionFadeGroups),
       createStringLights(),
     );
   }

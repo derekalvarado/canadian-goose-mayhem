@@ -8,6 +8,7 @@ import { FOUNTAIN_OBJECTIVE_ID, createPlazaRules } from "./simulation/plaza";
 import { PALETTE } from "./palette";
 import { PlazaEditor } from "./PlazaEditor";
 import { loadPlazaLayout } from "./plazaLayout";
+import { GooseOcclusionFader } from "./GooseOcclusionFader";
 
 const CAMERA_FOCUS_HEIGHT = 0.55;
 // A closer follow camera keeps the smaller goose readable and makes the plaza
@@ -31,6 +32,7 @@ export class Game {
   private readonly rules = createPlazaRules(this.layout);
   private readonly world = new PlazaWorld(this.layout);
   private readonly goose = new Goose();
+  private readonly gooseOcclusionFader = new GooseOcclusionFader(this.world.occlusionFadeGroups);
   private readonly input: InputController;
   private readonly clock = new THREE.Clock();
   private readonly velocity = new THREE.Vector3();
@@ -180,6 +182,7 @@ export class Game {
     }
 
     this.updateCamera(delta);
+    this.gooseOcclusionFader.update(this.world, this.camera, this.goose, delta);
     this.renderer.render(this.scene, this.camera);
   };
 
