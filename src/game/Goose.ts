@@ -286,7 +286,9 @@ export class Goose extends THREE.Group {
     const bounce = Math.abs(Math.sin(step)) * moving;
     const idleBreath = Math.sin(elapsed * 1.6) * 0.012 * (1 - moving);
 
-    this.parts.visual.position.y = bounce * 0.055 + idleBreath;
+    // Idle breathing belongs to the torso; moving the whole visual downward
+    // would intermittently push the planted feet below the paving.
+    this.parts.visual.position.y = bounce * 0.055;
     this.parts.visual.rotation.z = -sway * 0.045 - turnAmount * 0.045;
     this.parts.body.rotation.x = -bounce * 0.035;
     this.parts.body.scale.y = 0.72 + idleBreath * 0.25;

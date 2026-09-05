@@ -55,7 +55,6 @@ export class Game {
   private readonly keyboardControls = requireElement<HTMLElement>("#keyboard-controls");
   private readonly gamepadControls = requireElement<HTMLElement>("#gamepad-controls");
   private readonly deviceLabel = requireElement<HTMLElement>("#device-label");
-  private readonly wayfinder = requireElement<HTMLElement>("#wayfinder");
   private paused = false;
   private lastInputTime = performance.now();
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -170,8 +169,6 @@ export class Game {
           this.showFountainMilestone();
         }
       }
-      this.wayfinder.classList.toggle("wayfinder--visible",
-        !this.simulation.isObjectiveComplete(FOUNTAIN_OBJECTIVE_ID) && this.goose.position.z > 3.5);
     }
 
     const player = this.simulation.player;
@@ -225,7 +222,6 @@ export class Game {
     this.syncPlayerView();
     this.snapCameraToGoose();
     this.chapterComplete.hidden = true;
-    this.wayfinder.classList.remove("wayfinder--visible");
     requireElement<HTMLElement>("#objective").textContent = this.rules.objectives[0].description;
     this.lastInputTime = performance.now();
     this.controlsCard.classList.remove("controls-card--quiet");
