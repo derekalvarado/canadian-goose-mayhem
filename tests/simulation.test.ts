@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Objectives } from "../src/game/simulation/Objectives.ts";
-import { Simulation, FIXED_STEP, type WorldRules, type PlayerCommand } from "../src/game/simulation/Simulation.ts";
+import {
+  Simulation, FIXED_STEP, GOOSE_POOP_IDLE_SECONDS, MAX_GOOSE_POOPS, type WorldRules, type PlayerCommand,
+} from "../src/game/simulation/Simulation.ts";
 import { brambleRules, TRAIL_OBJECTIVE_ID } from "../src/game/simulation/bramble.ts";
 import { EXIT_Z, isPlayable, pathCenterAt } from "../src/game/level.ts";
 
@@ -111,4 +113,38 @@ test("diagonal commands are normalized and invalid time cannot poison simulation
   simulation.reset();
   simulation.advance(FIXED_STEP, { ...idle, moveX: 1 });
   assert.ok(Math.abs(simulation.player.speed - diagonalSpeed) < 1e-12);
+});
+
+test("the goose poops after ten idle seconds and player activity resets the wait", () => {
+  const simulation = new Simulation(openWorld);
+  const firstWait = Math.round(GOOSE_POOP_IDLE_SECONDS / FIXED_STEP) - 1;
+  for (let tick = 0; tick < firstWait; tick++) assert.deepEqual(simulation.advance(FIXED_STEP, idle), []);
+  assert.equal(simulation.goosePoops.length, 0);
+
+  simulation.advance(FIXED_STEP, { ...idle, moveX: 1 });
+  for (let tick = 0; tick < firstWait; tick++) simulation.advance(FIXED_STEP, idle);
+  assert.equal(simulation.goosePoops.length, 0);
+
+  const events = simulation.advance(FIXED_STEP, idle);
+  const poopEvent = events.find((event) => event.type === "goose-pooped");
+  assert.ok(poopEvent && poopEvent.type === "goose-pooped");
+  assert.equal(simulation.goosePoops.length, 1);
+  assert.equal(simulation.goosePoops[0]?.id, poopEvent.poopId);
+});
+
+test("only the ten newest durable goose poops remain and reset clears them", () => {
+  const simulation = new Simulation(openWorld);
+  const ticksPerPoop = Math.round(GOOSE_POOP_IDLE_SECONDS / FIXED_STEP);
+  for (let poop = 0; poop < MAX_GOOSE_POOPS + 2; poop++) {
+    for (let tick = 0; tick < ticksPerPoop; tick++) simulation.advance(FIXED_STEP, idle);
+  }
+  assert.deepEqual(simulation.goosePoops.map((poop) => poop.id), [
+    "goose-poop-2", "goose-poop-3", "goose-poop-4", "goose-poop-5", "goose-poop-6",
+    "goose-poop-7", "goose-poop-8", "goose-poop-9", "goose-poop-10", "goose-poop-11",
+  ]);
+  const snapshot = simulation.goosePoops[0];
+  if (snapshot) snapshot.position.x = 999;
+  assert.notEqual(simulation.goosePoops[0]?.position.x, 999);
+  simulation.reset();
+  assert.deepEqual(simulation.goosePoops, []);
 });

@@ -9,12 +9,40 @@ import { PALETTE } from "./palette";
 import { PlazaEditor } from "./PlazaEditor";
 import { loadPlazaLayout } from "./plazaLayout";
 import { GooseOcclusionFader } from "./GooseOcclusionFader";
+import { toonMaterial } from "./toonMaterial";
 
 const CAMERA_FOCUS_HEIGHT = 0.55;
 // A closer follow camera keeps the smaller goose readable and makes the plaza
 // landmarks feel larger without changing their gameplay dimensions.
 const CAMERA_AXIS_OFFSET = 9.6;
 const CAMERA_LEAD_SECONDS = 0.2;
+
+function createPoopView(): THREE.Group {
+  const poop = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.052, 0.06, 0.18, 10),
+    toonMaterial(PALETTE.green.deep),
+  );
+  // CylinderGeometry is vertical by default; lay the small dropping along the ground.
+  body.rotation.z = Math.PI / 2;
+  body.scale.y = 0.46;
+  body.position.y = 0.03;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  poop.add(body);
+
+  const whiteDab = new THREE.Mesh(
+    new THREE.SphereGeometry(0.034, 10, 7),
+    toonMaterial(PALETTE.goose.white),
+  );
+  whiteDab.scale.set(1.1, 0.34, 0.75);
+  whiteDab.position.set(0.025, 0.061, -0.008);
+  whiteDab.castShadow = true;
+  whiteDab.receiveShadow = true;
+  poop.add(whiteDab);
+
+  return poop;
+}
 
 function requireElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -32,6 +60,7 @@ export class Game {
   private readonly rules = createPlazaRules(this.layout);
   private readonly world = new PlazaWorld(this.layout);
   private readonly goose = new Goose();
+  private readonly poopViews = new Map<string, THREE.Group>();
   private readonly gooseOcclusionFader = new GooseOcclusionFader(this.world.occlusionFadeGroups);
   private readonly input: InputController;
   private readonly clock = new THREE.Clock();
@@ -160,12 +189,13 @@ export class Game {
         honkPressed: frame.honkPressed,
       });
       this.syncPlayerView();
+      this.syncPoopViews();
       for (const event of events) {
         if (event.type === "goose-honked") {
           this.goose.honk();
           void this.audio.playHonk();
           this.lastInputTime = performance.now();
-        } else if (event.objectiveId === FOUNTAIN_OBJECTIVE_ID) {
+        } else if (event.type === "objective-completed" && event.objectiveId === FOUNTAIN_OBJECTIVE_ID) {
           this.showFountainMilestone();
         }
       }
@@ -211,6 +241,25 @@ export class Game {
     this.velocity.copy(player.velocity);
   }
 
+  private syncPoopViews(): void {
+    const currentIds = new Set<string>();
+    for (const poop of this.simulation.goosePoops) {
+      currentIds.add(poop.id);
+      let view = this.poopViews.get(poop.id);
+      if (!view) {
+        view = createPoopView();
+        this.poopViews.set(poop.id, view);
+        this.scene.add(view);
+      }
+      view.position.copy(poop.position);
+    }
+    for (const [id, view] of this.poopViews) {
+      if (currentIds.has(id)) continue;
+      this.scene.remove(view);
+      this.poopViews.delete(id);
+    }
+  }
+
   private showFountainMilestone(): void {
     this.chapterComplete.hidden = false;
     requireElement<HTMLElement>("#objective").textContent = "✓ Find the goose fountain";
@@ -220,6 +269,7 @@ export class Game {
     this.simulation.reset();
     this.input.clear();
     this.syncPlayerView();
+    this.syncPoopViews();
     this.snapCameraToGoose();
     this.chapterComplete.hidden = true;
     requireElement<HTMLElement>("#objective").textContent = this.rules.objectives[0].description;

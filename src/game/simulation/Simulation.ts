@@ -10,6 +10,12 @@ export interface PlayerState {
   readonly turnAmount: number;
 }
 
+/** A durable, world-owned record of a dropping left by the goose. */
+export interface GoosePoop {
+  readonly id: string;
+  readonly position: Readonly<Position>;
+}
+
 /** Movement is already transformed from camera space into world space. */
 export interface PlayerCommand {
   readonly moveX: number;
@@ -20,6 +26,7 @@ export interface PlayerCommand {
 
 export type GameplayEvent =
   | { readonly type: "goose-honked"; readonly actorId: "goose"; readonly position: Readonly<Position> }
+  | { readonly type: "goose-pooped"; readonly actorId: "goose"; readonly poopId: string; readonly position: Readonly<Position> }
   | { readonly type: "objective-completed"; readonly objectiveId: string };
 
 /** The current forest adapter can be replaced without changing input or rendering. */
@@ -33,6 +40,8 @@ export interface WorldRules {
 export const FIXED_STEP = 1 / 60;
 export const WALK_SPEED = 3.45;
 export const HURRY_SPEED = 5.7;
+export const GOOSE_POOP_IDLE_SECONDS = 10;
+export const MAX_GOOSE_POOPS = 10;
 const MAX_STEPS_PER_FRAME = 8;
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
@@ -47,6 +56,9 @@ export class Simulation {
   private accumulator = 0;
   private honkQueued = false;
   private tickCount = 0;
+  private idleSeconds = 0;
+  private poopSequence = 0;
+  private readonly poopRecords: GoosePoop[] = [];
 
   constructor(rules: WorldRules) {
     this.rules = rules;
@@ -62,6 +74,11 @@ export class Simulation {
       heading: this.heading, speed: Math.hypot(this.velocity.x, this.velocity.z),
       turnAmount: this.turnAmount,
     };
+  }
+
+  /** Snapshot copies prevent rendering from mutating the durable world state. */
+  get goosePoops(): readonly GoosePoop[] {
+    return this.poopRecords.map((poop) => ({ id: poop.id, position: { ...poop.position } }));
   }
 
   isObjectiveComplete(id: string): boolean { return this.objectives.isComplete(id); }
@@ -91,6 +108,9 @@ export class Simulation {
     this.heading = this.rules.spawnHeading;
     this.turnAmount = 0;
     this.tickCount = 0;
+    this.idleSeconds = 0;
+    this.poopSequence = 0;
+    this.poopRecords.length = 0;
     this.suspend();
     this.objectives.reset();
   }
@@ -127,13 +147,36 @@ export class Simulation {
       this.turnAmount = clamp(difference * 1.8, -1, 1) + clamp(angularVelocity * 0.02, -0.25, 0.25);
     }
 
-    if (this.honkQueued) {
+    const honked = this.honkQueued;
+    if (honked) {
       events.push({ type: "goose-honked", actorId: "goose", position: { ...this.position } });
       this.honkQueued = false;
+    }
+
+    // A held movement command is activity even if a wall prevents movement.
+    if (hasInput || honked) {
+      this.idleSeconds = 0;
+    } else {
+      this.idleSeconds += FIXED_STEP;
+      if (this.idleSeconds + 1e-10 >= GOOSE_POOP_IDLE_SECONDS) this.leavePoop(events);
     }
     this.tickCount += 1;
     for (const objectiveId of this.objectives.evaluate(this.player)) {
       events.push({ type: "objective-completed", objectiveId });
     }
+  }
+
+  private leavePoop(events: GameplayEvent[]): void {
+    this.idleSeconds = 0;
+    const id = `goose-poop-${this.poopSequence++}`;
+    // The model faces local -Z, so this places the dropping just behind the goose.
+    const position = {
+      x: this.position.x + Math.sin(this.heading) * 0.34,
+      y: this.position.y,
+      z: this.position.z + Math.cos(this.heading) * 0.34,
+    };
+    this.poopRecords.push({ id, position });
+    if (this.poopRecords.length > MAX_GOOSE_POOPS) this.poopRecords.shift();
+    events.push({ type: "goose-pooped", actorId: "goose", poopId: id, position: { ...position } });
   }
 }
