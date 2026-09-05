@@ -8,6 +8,8 @@ import {
   pathHalfWidthAt,
   seededRandom,
 } from "./level";
+import { PALETTE } from "./palette";
+import { toonMaterial } from "./toonMaterial";
 
 interface TreePlacement {
   x: number;
@@ -16,14 +18,6 @@ interface TreePlacement {
   width: number;
   rotation: number;
   colorIndex: number;
-}
-
-function standardMaterial(
-  color: number,
-  roughness = 0.92,
-  options: Partial<THREE.MeshStandardMaterialParameters> = {},
-): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, ...options });
 }
 
 function finishMesh(mesh: THREE.Mesh, castShadow = true): THREE.Mesh {
@@ -55,7 +49,7 @@ function createRibbon(widthScale: number, y: number, color: number): THREE.Mesh 
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
 
-  return finishMesh(new THREE.Mesh(geometry, standardMaterial(color, 1)), false);
+  return finishMesh(new THREE.Mesh(geometry, toonMaterial(color)), false);
 }
 
 function createTreePlacements(): TreePlacement[] {
@@ -117,16 +111,16 @@ function createForestInstances(): THREE.Group {
   const placements = createTreePlacements();
   const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.48, 4.6, 12, 5);
   const branchGeometry = new THREE.CylinderGeometry(0.12, 0.24, 2.2, 10, 3);
-  const crownGeometry = new THREE.IcosahedronGeometry(1, 2);
-  const trunkMaterial = standardMaterial(0x62513d, 1, { vertexColors: true });
-  const crownMaterial = standardMaterial(0xffffff, 0.96, { vertexColors: true });
+  const crownGeometry = new THREE.SphereGeometry(1, 24, 16);
+  const trunkMaterial = toonMaterial(0xffffff, { vertexColors: true });
+  const crownMaterial = toonMaterial(0xffffff, { vertexColors: true });
   const trunkInstances = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, placements.length);
   const branchInstances = new THREE.InstancedMesh(branchGeometry, trunkMaterial, placements.length * 2);
   const crownLower = new THREE.InstancedMesh(crownGeometry, crownMaterial, placements.length);
   const crownMiddle = new THREE.InstancedMesh(crownGeometry, crownMaterial, placements.length);
   const crownUpper = new THREE.InstancedMesh(crownGeometry, crownMaterial, placements.length);
-  const crownColors = [0x254b31, 0x315c39, 0x3d6840, 0x486f43];
-  const trunkColors = [0x594735, 0x6b543d, 0x574835, 0x745b40];
+  const crownColors = [PALETTE.green.deep, PALETTE.green.hedge, PALETTE.green.leaf, PALETTE.green.grass];
+  const trunkColors = [PALETTE.earth.woodDark, PALETTE.earth.wood, PALETTE.earth.woodDark, PALETTE.earth.woodLight];
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
@@ -183,7 +177,7 @@ function createForestInstances(): THREE.Group {
       );
       matrix.compose(position, quaternion, scale);
       layer.mesh.setMatrixAt(index, matrix);
-      layer.mesh.setColorAt(index, crownColor.clone().offsetHSL(0, 0, (layerIndex - 1) * 0.025));
+      layer.mesh.setColorAt(index, crownColor);
     });
   });
 
@@ -199,18 +193,11 @@ function createForestInstances(): THREE.Group {
 
 function createGround(): THREE.Group {
   const group = new THREE.Group();
-  const groundGeometry = new THREE.PlaneGeometry(76, 82, 70, 70);
+  const groundGeometry = new THREE.PlaneGeometry(76, 82);
   groundGeometry.rotateX(-Math.PI / 2);
-  const groundPosition = groundGeometry.getAttribute("position");
-  for (let index = 0; index < groundPosition.count; index += 1) {
-    const x = groundPosition.getX(index);
-    const z = groundPosition.getZ(index);
-    const variation = Math.sin(x * 0.31) * 0.035 + Math.cos(z * 0.27) * 0.032;
-    groundPosition.setY(index, variation - 0.095);
-  }
-  groundGeometry.computeVertexNormals();
+  groundGeometry.translate(0, -0.095, 0);
   const ground = finishMesh(
-    new THREE.Mesh(groundGeometry, standardMaterial(0x243b28, 1)),
+    new THREE.Mesh(groundGeometry, toonMaterial(PALETTE.green.deep)),
     false,
   );
   group.add(ground);
@@ -218,7 +205,7 @@ function createGround(): THREE.Group {
   const clearing = finishMesh(
     new THREE.Mesh(
       new THREE.CircleGeometry(CLEARING_RADIUS_X + 0.5, 128),
-      standardMaterial(0x526b43, 1),
+      toonMaterial(PALETTE.green.lawn),
     ),
     false,
   );
@@ -227,26 +214,16 @@ function createGround(): THREE.Group {
   clearing.position.set(0, 0.003, CLEARING_CENTER_Z);
   group.add(clearing);
 
-  group.add(createRibbon(1.15, 0.006, 0x77684d));
-  group.add(createRibbon(0.92, 0.012, 0x9a8762));
-  group.add(createRibbon(0.63, 0.017, 0xaa9872));
+  group.add(createRibbon(1.15, 0.006, PALETTE.earth.pathShade));
+  group.add(createRibbon(0.92, 0.012, PALETTE.earth.path));
+  group.add(createRibbon(0.63, 0.017, PALETTE.earth.pathLight));
   return group;
 }
 
 function createBoulder(x: number, z: number, radius: number, color: number): THREE.Mesh {
-  const geometry = new THREE.DodecahedronGeometry(radius, 2);
-  const position = geometry.getAttribute("position");
-  for (let index = 0; index < position.count; index += 1) {
-    const scale = 0.94 + Math.sin(index * 12.9898) * 0.055;
-    position.setXYZ(
-      index,
-      position.getX(index) * scale,
-      position.getY(index) * scale,
-      position.getZ(index) * scale,
-    );
-  }
-  geometry.computeVertexNormals();
-  const rock = finishMesh(new THREE.Mesh(geometry, standardMaterial(color, 1)));
+  // Broad, intentional planes replace the noisy, displaced rock surface.
+  const geometry = new THREE.DodecahedronGeometry(radius, 0);
+  const rock = finishMesh(new THREE.Mesh(geometry, toonMaterial(color)));
   rock.position.set(x, radius * 0.52, z);
   rock.scale.set(1.08, 0.65, 0.9);
   rock.rotation.set(-0.12, x * 0.2, 0.08);
@@ -255,20 +232,20 @@ function createBoulder(x: number, z: number, radius: number, color: number): THR
 
 function createProps(): THREE.Group {
   const group = new THREE.Group();
-  group.add(createBoulder(OBSTACLES[0].x, OBSTACLES[0].z, 1.12, 0x72756a));
-  group.add(createBoulder(OBSTACLES[3].x, OBSTACLES[3].z, 0.82, 0x666c62));
+  group.add(createBoulder(OBSTACLES[0].x, OBSTACLES[0].z, 1.12, PALETTE.stone.mid));
+  group.add(createBoulder(OBSTACLES[3].x, OBSTACLES[3].z, 0.82, PALETTE.stone.dark));
 
   const log = finishMesh(
     new THREE.Mesh(
       new THREE.CylinderGeometry(0.47, 0.56, 2.7, 18, 5),
-      standardMaterial(0x654b34, 1),
+      toonMaterial(PALETTE.earth.wood),
     ),
   );
   log.position.set(OBSTACLES[2].x, 0.43, OBSTACLES[2].z);
   log.rotation.set(0, 0.68, Math.PI / 2);
   group.add(log);
 
-  const logEndMaterial = standardMaterial(0x987450, 1);
+  const logEndMaterial = toonMaterial(PALETTE.earth.woodLight);
   for (const end of [-1, 1]) {
     const endCap = finishMesh(
       new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.025, 18), logEndMaterial),
@@ -285,7 +262,7 @@ function createProps(): THREE.Group {
   const stump = finishMesh(
     new THREE.Mesh(
       new THREE.CylinderGeometry(0.62, 0.77, 0.8, 17, 4),
-      standardMaterial(0x604831, 1),
+      toonMaterial(PALETTE.earth.woodDark),
     ),
   );
   stump.position.set(OBSTACLES[1].x, 0.4, OBSTACLES[1].z);
@@ -301,22 +278,22 @@ function createProps(): THREE.Group {
   const marker = new THREE.Group();
   marker.position.set(pathCenterAt(-14) + pathHalfWidthAt(-14) + 0.9, 0, -14);
   const post = finishMesh(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 2.25, 12), standardMaterial(0x59412d)),
+    new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 2.25, 12), toonMaterial(PALETTE.earth.woodDark)),
   );
   post.position.y = 1.12;
   post.rotation.z = -0.035;
   marker.add(post);
   const arrow = finishMesh(
-    new THREE.Mesh(new THREE.ConeGeometry(0.31, 1.12, 4), standardMaterial(0xd2bd7c)),
+    new THREE.Mesh(new THREE.ConeGeometry(0.31, 1.12, 4), toonMaterial(PALETTE.accent.cream)),
   );
   arrow.position.set(-0.03, 1.9, -0.02);
   arrow.rotation.set(Math.PI / 2, 0, Math.PI / 4);
   marker.add(arrow);
   group.add(marker);
 
-  const mushroomCapMaterial = standardMaterial(0xb96d4f, 0.86);
-  const mushroomStemMaterial = standardMaterial(0xd9c8a4, 1);
-  const mushroomSpotsMaterial = standardMaterial(0xf0dfc5, 1);
+  const mushroomCapMaterial = toonMaterial(PALETTE.accent.brick);
+  const mushroomStemMaterial = toonMaterial(PALETTE.accent.cream);
+  const mushroomSpotsMaterial = toonMaterial(PALETTE.goose.white);
   const mushroomPositions = [
     [-3.55, 4.2, 0.22],
     [-3.3, 4.65, 0.17],
@@ -354,9 +331,9 @@ function createUndergrowth(): THREE.Group {
   const group = new THREE.Group();
   const random = seededRandom(90517);
   const bladeGeometry = new THREE.ConeGeometry(0.075, 0.5, 5);
-  const bladeMaterial = standardMaterial(0xffffff, 1, { vertexColors: true });
+  const bladeMaterial = toonMaterial(0xffffff, { vertexColors: true });
   const blades = new THREE.InstancedMesh(bladeGeometry, bladeMaterial, 420);
-  const colors = [0x49663b, 0x587548, 0x66824d, 0x3d5935];
+  const colors = [PALETTE.green.hedge, PALETTE.green.leaf, PALETTE.green.grass, PALETTE.green.deep];
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
@@ -390,10 +367,10 @@ function createUndergrowth(): THREE.Group {
   if (blades.instanceColor) blades.instanceColor.needsUpdate = true;
   group.add(blades);
 
-  const pebbleGeometry = new THREE.DodecahedronGeometry(0.13, 1);
-  const pebbleMaterial = standardMaterial(0xffffff, 1, { vertexColors: true });
+  const pebbleGeometry = new THREE.DodecahedronGeometry(0.13, 0);
+  const pebbleMaterial = toonMaterial(0xffffff, { vertexColors: true });
   const pebbles = new THREE.InstancedMesh(pebbleGeometry, pebbleMaterial, 66);
-  const pebbleColors = [0x7d765f, 0x918772, 0x6f705f];
+  const pebbleColors = [PALETTE.stone.mid, PALETTE.stone.light, PALETTE.stone.dark];
   for (let index = 0; index < 66; index += 1) {
     const progress = index / 65;
     const z = THREE.MathUtils.lerp(-7.5, -32.5, progress);
@@ -419,90 +396,10 @@ function createUndergrowth(): THREE.Group {
   return group;
 }
 
-function createPollen(): THREE.Points {
-  const random = seededRandom(48155);
-  const positions = new Float32Array(210 * 3);
-  for (let index = 0; index < 210; index += 1) {
-    positions[index * 3] = (random() - 0.5) * 33;
-    positions[index * 3 + 1] = 0.6 + random() * 6.7;
-    positions[index * 3 + 2] = -19 + random() * 39;
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  const points = new THREE.Points(
-    geometry,
-    new THREE.PointsMaterial({
-      color: 0xffeab0,
-      size: 0.055,
-      sizeAttenuation: true,
-      transparent: true,
-      opacity: 0.68,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }),
-  );
-  points.renderOrder = 2;
-  return points;
-}
-
-function createLightShafts(): THREE.Group {
-  const group = new THREE.Group();
-  const shaftMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffe9a9,
-    transparent: true,
-    opacity: 0.045,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
-  });
-  const shaftData = [
-    [-6.2, 4.7, -0.7, 0.74],
-    [4.8, -2.4, 0.54, 0.58],
-    [2.7, -16.5, 0.48, 0.7],
-  ] as const;
-  shaftData.forEach(([x, z, radius, opacityScale]) => {
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.15, radius, 10, 24, 1, true), shaftMaterial.clone());
-    (shaft.material as THREE.MeshBasicMaterial).opacity *= opacityScale;
-    shaft.position.set(x, 5, z);
-    shaft.rotation.z = -0.08;
-    group.add(shaft);
-  });
-  return group;
-}
-
+/** Solid forms share the same cel material; lighting lives in Game. */
 export class ForestWorld extends THREE.Group {
-  private readonly pollen: THREE.Points;
-  readonly exitLight: THREE.PointLight;
-
   constructor() {
     super();
-    this.add(createGround(), createForestInstances(), createUndergrowth(), createProps(), createLightShafts());
-    this.pollen = createPollen();
-    this.add(this.pollen);
-
-    this.exitLight = new THREE.PointLight(0xffd889, 7, 18, 1.5);
-    this.exitLight.position.set(pathCenterAt(-27), 4.5, -27);
-    this.exitLight.castShadow = false;
-    this.add(this.exitLight);
-
-    const exitGlow = new THREE.Mesh(
-      new THREE.PlaneGeometry(6.5, 8),
-      new THREE.MeshBasicMaterial({
-        color: 0xffe0a1,
-        transparent: true,
-        opacity: 0.08,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide,
-      }),
-    );
-    exitGlow.position.set(pathCenterAt(-29), 3.5, -29.4);
-    this.add(exitGlow);
-  }
-
-  update(delta: number, elapsed: number): void {
-    this.pollen.rotation.y += delta * 0.008;
-    this.pollen.position.y = Math.sin(elapsed * 0.22) * 0.13;
-    this.exitLight.intensity = 7 + Math.sin(elapsed * 1.15) * 0.7;
+    this.add(createGround(), createForestInstances(), createUndergrowth(), createProps());
   }
 }

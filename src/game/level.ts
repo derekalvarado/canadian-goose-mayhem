@@ -1,4 +1,4 @@
-import * as THREE from "three";
+interface Position { x: number; y: number; z: number }
 
 export const CLEARING_CENTER_Z = 2;
 export const CLEARING_RADIUS_X = 12.6;
@@ -61,11 +61,11 @@ function isUnblocked(x: number, z: number): boolean {
   return !OBSTACLES.some((obstacle) => overlapsObstacle(x, z, obstacle));
 }
 
-export function resolveLevelMovement(
-  current: THREE.Vector3,
-  proposed: THREE.Vector3,
-  output: THREE.Vector3,
-): THREE.Vector3 {
+export function resolveLevelMovement<T extends Position>(
+  current: Readonly<Position>,
+  proposed: Readonly<Position>,
+  output: T,
+): T {
   const candidates: ReadonlyArray<readonly [number, number]> = [
     [proposed.x, proposed.z],
     [proposed.x, current.z],
@@ -75,11 +75,11 @@ export function resolveLevelMovement(
 
   for (const [x, z] of candidates) {
     if (isPlayable(x, z) && isUnblocked(x, z)) {
-      return output.set(x, current.y, z);
+      return Object.assign(output, { x, y: current.y, z });
     }
   }
 
-  return output.copy(current);
+  return Object.assign(output, current);
 }
 
 export function seededRandom(seed: number): () => number {

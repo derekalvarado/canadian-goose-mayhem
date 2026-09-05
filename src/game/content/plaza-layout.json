@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "layoutId": "old-town-square.central-plaza",
+  "canonicalRevision": 2,
+  "units": "meters",
+  "coordinateSystem": "right-handed-y-up",
+  "groups": {
+    "plaza.goose-fountain": {
+      "type": "fountain",
+      "label": "Goose fountain",
+      "position": { "x": -8, "y": 0, "z": -3.75 },
+      "rotationY": 0
+    },
+    "plaza.splash-pad": {
+      "type": "splash-pad",
+      "label": "Splash pad",
+      "position": { "x": 3.5, "y": 0, "z": -3.25 },
+      "rotationY": 0
+    },
+    "plaza.play-area": {
+      "type": "play-area",
+      "label": "Play area",
+      "position": { "x": -8.5, "y": 0, "z": 10.928932188134524 },
+      "rotationY": 0.7853981633974492
+    },
+    "plaza.pavilion-stage": {
+      "type": "stage",
+      "label": "Stage and pavilion",
+      "position": { "x": 14, "y": 0, "z": -0.25 },
+      "rotationY": -1.5707963267948966
+    },
+    "plaza.cafe-table-1": {
+      "type": "cafe-table-set",
+      "label": "Table set 1",
+      "position": { "x": -2.25, "y": 0, "z": -14.25 },
+      "rotationY": 0
+    },
+    "plaza.cafe-table-2": {
+      "type": "cafe-table-set",
+      "label": "Table set 2",
+      "position": { "x": 3.25, "y": 0, "z": -14.5 },
+      "rotationY": 0
+    },
+    "plaza.cafe-table-3": {
+      "type": "cafe-table-set",
+      "label": "Table set 3",
+      "position": { "x": 1.25, "y": 0, "z": -11 },
+      "rotationY": 0
+    }
+  }
+}

@@ -5,36 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
-      content="A small 3D woodland adventure starring one determined Canada goose."
+      content="A small 3D Old Town adventure starring one determined Canada goose."
     />
     <meta name="theme-color" content="#17261d" />
-    <title>Goose Game 2 — The Bramble</title>
+    <title>Goose Game 2 — Old Town Square</title>
   </head>
   <body>
     <main id="game-shell">
-      <canvas id="game-canvas" tabindex="0" aria-label="3D forest game"></canvas>
+      <canvas id="game-canvas" tabindex="0" aria-label="3D Old Town Square game"></canvas>
 
       <div id="loading-screen" class="loading-screen" role="status" aria-live="polite">
         <div class="loading-mark" aria-hidden="true">
           <span></span><span></span><span></span>
         </div>
-        <p>Parting the brambles…</p>
+        <p>Opening the square…</p>
       </div>
 
       <div class="hud" aria-label="Game information">
         <section class="mission-card">
           <div class="mission-kicker">
-            <span>Chapter one</span>
-            <span class="mission-weather">Pinewake · morning</span>
+            <span>Central plaza</span>
+            <span class="mission-weather">Fort Collins · morning</span>
           </div>
           <div class="mission-rule"></div>
           <p class="mission-label">Current mischief</p>
-          <h1 id="objective">Find the path out of the forest</h1>
+          <h1 id="objective">Find the goose fountain</h1>
           <div class="trail-progress" aria-hidden="true">
             <span class="trail-dot trail-dot--active"></span>
             <span class="trail-line"></span>
             <span class="trail-dot"></span>
-            <span class="trail-copy">North trail</span>
+            <span class="trail-copy">Old Town Square</span>
           </div>
         </section>
 
@@ -45,7 +45,7 @@
 
         <div class="wayfinder" id="wayfinder" aria-hidden="true">
           <span class="wayfinder-arrow">↑</span>
-          <span>Way out</span>
+          <span>Fountain</span>
         </div>
 
         <section class="controls-card" id="controls-card" aria-label="Controls">
@@ -58,22 +58,20 @@
             </div>
             <div class="control-item"><kbd>⇧</kbd><span>Hurry</span></div>
             <div class="control-item"><kbd>Space</kbd><span>Honk</span></div>
-            <div class="control-item"><kbd>Q</kbd><kbd>E</kbd><span>Camera</span></div>
           </div>
           <div class="control-set control-set--gamepad" id="gamepad-controls" hidden>
             <div class="control-item"><span class="stick-icon" aria-hidden="true">L</span><span>Move</span></div>
             <div class="control-item"><span class="trigger-icon" aria-hidden="true">RT</span><span>Hurry</span></div>
             <div class="control-item"><span class="button-icon" aria-hidden="true">A</span><span>Honk</span></div>
-            <div class="control-item"><span class="stick-icon" aria-hidden="true">R</span><span>Camera</span></div>
           </div>
         </section>
       </div>
 
-      <section class="chapter-complete" id="chapter-complete" hidden aria-labelledby="complete-title">
+      <section class="chapter-complete" id="chapter-complete" hidden role="status" aria-live="polite" aria-labelledby="complete-title">
         <div class="complete-card">
-          <p class="complete-kicker">Trail found</p>
-          <h2 id="complete-title">Beyond the bramble</h2>
-          <p>The woods open onto a well-worn path. Whatever is down there, it probably should have hidden its lunch.</p>
+          <p class="complete-kicker">Landmark found</p>
+          <h2 id="complete-title">A familiar face</h2>
+          <p>You found Old Town's other goose. Keep exploring the square or start another lap.</p>
           <button id="restart-button" type="button">
             <span>Waddle again</span>
             <span aria-hidden="true">↺</span>

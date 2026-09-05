@@ -1,0 +1,270 @@
+# Game architecture and development direction
+
+Status: foundation implemented; social stealth, movable objects, villagers, reactive
+piano, gates, and saved games are still future work.
+
+## Product contract
+
+Build a small, interconnected social-stealth sandbox about physical comedy. The
+player succeeds by understanding people and manipulating their surroundings.
+Being caught creates another situation to play through: a villager retrieves an
+item, shoos the goose away, or temporarily guards an entrance. It must not kill the
+goose, erase completed objectives, reset the neighborhood, or end the game.
+
+The core loop is **observe a routine → improvise a distraction → manipulate an
+object → provoke a readable reaction → exploit the opportunity → cross off a task**.
+Walking through attractive scenery is the prologue, not proof of that loop.
+
+Preserve the existing Canada goose, cel shading, camera, and controls. Develop
+original places, puzzles, characters, and recordings with the requested gameplay
+qualities. Do not expand the village until one small garden proves the loop.
+
+## What the repository supports today
+
+| Area | Current implementation | Remaining constraint |
+| --- | --- | --- |
+| Gameplay ownership | `Simulation` owns position, velocity, heading, time, and objective progress | Only the goose exists; no general object or villager state yet |
+| Timing | 60 Hz simulation, bounded catch-up, retained honk edge | No replay format or cross-platform physics determinism promise |
+| Input | Keyboard/gamepad become a world-space command | Grab, drop, drag, throw, bend, and mimic actions are not implemented |
+| Rendering | `Game` copies simulation state into Three.js; models are presentation | Future bodies and NPCs need views keyed by persistent IDs |
+| Collision | Renderer-independent forest movement adapter | Ellipse/path/circle constraints are a temporary prologue solution; no rigid bodies, sweep queries, or navigation |
+| Objectives | Independent predicates, stable IDs, completion recorded once | Only one actual task; UI is still the prologue's single objective display |
+| Progression | Finding the trail allows continued movement and backtracking | No next neighborhood or unlockable shortcut yet |
+| Sound | Honk events feed a separate browser audio output with one reusable context | No human awareness, music director, piano assets, or spatial sound yet |
+| Persistence | Session state survives movement and milestone completion | Reloading still resets everything; no save/load implementation |
+
+`src/` is the active browser game. Godot files and `legacy/phaser-prototype/` are
+reference experiments. Do not develop the same feature in multiple runtimes.
+
+## Boundaries that prevent expensive rewrites
+
+```mermaid
+flowchart LR
+  Input[Keyboard / gamepad] --> Commands[World-space commands]
+  Content[Area definitions] --> Sim[Fixed-step simulation]
+  Commands --> Sim
+  Sim --> State[World snapshot]
+  Sim --> Events[Gameplay events]
+  State --> Views[Three.js models / camera / HUD]
+  Events --> Feedback[Animation cues / sound output]
+```
+
+This diagram represents the implemented boundary. As the garden grows, physics,
+perception, NPC decisions, interactions, objectives, and progression run **inside**
+the simulation. Persistence and the music director become adapters around it.
+Avoid a second set of gameplay rules in animation callbacks, DOM handlers, or
+mesh names. A headless simulation must be able to resolve the same puzzle.
+
+Keep concrete modules and typed data. A full entity-component framework, general
+event bus, network synchronization, and an editor are not prerequisites. Introduce
+an abstraction when a real garden mechanic needs the boundary.
+
+### Tick order and events
+
+The current tick moves the goose, emits a honk event, then evaluates objectives.
+The garden should extend that order explicitly:
+
+1. Consume player commands and NPC intents decided on the previous tick.
+2. Resolve valid actions and ownership changes, then advance physical bodies.
+3. Derive contacts, overlaps, noise, visibility, and each human's observations.
+4. Update human memories/awareness and choose intents for the next tick.
+5. Evaluate objective predicates against settled state, then apply unlock rules.
+6. Expose the snapshot and this tick's events to presentation and music.
+
+Commands request actions; events describe actions that actually happened. A denied
+grab must not emit an item-grabbed flourish or complete a theft task. Events carry
+stable actor/object IDs and relevant positions. Do not use an event history as the
+only record of durable world facts. A completed task is state; its notification
+is a one-time event. Keep queues bounded and presentation disposable.
+
+The fixed-step loop retains a honk on a render frame without a simulation tick
+and consumes it once during catch-up. Pausing clears pending inputs and time,
+preserving progress. Cap stalls instead of simulating minutes of chases on tab
+return. Input replays, if added, must record commands per simulation tick. Render
+interpolation may later smooth fast displays without changing physical results.
+
+### One world and stable object identity
+
+Before adding carryable props, introduce a world-owned registry keyed by authored
+IDs, such as `garden.thermos`, `garden.gardener`, and `garden.north-gate`. Render
+meshes and physics handles map to these IDs; neither owns their identity.
+
+Separate immutable content definitions from mutable state. An object definition
+describes shape, mass, grip points, affordances, appearance, and home location.
+Its state records current transform, velocity, holder, containment, and condition.
+Legal ownership is distinct from the actor currently holding it. A human and the
+goose cannot both acquire the same item in a tick; one interaction resolver
+arbitrates all acquisition/release operations deterministically.
+
+Areas describe geography and content placement. They do not own disposable copies
+of the world's objects. Crossing an area boundary updates location without
+recreating the goose or carried objects. Start with the small village loaded
+together. If streaming later becomes necessary, stream visual assets separately
+from authoritative state; held objects, nearby physics, and active pursuits stay
+resident. Never respawn an authored object just because its home area reloads.
+
+### Interaction and physics
+
+Use capabilities such as carryable, draggable, throwable, containable, openable,
+wearable, and noise-producing. Compose them per prop; don't subclass every puzzle
+item or scatter checks like `if item.name === "thermos"` throughout the engine.
+Objectives may target a specific authored object, but generic verbs must work on
+every compatible object.
+
+Before producing many props, run a physics spike behind a narrow adapter: body
+creation/removal, fixed stepping, constraints, impulses, overlap/sweep/line queries,
+and stable body-to-entity mapping. Select an actual rigid-body engine by testing
+the scenarios below in the browser. The current collision helper does not supply
+physics, and Three.js rendering is not a substitute for it. Retain the option to
+move runtime if this spike demonstrates an unsuitable browser performance or
+authoring workflow; make that decision before large content investment.
+
+Treat the goose and walking humans as controlled character bodies. Give small
+props physical bodies, friction, mass, and collision shapes independent of their
+render geometry. Carrying uses a controlled grip constraint/target; dragging uses
+a tether with ground contact; dropping releases; throwing applies a bounded
+impulse. Use appropriate swept collision for fast objects. Keep a low, clumsy toss
+that supports puzzles and comedy, with no damage system.
+
+The first spike must demonstrate a mug resting on a table, an item dragged through
+a narrow gate, carrying around a corner without clipping walls, a toss that hits
+an obstacle, release during a shoo reaction, and a human retrieving the same item.
+Also test tipping, containers, and multiple interacting objects. If these do not
+work reliably, stop and fix interaction/physics before building more scenery.
+
+### Human knowledge and social stealth
+
+Physics queries answer what can be seen or heard; the AI remembers only its own
+observations. Give each villager a routine, interests/home objects, personal
+space, field of view, hearing parameters, last-seen position/time, and a bounded
+search. A simple state machine is enough initially:
+
+`routine → notice → investigate → shoo/chase or retrieve → search → return`
+
+Check distance, facing, and occlusion before visual detection. Track awareness
+over time with separate acquisition/loss thresholds so reactions do not flicker
+at hedge edges. Honks and collisions produce positional noise: a human can turn
+toward a hidden noise without knowing the goose's exact current location. Losing
+sight preserves the last seen location, not live tracking through walls.
+
+Movement collision, navigation, sight blocking, sound attenuation, and hiding
+cover are separate authored properties. A low bush can conceal the goose while
+allowing passage; a fence can stop walking while allowing sight. An open gate
+changes traversal and occlusion together. Visual hedges must agree with authored
+sight-blocking geometry. Add a development overlay for colliders, paths, vision
+cones, last-seen locations, hearing events, and awareness values during this work.
+
+Navigation must route around fences and respect gate width and agent size. A human
+searches reachable places and eventually returns to routine; a chase cannot
+deadlock at a gate forever. NPCs use the same grab/release rules as the player.
+Mimicry is an observable action or pose that a particular NPC recognizes, routed
+through this perception/reaction system rather than a task-specific cutscene.
+
+Being caught may release a held item, move the human into the goose's path, or
+cause a brief retreat. Completed tasks and unlocked shortcuts remain completed.
+Never solve an AI failure by globally resetting the world. Object recovery should
+restore only an unreachable essential item to a safe location when no actor holds
+it, with no duplication and no task rollback.
+
+### To-do list and shortcuts
+
+Objectives observe **outcomes**, not a mandatory sequence of button presses. For
+example, an item is inside a basket, or a gardener has worn an object. A task about
+simultaneous placement must verify all required items coexist in the container;
+historical visits alone are insufficient. A task about a past occurrence needs an
+explicit durable fact recorded when the occurrence happens.
+
+Extend the current predicate input from `PlayerState` to a read-only world snapshot
+as entities arrive. Keep all independent tasks eligible on each update. Add a real
+list UI before adding multiple tasks. Separate list visibility from eligibility
+so an unlisted task can still count when the player discovers its solution early.
+Use prerequisites only where the puzzle physically requires them.
+
+Unlock rules observe completed objective IDs and update a specific gate/shortcut.
+Do not have the UI open gates, let an objective teleport items, or let crossing an
+exit destroy the current area. An unlocked route must allow backtracking and item
+transport. Keep quest-related object references global across neighborhoods.
+
+### Reactive music
+
+Do not build the score around constant background playback or player speed alone.
+House House describes selecting between recorded high/low-energy piano fragments
+and silence according to the action. The claim that the original uses no
+prerecorded music is incorrect. The specific rule “every stop immediately silences
+the piano” is not a requirement established by that explanation.
+
+Source: [Panic's interview with House House](https://podcast.panic.com/episodes/s01e01/transcript/).
+
+Add a music director that reads the same awareness states as NPC behavior plus
+confirmed action events. It requests quiet, curious, or chase phrases and brief
+action accents; the audio output schedules them. Use one audio context, cached
+recordings, phrase-boundary transitions, short fades, a maximum voice count, and
+cooldowns to avoid a flourish on every tick. Choose tempo/intensity through the
+recordings and their metadata rather than blindly speeding up audio and changing
+pitch. Allow silence as an intentional state after tension resolves. Stopping
+while still being pursued should not falsely signal safety.
+
+Define how several observers combine (initially the highest nearby engagement),
+with hysteresis and a release delay. Unrelated activity across the village should
+not dominate the local score. NPC gestures and posture must still communicate
+awareness when music is muted. Provide separate music/effects volume controls
+when music is added. Use original or appropriately sourced recordings; no piano
+assets are included in this foundation.
+
+### Persistence and recovery
+
+Before the second neighborhood, implement a versioned save snapshot of entity IDs,
+transforms, ownership/containment, gate state, objective completion, durable facts,
+NPC routine/memory state needed for continuity, and seeded random state. Serialize
+plain data, not scene graphs, audio nodes, or physics handles. Define migrations
+and behavior for missing content IDs. Validate one holder per item on load.
+
+Restore state before evaluating objectives, suppress repeated completion cues on
+load, then rebuild views/physics. Test save/load while carrying an item across a
+gate and after an NPC has moved it from its original home. Pause and reload are
+different operations. Until saves exist, the game is explicitly session-only.
+
+## Development sequence and exit criteria
+
+1. **Foundation (this change).** Separate simulation from views, fix gameplay time,
+   keep objective evaluation independent, separate audio output, and remove the
+   terminal trail state. Headless regression tests pass alongside the old tests.
+2. **One garden: physical interactions.** One table, one fence/gate, one container,
+   one bush, and several small props. Prove the physics spike and common player/NPC
+   interaction rules. Do not polish a whole village during this milestone.
+3. **One garden: a person and mischief.** One gardener with a routine, vision,
+   hearing, investigation, retrieval, search, and shooing. Add a small to-do list
+   with three independent tasks. Include an original distraction/theft task, an
+   object arrangement task, and an observable mimicry task. Each task should admit
+   improvised timing or placement rather than require a scripted solution.
+4. **One garden: audio and recovery.** Add a small authored piano phrase set,
+   awareness-based music, readable silent-mode reactions, safe item recovery, and
+   save/load. Playtest the complete loop and revise it before adding another area.
+5. **Second connected neighborhood.** Unlock a physical shortcut, carry a prop
+   across it, let a human retrieve it, revisit the garden, and reload the save.
+   Expand only after identity, progress, navigation, and performance hold up.
+
+## Acceptance scenarios before village expansion
+
+- Complete the three tasks in different orders. Allow two to complete on one tick
+  and completion before the list is viewed. No duplicates or revoked checkmarks.
+- Solve one task through at least two different action sequences or placements.
+  An alternate solution requires no new task-specific interaction code.
+- Hide behind the bush; the gardener loses sight, searches the last observed place,
+  and returns to routine. Honking from cover causes investigation, not omniscience.
+- Distract the gardener, steal a prop, get caught, and try again immediately. The
+  item remains unique, the world persists, and completed tasks remain completed.
+- Carry, drag, and toss compatible props through the same interaction system used
+  by the gardener. Invalid grabs produce neither ownership changes nor success cues.
+- Carry a red thermos through a shortcut and back. It remains the same object after
+  a save/load; its original spawn does not create a duplicate.
+- Hear quiet/engaged/chase transitions from actual human awareness. Breaking sight
+  and resolving a search allows silence; a stationary goose under pursuit does not
+  make the soundtrack report safety. Muting still leaves readable visual reactions.
+- Run at 30, 60, and 144 render FPS, pause mid-interaction, and return from a stalled
+  tab. Commands are not repeated, actors do not tunnel or explode, and progress
+  persists. Profile target hardware before increasing active body/NPC counts.
+
+These garden scenarios are future acceptance gates, not claims that the current
+forest passes them. Current automated coverage is in `tests/level.test.ts` and
+`tests/simulation.test.ts`; browser playtesting and the garden systems remain to do.

@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { PALETTE } from "./palette";
+import { toonMaterial } from "./toonMaterial";
 
 interface GooseParts {
   visual: THREE.Group;
@@ -15,22 +17,21 @@ interface GooseParts {
   rightEye: THREE.Group;
 }
 
-const FEATHER_COLORS = [0x6d6453, 0x7b705d, 0x887b65, 0x5d594f];
+// World units are meter-like in the plaza. Keep the authored goose proportions,
+// but make its standing height read as roughly one world unit beside the props.
+const GOOSE_VISUAL_SCALE = 0.4;
 
-function material(color: number, roughness = 0.88): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
-}
-
-function castAndReceive(mesh: THREE.Mesh): THREE.Mesh {
+function characterMesh(mesh: THREE.Mesh): THREE.Mesh {
   mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  // Keep overlapping animated forms free of tiny self-shadow seams.
+  mesh.receiveShadow = false;
   return mesh;
 }
 
 function createFoot(): THREE.Group {
   const foot = new THREE.Group();
-  const footMaterial = material(0x161916, 0.76);
-  const ankle = castAndReceive(
+  const footMaterial = toonMaterial(PALETTE.goose.black, { side: THREE.DoubleSide });
+  const ankle = characterMesh(
     new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.078, 0.48, 16), footMaterial),
   );
   ankle.position.y = -0.22;
@@ -49,8 +50,10 @@ function createFoot(): THREE.Group {
   shape.lineTo(0.09, 0.12);
   shape.closePath();
 
-  const web = castAndReceive(new THREE.Mesh(new THREE.ShapeGeometry(shape, 4), footMaterial));
-  web.rotation.x = -Math.PI / 2;
+  const web = characterMesh(new THREE.Mesh(new THREE.ShapeGeometry(shape, 4), footMaterial));
+  // The bill faces -Z, so rotate the webbing this way to put the toes
+  // toward the goose's front instead of behind its ankles.
+  web.rotation.x = Math.PI / 2;
   web.position.set(0, -0.47, -0.13);
   foot.add(web);
   return foot;
@@ -60,15 +63,15 @@ function createEye(side: -1 | 1): THREE.Group {
   const eye = new THREE.Group();
   eye.position.set(side * 0.278, 0.08, -0.176);
 
-  const iris = castAndReceive(
-    new THREE.Mesh(new THREE.SphereGeometry(0.047, 20, 14), material(0x171a16, 0.45)),
+  const iris = characterMesh(
+    new THREE.Mesh(new THREE.SphereGeometry(0.047, 20, 14), toonMaterial(PALETTE.goose.black)),
   );
   iris.scale.set(0.55, 1, 1);
   eye.add(iris);
 
   const glint = new THREE.Mesh(
     new THREE.SphereGeometry(0.011, 12, 8),
-    new THREE.MeshBasicMaterial({ color: 0xf7edcf }),
+    toonMaterial(PALETTE.goose.highlight),
   );
   glint.position.set(side * 0.018, 0.018, -0.035);
   eye.add(glint);
@@ -76,23 +79,23 @@ function createEye(side: -1 | 1): THREE.Group {
 }
 
 function createBill(): { upper: THREE.Mesh; lower: THREE.Group } {
-  const billMaterial = material(0x171a17, 0.7);
+  const billMaterial = toonMaterial(PALETTE.goose.black);
   const billGeometry = new THREE.SphereGeometry(0.25, 28, 18);
 
-  const upper = castAndReceive(new THREE.Mesh(billGeometry, billMaterial));
+  const upper = characterMesh(new THREE.Mesh(billGeometry, billMaterial));
   upper.scale.set(0.78, 0.28, 1.28);
   upper.position.set(0, -0.045, -0.43);
 
   const lower = new THREE.Group();
   lower.position.set(0, -0.075, -0.24);
-  const lowerMesh = castAndReceive(new THREE.Mesh(billGeometry, billMaterial));
+  const lowerMesh = characterMesh(new THREE.Mesh(billGeometry, billMaterial));
   lowerMesh.scale.set(0.72, 0.2, 0.98);
   lowerMesh.position.z = -0.2;
   lower.add(lowerMesh);
 
   const mouthLine = new THREE.Mesh(
     new THREE.BoxGeometry(0.31, 0.014, 0.33),
-    new THREE.MeshBasicMaterial({ color: 0x070907 }),
+    toonMaterial(PALETTE.goose.black),
   );
   mouthLine.position.set(0, 0.006, -0.19);
   lower.add(mouthLine);
@@ -103,40 +106,12 @@ function createWing(side: -1 | 1): THREE.Group {
   const wing = new THREE.Group();
   wing.position.set(side * 0.6, 0.9, 0.05);
 
-  const wingBase = castAndReceive(
-    new THREE.Mesh(new THREE.SphereGeometry(0.55, 36, 24), material(0x766c5a)),
+  const wingBase = characterMesh(
+    new THREE.Mesh(new THREE.SphereGeometry(0.55, 36, 24), toonMaterial(PALETTE.goose.canadaBrown)),
   );
   wingBase.scale.set(0.32, 0.57, 1.18);
   wingBase.rotation.x = -0.18;
   wing.add(wingBase);
-
-  const featherGeometry = new THREE.SphereGeometry(1, 24, 16);
-  const rows = [
-    { count: 4, y: 0.2, z: -0.18, size: 0.26 },
-    { count: 5, y: 0.02, z: -0.05, size: 0.3 },
-    { count: 5, y: -0.17, z: 0.13, size: 0.33 },
-  ];
-
-  rows.forEach((row, rowIndex) => {
-    for (let index = 0; index < row.count; index += 1) {
-      const progress = row.count === 1 ? 0 : index / (row.count - 1);
-      const feather = castAndReceive(
-        new THREE.Mesh(
-          featherGeometry,
-          material(FEATHER_COLORS[(index + rowIndex) % FEATHER_COLORS.length]),
-        ),
-      );
-      feather.scale.set(0.085, row.size * 0.52, row.size);
-      feather.position.set(
-        side * (0.13 + rowIndex * 0.018),
-        row.y - Math.abs(progress - 0.5) * 0.07,
-        row.z + (progress - 0.5) * 0.92,
-      );
-      feather.rotation.x = -0.23 + progress * 0.11;
-      feather.rotation.z = side * (-0.08 + (progress - 0.5) * 0.06);
-      wing.add(feather);
-    }
-  });
 
   return wing;
 }
@@ -144,17 +119,22 @@ function createWing(side: -1 | 1): THREE.Group {
 function createTail(): THREE.Group {
   const tail = new THREE.Group();
   tail.position.set(0, 0.86, 1.03);
-  const tailGeometry = new THREE.CapsuleGeometry(0.09, 0.47, 8, 18);
-  const tailMaterial = material(0xede8d8);
-
-  for (let index = -3; index <= 3; index += 1) {
-    const feather = castAndReceive(new THREE.Mesh(tailGeometry, tailMaterial));
-    feather.rotation.x = Math.PI / 2;
-    feather.rotation.z = index * 0.065;
-    feather.position.set(index * 0.085, Math.abs(index) * -0.012, index % 2 === 0 ? 0.12 : 0.04);
-    feather.scale.set(1 - Math.abs(index) * 0.055, 1 - Math.abs(index) * 0.04, 0.62);
-    tail.add(feather);
-  }
+  // One tapered silhouette, with no separate feather geometry.
+  const outline = new THREE.Shape();
+  outline.moveTo(-0.34, -0.2);
+  outline.quadraticCurveTo(-0.32, 0.18, -0.22, 0.43);
+  outline.quadraticCurveTo(0, 0.51, 0.22, 0.43);
+  outline.quadraticCurveTo(0.32, 0.18, 0.34, -0.2);
+  outline.closePath();
+  const shape = characterMesh(new THREE.Mesh(
+    new THREE.ExtrudeGeometry(outline, {
+      depth: 0.08, bevelEnabled: true, bevelThickness: 0.025,
+      bevelSize: 0.035, bevelSegments: 2, steps: 1, curveSegments: 12,
+    }),
+    toonMaterial(PALETTE.goose.canadaBrownDark),
+  ));
+  shape.rotation.x = Math.PI / 2;
+  tail.add(shape);
   return tail;
 }
 
@@ -162,30 +142,23 @@ function createGooseParts(): GooseParts {
   const visual = new THREE.Group();
   visual.rotation.order = "YXZ";
 
-  const bodyMaterial = material(0x7b715e);
-  const body = castAndReceive(
+  const bodyMaterial = toonMaterial(PALETTE.goose.canadaBrown);
+  const body = characterMesh(
     new THREE.Mesh(new THREE.SphereGeometry(0.78, 48, 32), bodyMaterial),
   );
   body.scale.set(0.95, 0.72, 1.25);
   body.position.set(0, 0.88, 0.16);
   visual.add(body);
 
-  const rump = castAndReceive(
-    new THREE.Mesh(new THREE.SphereGeometry(0.63, 40, 26), material(0x6e6657)),
-  );
-  rump.scale.set(1, 0.72, 0.92);
-  rump.position.set(0, 0.91, 0.69);
-  visual.add(rump);
-
-  const chest = castAndReceive(
-    new THREE.Mesh(new THREE.SphereGeometry(0.58, 40, 28), material(0x9a8a70)),
+  const chest = characterMesh(
+    new THREE.Mesh(new THREE.SphereGeometry(0.58, 40, 28), toonMaterial(PALETTE.goose.canadaBrownLight)),
   );
   chest.scale.set(0.92, 0.95, 0.76);
   chest.position.set(0, 0.9, -0.49);
   visual.add(chest);
 
-  const belly = castAndReceive(
-    new THREE.Mesh(new THREE.SphereGeometry(0.55, 36, 24), material(0xb1a489)),
+  const belly = characterMesh(
+    new THREE.Mesh(new THREE.SphereGeometry(0.55, 36, 24), toonMaterial(PALETTE.goose.canadaBrownLight)),
   );
   belly.scale.set(0.92, 0.4, 1.35);
   belly.position.set(0, 0.55, 0.2);
@@ -195,22 +168,6 @@ function createGooseParts(): GooseParts {
   const rightWing = createWing(1);
   visual.add(leftWing, rightWing, createTail());
 
-  const backFeatherGeometry = new THREE.SphereGeometry(1, 22, 14);
-  for (let row = 0; row < 3; row += 1) {
-    for (let index = -2; index <= 2; index += 1) {
-      const feather = castAndReceive(
-        new THREE.Mesh(
-          backFeatherGeometry,
-          material(FEATHER_COLORS[(row + index + 8) % FEATHER_COLORS.length]),
-        ),
-      );
-      feather.scale.set(0.19, 0.065, 0.28);
-      feather.position.set(index * 0.2, 1.42 - Math.abs(index) * 0.025, -0.05 + row * 0.29);
-      feather.rotation.x = -0.14 + row * 0.05;
-      visual.add(feather);
-    }
-  }
-
   const neckPivot = new THREE.Group();
   neckPivot.position.set(0, 0.78, -0.48);
   const neckCurve = new THREE.CatmullRomCurve3([
@@ -219,39 +176,50 @@ function createGooseParts(): GooseParts {
     new THREE.Vector3(0, 0.93, -0.18),
     new THREE.Vector3(0, 1.32, -0.44),
   ]);
-  const neck = castAndReceive(
+  const neck = characterMesh(
     new THREE.Mesh(
       new THREE.TubeGeometry(neckCurve, 56, 0.195, 24, false),
-      material(0x202520, 0.8),
+      toonMaterial(PALETTE.goose.black),
     ),
   );
   neckPivot.add(neck);
 
-  const neckBib = castAndReceive(
-    new THREE.Mesh(new THREE.SphereGeometry(0.24, 28, 18), material(0xe9e6d8)),
-  );
-  neckBib.scale.set(0.76, 1.2, 0.28);
-  neckBib.position.set(0, 0.66, -0.37);
-  neckBib.rotation.x = -0.18;
-  neckPivot.add(neckBib);
-
   const head = new THREE.Group();
   head.position.set(0, 1.38, -0.47);
-  const skull = castAndReceive(
-    new THREE.Mesh(new THREE.SphereGeometry(0.32, 40, 28), material(0x202520, 0.76)),
+  const skull = characterMesh(
+    new THREE.Mesh(new THREE.SphereGeometry(0.32, 40, 28), toonMaterial(PALETTE.goose.black)),
   );
   skull.scale.set(0.92, 0.92, 1.08);
   head.add(skull);
 
-  for (const side of [-1, 1] as const) {
-    const cheek = castAndReceive(
-      new THREE.Mesh(new THREE.SphereGeometry(0.15, 28, 18), material(0xf1eee2)),
-    );
-    cheek.scale.set(0.24, 0.8, 1.08);
-    cheek.position.set(side * 0.302, -0.035, -0.045);
-    cheek.rotation.z = side * -0.12;
-    head.add(cheek);
+  // A surface patch follows the skull: the chinstrap is a flat marking,
+  // not a raised white cheek. Its normals match the underlying head.
+  const strapPositions: number[] = [];
+  const strapNormals: number[] = [];
+  const strapIndices: number[] = [];
+  const columns = 20;
+  const rows = 24;
+  for (let row = 0; row <= rows; row += 1) {
+    const around = THREE.MathUtils.lerp(-Math.PI + 0.18, -0.18, row / rows);
+    for (let column = 0; column <= columns; column += 1) {
+      const along = THREE.MathUtils.lerp(-0.43, 0.38, column / columns);
+      const x = Math.cos(around) * Math.cos(along);
+      const y = Math.sin(around) * Math.cos(along);
+      const z = Math.sin(along);
+      strapPositions.push(x * 0.296, y * 0.296, z * 0.347);
+      const normal = new THREE.Vector3(x / 0.296, y / 0.296, z / 0.347).normalize();
+      strapNormals.push(normal.x, normal.y, normal.z);
+      if (row < rows && column < columns) {
+        const i = row * (columns + 1) + column;
+        strapIndices.push(i, i + columns + 1, i + 1, i + 1, i + columns + 1, i + columns + 2);
+      }
+    }
   }
+  const strapGeometry = new THREE.BufferGeometry();
+  strapGeometry.setAttribute("position", new THREE.Float32BufferAttribute(strapPositions, 3));
+  strapGeometry.setAttribute("normal", new THREE.Float32BufferAttribute(strapNormals, 3));
+  strapGeometry.setIndex(strapIndices);
+  head.add(new THREE.Mesh(strapGeometry, toonMaterial(PALETTE.goose.highlight)));
 
   const leftEye = createEye(-1);
   const rightEye = createEye(1);
@@ -260,7 +228,7 @@ function createGooseParts(): GooseParts {
   const { upper, lower } = createBill();
   head.add(upper, lower);
 
-  const nostrilMaterial = new THREE.MeshBasicMaterial({ color: 0x050605 });
+  const nostrilMaterial = toonMaterial(PALETTE.goose.black);
   for (const side of [-1, 1] as const) {
     const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), nostrilMaterial);
     nostril.position.set(side * 0.1, -0.004, -0.7);
@@ -301,21 +269,8 @@ export class Goose extends THREE.Group {
   constructor() {
     super();
     this.parts = createGooseParts();
+    this.parts.visual.scale.setScalar(GOOSE_VISUAL_SCALE);
     this.add(this.parts.visual);
-
-    const shadow = new THREE.Mesh(
-      new THREE.CircleGeometry(0.82, 48),
-      new THREE.MeshBasicMaterial({
-        color: 0x0b140d,
-        transparent: true,
-        opacity: 0.21,
-        depthWrite: false,
-      }),
-    );
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.scale.set(1, 1.45, 1);
-    shadow.position.y = 0.025;
-    this.add(shadow);
   }
 
   honk(): void {

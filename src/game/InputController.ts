@@ -4,7 +4,6 @@ export type InputDevice = "keyboard" | "gamepad";
 
 export interface InputFrame {
   move: THREE.Vector2;
-  camera: number;
   hurry: boolean;
   honkPressed: boolean;
   device: InputDevice;
@@ -22,8 +21,6 @@ const MOVEMENT_KEYS = new Set([
   "ShiftLeft",
   "ShiftRight",
   "Space",
-  "KeyQ",
-  "KeyE",
 ]);
 
 function applyDeadzone(value: number, deadzone = 0.18): number {
@@ -54,7 +51,6 @@ export class InputController {
       - Number(this.keys.has("KeyA") || this.keys.has("ArrowLeft"));
     let vertical = Number(this.keys.has("KeyW") || this.keys.has("ArrowUp"))
       - Number(this.keys.has("KeyS") || this.keys.has("ArrowDown"));
-    let camera = Number(this.keys.has("KeyE")) - Number(this.keys.has("KeyQ"));
     let hurry = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
     let honkPressed = this.honkQueued;
     this.honkQueued = false;
@@ -66,19 +62,16 @@ export class InputController {
       this.connectedGamepad = true;
       const stickX = applyDeadzone(gamepad.axes[0] ?? 0);
       const stickY = -applyDeadzone(gamepad.axes[1] ?? 0);
-      const cameraStick = applyDeadzone(gamepad.axes[2] ?? 0, 0.22);
       const gamepadHurry = (gamepad.buttons[7]?.value ?? 0) > 0.25
         || Boolean(gamepad.buttons[5]?.pressed);
       const gamepadHonkDown = Boolean(gamepad.buttons[0]?.pressed);
       const gamepadActive = Math.hypot(stickX, stickY) > 0.03
-        || Math.abs(cameraStick) > 0.03
         || gamepadHurry
         || gamepadHonkDown;
 
       if (gamepadActive) {
         horizontal = stickX;
         vertical = stickY;
-        camera = cameraStick;
         hurry = gamepadHurry;
         if (this.lastDevice !== "gamepad") {
           this.lastDevice = "gamepad";
@@ -98,7 +91,6 @@ export class InputController {
 
     return {
       move: this.movement,
-      camera,
       hurry,
       honkPressed,
       device: this.lastDevice,
@@ -106,12 +98,14 @@ export class InputController {
   }
 
   clear(): void {
+    this.honkQueued = false;
     this.keys.clear();
     this.movement.set(0, 0);
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     if (!MOVEMENT_KEYS.has(event.code)) return;
+    if (event.target instanceof HTMLElement && event.target.closest("button, input, textarea, select, [contenteditable]")) return;
     event.preventDefault();
     this.keys.add(event.code);
 
@@ -124,8 +118,9 @@ export class InputController {
 
   private readonly handleKeyUp = (event: KeyboardEvent): void => {
     if (!MOVEMENT_KEYS.has(event.code)) return;
-    event.preventDefault();
     this.keys.delete(event.code);
+    if (event.target instanceof HTMLElement && event.target.closest("button, input, textarea, select, [contenteditable]")) return;
+    event.preventDefault();
   };
 
   private readonly handleGamepadConnection = (): void => {
