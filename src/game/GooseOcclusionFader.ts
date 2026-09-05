@@ -9,6 +9,7 @@ interface FadedMesh {
   readonly originalMaterial: THREE.Material | THREE.Material[];
   readonly fadedMaterial: THREE.Material | THREE.Material[];
   readonly originalCastShadow: boolean;
+  readonly originalReceiveShadow: boolean;
   opacity: number;
 }
 
@@ -94,11 +95,13 @@ export class GooseOcclusionFader {
           originalMaterial,
           fadedMaterial: cloneTransparent(originalMaterial),
           originalCastShadow: mesh.castShadow,
+          originalReceiveShadow: mesh.receiveShadow,
           opacity: 1,
         };
         mesh.material = state.fadedMaterial;
-        // A transparent roof should not still darken the goose through its shadow.
+        // Faded scenery must neither cast nor visibly receive a shadow.
         mesh.castShadow = false;
+        mesh.receiveShadow = false;
         meshes.set(mesh, state);
       }
       this.fadedGroups.set(group, meshes);
@@ -113,6 +116,7 @@ export class GooseOcclusionFader {
     for (const [mesh, state] of meshes) {
       mesh.material = state.originalMaterial;
       mesh.castShadow = state.originalCastShadow;
+      mesh.receiveShadow = state.originalReceiveShadow;
     }
     this.fadedGroups.delete(group);
   }

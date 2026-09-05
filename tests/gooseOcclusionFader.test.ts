@@ -19,6 +19,7 @@ function createMesh(x: number, y: number, z: number): THREE.Mesh {
   );
   mesh.position.set(x, y, z);
   mesh.castShadow = true;
+  mesh.receiveShadow = true;
   return mesh;
 }
 
@@ -43,10 +44,12 @@ test("a hit on one member fades and restores its complete authored group", () =>
     assert.equal((mesh.material as THREE.Material).transparent, true);
     assert.ok((mesh.material as THREE.Material).opacity < 0.35);
     assert.equal(mesh.castShadow, false);
+    assert.equal(mesh.receiveShadow, false);
   }
   assert.equal(ungroupedLamp.material, lampMaterial);
   assert.equal((ungroupedLamp.material as THREE.Material).transparent, false);
   assert.equal(ungroupedLamp.castShadow, true);
+  assert.equal(ungroupedLamp.receiveShadow, true);
 
   wall.position.x = 8;
   fader.update(world, createCamera(), new THREE.Group(), 1);
@@ -54,6 +57,8 @@ test("a hit on one member fades and restores its complete authored group", () =>
   assert.equal(window.material, windowMaterial);
   assert.equal(wall.castShadow, true);
   assert.equal(window.castShadow, true);
+  assert.equal(wall.receiveShadow, true);
+  assert.equal(window.receiveShadow, true);
 });
 
 test("a pavilion canopy fades without fading its unregistered stage deck", () => {
