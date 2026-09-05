@@ -43,8 +43,8 @@ test("a hit on one member fades and restores its complete authored group", () =>
   for (const mesh of [wall, window]) {
     assert.equal((mesh.material as THREE.Material).transparent, true);
     assert.ok((mesh.material as THREE.Material).opacity < 0.35);
-    assert.equal(mesh.castShadow, false);
-    assert.equal(mesh.receiveShadow, false);
+    assert.equal(mesh.castShadow, true);
+    assert.equal(mesh.receiveShadow, true);
   }
   assert.equal(ungroupedLamp.material, lampMaterial);
   assert.equal((ungroupedLamp.material as THREE.Material).transparent, false);

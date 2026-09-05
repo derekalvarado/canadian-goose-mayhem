@@ -8,8 +8,6 @@ const RESTORE_EPSILON = 0.005;
 interface FadedMesh {
   readonly originalMaterial: THREE.Material | THREE.Material[];
   readonly fadedMaterial: THREE.Material | THREE.Material[];
-  readonly originalCastShadow: boolean;
-  readonly originalReceiveShadow: boolean;
   opacity: number;
 }
 
@@ -94,14 +92,9 @@ export class GooseOcclusionFader {
         const state: FadedMesh = {
           originalMaterial,
           fadedMaterial: cloneTransparent(originalMaterial),
-          originalCastShadow: mesh.castShadow,
-          originalReceiveShadow: mesh.receiveShadow,
           opacity: 1,
         };
         mesh.material = state.fadedMaterial;
-        // Faded scenery must neither cast nor visibly receive a shadow.
-        mesh.castShadow = false;
-        mesh.receiveShadow = false;
         meshes.set(mesh, state);
       }
       this.fadedGroups.set(group, meshes);
@@ -115,8 +108,6 @@ export class GooseOcclusionFader {
   private restore(group: OcclusionFadeGroup, meshes: Map<THREE.Mesh, FadedMesh>): void {
     for (const [mesh, state] of meshes) {
       mesh.material = state.originalMaterial;
-      mesh.castShadow = state.originalCastShadow;
-      mesh.receiveShadow = state.originalReceiveShadow;
     }
     this.fadedGroups.delete(group);
   }
