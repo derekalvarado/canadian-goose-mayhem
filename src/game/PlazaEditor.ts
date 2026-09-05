@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import {
   PLAZA_GROUP_COLLIDERS,
@@ -21,6 +22,8 @@ import type { PlazaWorld } from "./PlazaWorld";
 
 const TRANSLATION_SNAP = 0.25;
 const ROTATION_SNAP = THREE.MathUtils.degToRad(5);
+const CLICK_DISTANCE_PX = 4;
+const FRAME_PADDING = 1.25;
 
 function downloadText(filename: string, contents: string): void {
   const blob = new Blob([contents], { type: "application/json" });
@@ -89,9 +92,11 @@ export class PlazaEditor {
   private readonly world: PlazaWorld;
   private readonly camera: THREE.Camera;
   private readonly canvas: HTMLCanvasElement;
+  private readonly orbit: OrbitControls;
   private readonly transform: TransformControls;
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
+  private readonly pointerDown = new THREE.Vector2();
   private readonly selectionOutline = new THREE.BoxHelper(new THREE.Object3D(), 0xf1d38b);
   private readonly panel = document.createElement("aside");
   private readonly select = document.createElement("select");
@@ -103,6 +108,9 @@ export class PlazaEditor {
   private readonly moveButton = document.createElement("button");
   private readonly rotateButton = document.createElement("button");
   private selectedId: PlazaGroupId;
+  private selectionPointerActive = false;
+  private selectionPointerMoved = false;
+  private transformedDuringPointer = false;
 
   constructor(
     scene: THREE.Scene,
@@ -116,6 +124,11 @@ export class PlazaEditor {
     this.camera = camera;
     this.canvas = canvas;
     this.selectedId = PLAZA_GROUP_IDS[0];
+
+    this.orbit = new OrbitControls(camera, canvas);
+    this.orbit.target.set(0, 0, 0);
+    this.orbit.update();
+    this.orbit.saveState();
 
     this.transform = new TransformControls(camera, canvas);
     this.transform.setSpace("world");
@@ -139,9 +152,13 @@ export class PlazaEditor {
     this.setMode("translate");
     this.selectGroup(this.selectedId);
     this.canvas.addEventListener("pointerdown", this.handleCanvasPointerDown);
+    this.canvas.addEventListener("pointermove", this.handleCanvasPointerMove);
+    this.canvas.addEventListener("pointerup", this.handleCanvasPointerUp);
     this.transform.addEventListener("objectChange", this.handleObjectChange);
-    this.transform.addEventListener("mouseDown", () => this.panel.classList.add("plaza-editor--dragging"));
-    this.transform.addEventListener("mouseUp", () => this.panel.classList.remove("plaza-editor--dragging"));
+    this.transform.addEventListener("dragging-changed", this.handleTransformDraggingChanged);
+    this.transform.addEventListener("mouseDown", this.handleTransformMouseDown);
+    this.transform.addEventListener("mouseUp", this.handleTransformMouseUp);
+    document.addEventListener("keydown", this.handleKeyDown);
     document.body.classList.add("editor-mode");
   }
 
@@ -237,7 +254,12 @@ export class PlazaEditor {
       this.selectGroup(this.selectedId);
       this.setStatus("Restored the canonical layout.");
     });
-    actions.append(exportButton, importButton, importInput, resetButton);
+
+    const resetViewButton = document.createElement("button");
+    resetViewButton.type = "button";
+    resetViewButton.textContent = "Reset view";
+    resetViewButton.addEventListener("click", this.resetView);
+    actions.append(exportButton, importButton, importInput, resetButton, resetViewButton);
 
     this.status.className = "plaza-editor__status";
     this.status.setAttribute("aria-live", "polite");
@@ -246,7 +268,7 @@ export class PlazaEditor {
 
     const help = document.createElement("p");
     help.className = "plaza-editor__help";
-    help.textContent = "Click a feature or choose it above. Position snaps to 0.25 m; rotation snaps to 5°. Changes save automatically.";
+    help.textContent = "Left-drag to orbit, right-drag to pan, and scroll or pinch to zoom. Click a feature or choose it above; press F to frame it. Reset view restores the plaza view. Position snaps to 0.25 m; rotation snaps to 5°. Changes save automatically.";
 
     this.panel.append(heading, selectLabel, modes, fields, actions, this.status, this.warnings, help);
     document.querySelector("#game-shell")?.append(this.panel);
@@ -286,6 +308,31 @@ export class PlazaEditor {
   }
 
   private readonly handleCanvasPointerDown = (event: PointerEvent): void => {
+    if (event.button !== 0 || this.transform.dragging) return;
+    this.pointerDown.set(event.clientX, event.clientY);
+    this.selectionPointerActive = true;
+    this.selectionPointerMoved = false;
+  };
+
+  private readonly handleCanvasPointerMove = (event: PointerEvent): void => {
+    if (!this.selectionPointerActive) return;
+    if (Math.hypot(
+      event.clientX - this.pointerDown.x,
+      event.clientY - this.pointerDown.y,
+    ) > CLICK_DISTANCE_PX) {
+      this.selectionPointerMoved = true;
+    }
+  };
+
+  private readonly handleCanvasPointerUp = (event: PointerEvent): void => {
+    const shouldSelect = this.selectionPointerActive
+      && !this.selectionPointerMoved
+      && !this.transformedDuringPointer
+      && event.button === 0;
+    this.selectionPointerActive = false;
+    this.transformedDuringPointer = false;
+    if (!shouldSelect) return;
+
     const bounds = this.canvas.getBoundingClientRect();
     this.pointer.set(
       ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
@@ -297,6 +344,57 @@ export class PlazaEditor {
     const id = findLayoutGroupId(hit?.object ?? null);
     if (id) this.selectGroup(id);
   };
+
+  private readonly handleTransformDraggingChanged = (event: { value: unknown }): void => {
+    this.orbit.enabled = event.value !== true;
+  };
+
+  private readonly handleTransformMouseDown = (): void => {
+    this.transformedDuringPointer = true;
+    this.panel.classList.add("plaza-editor--dragging");
+  };
+
+  private readonly handleTransformMouseUp = (): void => {
+    this.panel.classList.remove("plaza-editor--dragging");
+  };
+
+  private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.code !== "KeyF" || this.isTextEntry(event.target)) return;
+    event.preventDefault();
+    this.frameSelectedGroup();
+  };
+
+  private readonly resetView = (): void => {
+    this.orbit.reset();
+  };
+
+  private frameSelectedGroup(): void {
+    const group = this.world.editableGroups.get(this.selectedId);
+    if (!group) return;
+
+    const bounds = new THREE.Box3().setFromObject(group);
+    if (bounds.isEmpty()) return;
+    const sphere = bounds.getBoundingSphere(new THREE.Sphere());
+    const viewDirection = this.camera.position.clone().sub(this.orbit.target);
+    if (viewDirection.lengthSq() === 0) viewDirection.set(1, 1, 1);
+    viewDirection.normalize();
+
+    const verticalFov = this.camera instanceof THREE.PerspectiveCamera
+      ? THREE.MathUtils.degToRad(this.camera.fov)
+      : THREE.MathUtils.degToRad(38);
+    const distance = Math.max(
+      1,
+      (sphere.radius * FRAME_PADDING) / Math.sin(verticalFov / 2),
+    );
+    this.orbit.target.copy(sphere.center);
+    this.camera.position.copy(sphere.center).addScaledVector(viewDirection, distance);
+    this.orbit.update();
+  }
+
+  private isTextEntry(target: EventTarget | null): boolean {
+    return target instanceof HTMLElement
+      && target.matches("input, select, textarea, [contenteditable='true']");
+  }
 
   private readonly handleObjectChange = (): void => {
     const group = this.world.editableGroups.get(this.selectedId);
