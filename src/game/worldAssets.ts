@@ -22,6 +22,8 @@ export interface WorldAssetDefinition {
   readonly halfDepth: number;
   readonly colliders: readonly WorldAssetCollider[];
   readonly occludesCamera?: boolean;
+  /** Local visual pivot offset used when an asset's authored transform is not its mesh center. */
+  readonly pivotOffset?: Readonly<{ x: number; z: number }>;
   /** Large compositional layers should not create meaningless overlap warnings. */
   readonly warnForOverlap?: boolean;
   /** A walkable surface's top height relative to its instance transform. */
@@ -32,11 +34,13 @@ export interface WorldAssetDefinition {
 
 export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.paving-patch", label: "Paving patch", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: 0, surfacePriority: 1 },
+  { assetId: "plaza.paving-patch-large", label: "Large paving patch", category: "ground", halfWidth: 8, halfDepth: 8, colliders: [], surfaceHeight: 0, surfacePriority: 1 },
   { assetId: "plaza.paving-base", label: "Plaza paving base", category: "ground", halfWidth: 22, halfDepth: 18, colliders: [], warnForOverlap: false, surfaceHeight: 0, surfacePriority: 1 },
   { assetId: "street.sidewalk-tile", label: "Sidewalk tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: 0, surfacePriority: 3 },
   { assetId: "street.road-tile", label: "Lowered road tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: -0.15, surfacePriority: 2 },
   { assetId: "street.curb-straight", label: "Straight curb", category: "ground", halfWidth: 4, halfDepth: 0.2, colliders: [] },
-  { assetId: "plaza.building-frontage", label: "Building frontage", category: "architecture", halfWidth: 22, halfDepth: 22, colliders: [], occludesCamera: true, warnForOverlap: false },
+  { assetId: "plaza.building-frontage", label: "Building frontage", category: "architecture", halfWidth: 22, halfDepth: 22, colliders: [], occludesCamera: true, pivotOffset: { x: 0, z: -20 }, warnForOverlap: false },
+  { assetId: "plaza.corner-market-building", label: "Corner market building", category: "architecture", halfWidth: 7.8, halfDepth: 6.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.25, halfDepth: 6.1 }], occludesCamera: true },
   { assetId: "plaza.goose-fountain", label: "Goose fountain", category: "landmark", halfWidth: 3.45, halfDepth: 3.45, colliders: [{ shape: "circle", x: 0, z: 0, radius: 3.35 }] },
   { assetId: "plaza.splash-pad", label: "Splash pad", category: "landmark", halfWidth: 4.9, halfDepth: 4.9, colliders: [] },
   { assetId: "plaza.play-area", label: "Play area", category: "landmark", halfWidth: 6.75, halfDepth: 3.25, colliders: [

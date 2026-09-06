@@ -90,6 +90,7 @@ test("plaza metadata groups complete façades and trees while leaving stage deck
   const tree = groups.groupById("plaza.tree.east-north");
   const canopy = groups.groupById("plaza.pavilion-stage.canopy");
   assert.ok(facade && facade.meshes.length > 5);
+  assert.equal(groups.groupById("plaza.building.south.1"), undefined, "building frontage should contain one row");
   assert.ok(tree && tree.meshes.length === 4);
   assert.ok(canopy && canopy.meshes.length === 6);
 
@@ -110,10 +111,12 @@ test("separate world instances namespace their fade groups and survive a view re
     id: "plaza.buildings-copy",
     assetId: "plaza.building-frontage",
     label: "Building frontage copy",
-    transform: { x: 64, y: 0, z: 0, rotationY: 0 },
+    transform: { x: 64, y: 0, z: 64, rotationY: 0 },
   });
   const view = new WorldView(area);
   assert.ok(view.occlusionFadeGroups.groupById("plaza.buildings.north.1"));
   assert.ok(view.occlusionFadeGroups.groupById("plaza.buildings-copy.north.1"));
+  assert.equal(view.instances.get("plaza.buildings")?.position.z, -20, "building frontage pivot should sit at the row center");
+  assert.equal(view.instances.get("plaza.buildings-copy")?.position.z, 44, "pivot offset should preserve the copied row location");
   assert.doesNotThrow(() => view.applyArea(area));
 });

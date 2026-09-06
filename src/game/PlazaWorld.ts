@@ -81,17 +81,18 @@ function createPaving(): THREE.Group {
   return group;
 }
 
-/** A reusable eight-metre authored paving unit for the WorldEditor catalog. */
-function createPavingPatch(): THREE.Group {
+/** A reusable authored paving unit for the WorldEditor catalog. */
+function createPavingPatch(halfExtent = 4): THREE.Group {
   const group = new THREE.Group();
-  group.add(box(8, 0.16, 8, PALETTE.stone.dark, 0, -0.12, 0));
+  const cells = halfExtent * 2;
+  group.add(box(halfExtent * 2, 0.16, halfExtent * 2, PALETTE.stone.dark, 0, -0.12, 0));
   const geometry = new THREE.BoxGeometry(0.93, 0.035, 0.43);
   const colors = [PALETTE.plaza.paverLight, PALETTE.plaza.paver, PALETTE.plaza.paverDark];
-  const meshes = colors.map((color) => new THREE.InstancedMesh(geometry, toonMaterial(color), 128));
+  const meshes = colors.map((color) => new THREE.InstancedMesh(geometry, toonMaterial(color), cells * cells * 2));
   const counts = colors.map(() => 0); const matrix = new THREE.Matrix4();
-  for (let row = 0; row < 16; row += 1) {
-    for (let column = 0; column < 8; column += 1) {
-      const x = -3.5 + column + (row % 2 ? 0.5 : 0); const z = -3.75 + row * 0.5;
+  for (let row = 0; row < cells * 2; row += 1) {
+    for (let column = 0; column < cells; column += 1) {
+      const x = -halfExtent + 0.5 + column + (row % 2 ? 0.5 : 0); const z = -halfExtent + 0.25 + row * 0.5;
       const variant = (row * 7 + column * 3) % colors.length;
       matrix.makeTranslation(x, 0.018, z); meshes[variant].setMatrixAt(counts[variant], matrix); counts[variant] += 1;
     }
@@ -335,11 +336,11 @@ interface LongSideFacadeSpec {
   readonly awning: number;
 }
 
-function createLongSideFacade(spec: LongSideFacadeSpec, side: -1 | 1): THREE.Group {
+function createLongSideFacade(spec: LongSideFacadeSpec, side: -1 | 1, rowCenterZ = 0): THREE.Group {
   const group = new THREE.Group();
-  const buildingZ = side * 20;
-  const frontZ = side * 18.04;
-  const awningZ = side * 17.72;
+  const buildingZ = side * 20 - rowCenterZ;
+  const frontZ = side * 18.04 - rowCenterZ;
+  const awningZ = side * 17.72 - rowCenterZ;
 
   group.add(
     box(spec.width, spec.height, 3.8, spec.color, spec.centerX, spec.height / 2, buildingZ),
@@ -372,7 +373,7 @@ function createLongSideFacade(spec: LongSideFacadeSpec, side: -1 | 1): THREE.Gro
   return group;
 }
 
-function createLongSideBuildings(groups: OcclusionFadeGroupRegistry, namespace = "plaza.building"): THREE.Group {
+function createLongSideBuildings(groups: OcclusionFadeGroupRegistry, namespace = "plaza.building", localPivot = false): THREE.Group {
   const group = new THREE.Group();
   const north: readonly LongSideFacadeSpec[] = [
     { centerX: -17.6, width: 8.4, height: 7.8, color: PALETTE.plaza.brickDark, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningBlue },
@@ -381,23 +382,156 @@ function createLongSideBuildings(groups: OcclusionFadeGroupRegistry, namespace =
     { centerX: 9.1, width: 8.7, height: 9.5, color: PALETTE.plaza.brick, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningGreen },
     { centerX: 17.8, width: 8.3, height: 8.2, color: PALETTE.plaza.brickDark, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningBlue },
   ];
-  const south: readonly LongSideFacadeSpec[] = [
-    { centerX: -17.6, width: 8.4, height: 8.8, color: PALETTE.plaza.brick, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningGreen },
-    { centerX: -8.8, width: 8.8, height: 7.3, color: PALETTE.plaza.brickLight, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningBlue },
-    { centerX: 0.2, width: 8.7, height: 9.4, color: PALETTE.plaza.brickDark, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningGreen },
-    { centerX: 9.1, width: 8.7, height: 7.9, color: PALETTE.plaza.brickLight, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningBlue },
-    { centerX: 17.8, width: 8.3, height: 8.9, color: PALETTE.plaza.brick, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningGreen },
-  ];
   for (const [index, spec] of north.entries()) {
-    const facade = createLongSideFacade(spec, -1);
+    const facade = createLongSideFacade(spec, -1, localPivot ? -20 : 0);
     groups.register(`${namespace}.north.${index + 1}`, facade);
     group.add(facade);
   }
-  for (const [index, spec] of south.entries()) {
-    const facade = createLongSideFacade(spec, 1);
-    groups.register(`${namespace}.south.${index + 1}`, facade);
-    group.add(facade);
+  return group;
+}
+
+function createCornerWindow(front: boolean, coordinate: number, y: number, width: number, height: number, trim: number): THREE.Group {
+  const group = new THREE.Group();
+  const x = front ? coordinate : 7.34;
+  const z = front ? -6.04 : coordinate;
+  group.add(front
+    ? box(width, height, 0.14, PALETTE.plaza.window, x, y, z)
+    : box(0.14, height, width, PALETTE.plaza.window, x, y, z));
+
+  if (front) {
+    group.add(
+      box(width + 0.22, 0.12, 0.2, trim, x, y + height / 2 + 0.1, z),
+      box(width + 0.22, 0.12, 0.2, trim, x, y - height / 2 - 0.1, z),
+      box(0.12, height + 0.22, 0.2, trim, x - width / 2 - 0.1, y, z),
+      box(0.12, height + 0.22, 0.2, trim, x + width / 2 + 0.1, y, z),
+      box(0.08, height, 0.18, trim, x, y, z - 0.09),
+    );
+  } else {
+    group.add(
+      box(0.2, 0.12, width + 0.22, trim, x, y + height / 2 + 0.1, z),
+      box(0.2, 0.12, width + 0.22, trim, x, y - height / 2 - 0.1, z),
+      box(0.2, height + 0.22, 0.12, trim, x, y, z - width / 2 - 0.1),
+      box(0.2, height + 0.22, 0.12, trim, x, y, z + width / 2 + 0.1),
+      box(0.18, height, 0.08, trim, x - 0.09, y, z),
+    );
   }
+  return group;
+}
+
+function createCornerAwning(front: boolean, coordinate: number, width: number, color: number): THREE.Group {
+  const group = new THREE.Group();
+  const x = front ? coordinate : 7.58;
+  const z = front ? -6.28 : coordinate;
+  const canopy = front
+    ? box(width, 0.18, 0.78, color, x, 3.02, z)
+    : box(0.78, 0.18, width, color, x, 3.02, z);
+  canopy.rotation[front ? "x" : "z"] = front ? -0.16 : 0.16;
+  group.add(canopy);
+  group.add(front
+    ? box(width + 0.08, 0.22, 0.12, PALETTE.plaza.brickDark, x, 2.9, z - 0.34)
+    : box(0.12, 0.22, width + 0.08, PALETTE.plaza.brickDark, x + 0.34, 2.9, z));
+  return group;
+}
+
+function createCornerDoor(front: boolean, coordinate: number): THREE.Group {
+  const group = new THREE.Group();
+  const x = front ? coordinate : 7.4;
+  const z = front ? -6.08 : coordinate;
+  group.add(front
+    ? box(1.24, 2.7, 0.16, PALETTE.earth.woodDark, x, 1.38, z)
+    : box(0.16, 2.7, 1.24, PALETTE.earth.woodDark, x, 1.38, z));
+  group.add(front
+    ? box(1.48, 0.14, 0.22, PALETTE.accent.cream, x, 2.82, z)
+    : box(0.22, 0.14, 1.48, PALETTE.accent.cream, x, 2.82, z));
+  const handle = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), toonMaterial(PALETTE.accent.sunlight)), false);
+  handle.position.set(front ? x + 0.32 : x - 0.1, 1.35, front ? z - 0.11 : z - 0.32);
+  group.add(handle);
+  return group;
+}
+
+/** A detailed two-story corner market inspired by the brick storefronts around Old Town. */
+function createCornerMarketBuilding(groups: OcclusionFadeGroupRegistry, namespace = "plaza.corner-market-building"): THREE.Group {
+  const group = new THREE.Group();
+  const brick = PALETTE.plaza.brickLight;
+  const brickShadow = PALETTE.plaza.brick;
+  const stone = PALETTE.plaza.concrete;
+  const iron = PALETTE.plaza.iron;
+  const trim = PALETTE.accent.cream;
+
+  group.add(
+    box(14.5, 10.2, 11.8, brick, 0, 5.1, 0),
+    box(14.85, 0.42, 12.1, stone, 0, 0.3, 0),
+    box(14.78, 0.28, 0.32, trim, 0, 3.45, -6.04),
+    box(0.32, 0.28, 12.08, trim, 7.28, 3.45, 0),
+    box(14.82, 0.24, 0.3, trim, 0, 6.98, -6.04),
+    box(0.3, 0.24, 12.04, trim, 7.28, 6.98, 0),
+  );
+
+  for (const x of [-6.9, 6.9]) {
+    group.add(box(0.3, 9.9, 0.34, brickShadow, x, 5.05, -6.03));
+  }
+  for (const z of [-5.7, 5.7]) {
+    group.add(box(0.34, 9.9, 0.3, brickShadow, 7.25, 5.05, z));
+  }
+
+  for (const x of [-4.5, -1.9, 0.7, 3.3]) {
+    group.add(createCornerWindow(true, x, 5.05, 0.95, 1.85, trim), createCornerWindow(true, x, 7.7, 0.95, 1.85, trim));
+  }
+  for (const z of [-4.3, -1.7, 0.9, 3.5]) {
+    group.add(createCornerWindow(false, z, 5.05, 0.95, 1.85, trim), createCornerWindow(false, z, 7.7, 0.95, 1.85, trim));
+  }
+
+  group.add(
+    createCornerWindow(true, -4.25, 1.55, 2.55, 2.05, trim),
+    createCornerWindow(true, -0.85, 1.55, 2.55, 2.05, trim),
+    createCornerWindow(false, -3.95, 1.55, 2.55, 2.05, trim),
+    createCornerWindow(false, -0.55, 1.55, 2.55, 2.05, trim),
+    createCornerAwning(true, -4.25, 2.75, PALETTE.accent.red),
+    createCornerAwning(true, -0.85, 2.75, PALETTE.plaza.awningGreen),
+    createCornerAwning(false, -3.95, 2.75, PALETTE.plaza.awningGreen),
+    createCornerAwning(false, -0.55, 2.75, PALETTE.accent.red),
+    createCornerDoor(true, 5.42),
+    createCornerDoor(false, 4.88),
+  );
+
+  // Deep eaves, repeating brackets, and a raised parapet give the roofline the
+  // ornate silhouette visible in the reference instead of a plain box roof.
+  group.add(
+    box(15.35, 0.4, 12.55, iron, 0, 10.35, 0),
+    box(15.65, 0.26, 12.84, stone, 0, 10.72, 0),
+    box(15.28, 0.18, 0.42, iron, 0, 10.94, -6.32),
+    box(0.42, 0.18, 12.5, iron, 7.58, 10.94, 0),
+  );
+  for (const x of [-6.35, -4.6, -2.85, -1.1, 0.65, 2.4, 4.15, 5.9]) {
+    group.add(box(0.24, 0.54, 0.3, iron, x, 10.22, -6.18));
+  }
+  for (const z of [-5.65, -3.9, -2.15, -0.4, 1.35, 3.1, 4.85]) {
+    group.add(box(0.3, 0.54, 0.24, iron, 7.42, 10.22, z));
+  }
+  for (const x of [-6.5, -4.3, -2.1, 0.1, 2.3, 4.5, 6.5]) {
+    group.add(box(0.12, 0.62, 0.12, trim, x, 11.08, -6.28));
+  }
+
+  const sign = new THREE.Group();
+  sign.add(
+    box(2.5, 0.78, 0.22, iron, -3.75, 11.48, -6.2),
+    box(1.88, 0.4, 0.08, trim, -3.75, 11.5, -6.34),
+    box(1.1, 0.12, 0.12, PALETTE.accent.sunlight, -3.75, 11.8, -6.35),
+  );
+  group.add(sign);
+
+  const turret = new THREE.Group();
+  turret.add(
+    box(1.65, 0.68, 1.65, brickShadow, 4.35, 11.18, -4.35),
+    box(1.85, 0.18, 1.85, iron, 4.35, 11.58, -4.35),
+  );
+  const turretRoof = finishMesh(new THREE.Mesh(new THREE.ConeGeometry(1.18, 1.15, 4), toonMaterial(iron)), true, true);
+  turretRoof.position.set(4.35, 12.22, -4.35);
+  turretRoof.rotation.y = Math.PI / 4;
+  turret.add(turretRoof);
+  group.add(turret);
+
+  groups.register(namespace, group);
   return group;
 }
 
@@ -585,10 +719,12 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
   switch (assetId) {
     case "plaza.paving-base": return createPaving();
     case "plaza.paving-patch": return createPavingPatch();
+    case "plaza.paving-patch-large": return createPavingPatch(8);
     case "street.sidewalk-tile": return createStreetTile(PALETTE.plaza.concrete, 0);
     case "street.road-tile": return createStreetTile(PALETTE.stone.dark, -0.15);
     case "street.curb-straight": return createStraightCurb();
-    case "plaza.building-frontage": return createLongSideBuildings(groups, instanceId);
+    case "plaza.building-frontage": return createLongSideBuildings(groups, instanceId, true);
+    case "plaza.corner-market-building": return createCornerMarketBuilding(groups, instanceId);
     case "plaza.goose-fountain": return createFountain();
     case "plaza.splash-pad": return createSplashPad();
     case "plaza.play-area": return createPlayArea();

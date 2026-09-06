@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { createWorldAssetView } from "./PlazaWorld.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { isWorldChunkPlayable, WORLD_CHUNK_SIZE, type WorldArea, type WorldInstance } from "./worldLayout.ts";
+import { getWorldAsset } from "./worldAssets.ts";
 
 export class WorldView extends THREE.Group {
   readonly instances = new Map<string, THREE.Group>();
@@ -31,7 +32,9 @@ export class WorldView extends THREE.Group {
     const wrapper = new THREE.Group();
     wrapper.name = instance.label;
     wrapper.userData.worldInstanceId = instance.id;
-    wrapper.position.set(instance.transform.x, instance.transform.y, instance.transform.z);
+    const pivotOffset = getWorldAsset(instance.assetId)?.pivotOffset ?? { x: 0, z: 0 };
+    wrapper.userData.worldPivotOffset = pivotOffset;
+    wrapper.position.set(instance.transform.x + pivotOffset.x, instance.transform.y, instance.transform.z + pivotOffset.z);
     wrapper.rotation.y = instance.transform.rotationY;
     wrapper.add(createWorldAssetView(
       instance.assetId,
