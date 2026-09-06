@@ -8,11 +8,17 @@ export class WorldView extends THREE.Group {
   readonly occlusionFadeGroups = new OcclusionFadeGroupRegistry();
   private activeArea?: WorldArea;
   private editorFocus?: Readonly<{ x: number; z: number }>;
+  private readonly playableOnly: boolean;
 
-  constructor(area: WorldArea, private readonly playableOnly = false) { super(); this.applyArea(area); }
+  constructor(area: WorldArea, playableOnly = false) {
+    super();
+    this.playableOnly = playableOnly;
+    this.applyArea(area);
+  }
 
   applyArea(area: WorldArea): void {
     this.activeArea = area;
+    this.occlusionFadeGroups.clear();
     this.clear();
     this.instances.clear();
     for (const instance of area.instances) {
@@ -21,13 +27,17 @@ export class WorldView extends THREE.Group {
     this.updateEditorChunkVisibility();
   }
 
-  addInstance(instance: WorldInstance): THREE.Group {
+  addInstance(instance: WorldInstance, registerOcclusion = true): THREE.Group {
     const wrapper = new THREE.Group();
     wrapper.name = instance.label;
     wrapper.userData.worldInstanceId = instance.id;
     wrapper.position.set(instance.transform.x, instance.transform.y, instance.transform.z);
     wrapper.rotation.y = instance.transform.rotationY;
-    wrapper.add(createWorldAssetView(instance.assetId, this.occlusionFadeGroups));
+    wrapper.add(createWorldAssetView(
+      instance.assetId,
+      registerOcclusion ? this.occlusionFadeGroups : new OcclusionFadeGroupRegistry(),
+      instance.id,
+    ));
     this.instances.set(instance.id, wrapper);
     this.add(wrapper);
     return wrapper;

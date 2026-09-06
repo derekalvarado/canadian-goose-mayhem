@@ -303,7 +303,7 @@ function createPlayArea(): THREE.Group {
   return group;
 }
 
-function createPavilion(groups: OcclusionFadeGroupRegistry): THREE.Group {
+function createPavilion(groups: OcclusionFadeGroupRegistry, namespace = "plaza.pavilion-stage"): THREE.Group {
   const group = new THREE.Group();
   group.add(box(PAVILION_SIZE.halfWidth * 2, 0.52, PAVILION_SIZE.halfDepth * 2, PALETTE.earth.woodDark, 0, 0.26, 0));
   group.add(box(PAVILION_SIZE.halfWidth * 2 - 0.5, 0.08, PAVILION_SIZE.halfDepth * 2 - 0.35, PALETTE.earth.woodLight, 0, 0.56, 0));
@@ -322,7 +322,7 @@ function createPavilion(groups: OcclusionFadeGroupRegistry): THREE.Group {
     box(13.8, 0.17, 4.8, PALETTE.earth.woodDark, 0, 4.38, 0),
   );
   group.add(canopy);
-  groups.register("plaza.pavilion-stage.canopy", canopy);
+  groups.register(`${namespace}.canopy`, canopy);
   return group;
 }
 
@@ -372,7 +372,7 @@ function createLongSideFacade(spec: LongSideFacadeSpec, side: -1 | 1): THREE.Gro
   return group;
 }
 
-function createLongSideBuildings(groups: OcclusionFadeGroupRegistry): THREE.Group {
+function createLongSideBuildings(groups: OcclusionFadeGroupRegistry, namespace = "plaza.building"): THREE.Group {
   const group = new THREE.Group();
   const north: readonly LongSideFacadeSpec[] = [
     { centerX: -17.6, width: 8.4, height: 7.8, color: PALETTE.plaza.brickDark, trim: PALETTE.accent.cream, awning: PALETTE.plaza.awningBlue },
@@ -390,12 +390,12 @@ function createLongSideBuildings(groups: OcclusionFadeGroupRegistry): THREE.Grou
   ];
   for (const [index, spec] of north.entries()) {
     const facade = createLongSideFacade(spec, -1);
-    groups.register(`plaza.building.north.${index + 1}`, facade);
+    groups.register(`${namespace}.north.${index + 1}`, facade);
     group.add(facade);
   }
   for (const [index, spec] of south.entries()) {
     const facade = createLongSideFacade(spec, 1);
-    groups.register(`plaza.building.south.${index + 1}`, facade);
+    groups.register(`${namespace}.south.${index + 1}`, facade);
     group.add(facade);
   }
   return group;
@@ -489,13 +489,13 @@ function createPlanterCluster(): THREE.Group {
   return group;
 }
 
-function createTreeCluster(groups: OcclusionFadeGroupRegistry): THREE.Group {
+function createTreeCluster(groups: OcclusionFadeGroupRegistry, namespace = "plaza.tree"): THREE.Group {
   const group = new THREE.Group();
   group.add(
-    createTree("plaza.tree.east-north", 19.35, -7.2, 6.7, groups),
-    createTree("plaza.tree.east-south", 19.35, 6.2, 6.2, groups),
-    createTree("plaza.tree.south", 7.8, 16.7, 6.8, groups),
-    createTree("plaza.tree.north-west", -17.5, 13.5, 7.2, groups),
+    createTree(`${namespace}.east-north`, 19.35, -7.2, 6.7, groups),
+    createTree(`${namespace}.east-south`, 19.35, 6.2, 6.2, groups),
+    createTree(`${namespace}.south`, 7.8, 16.7, 6.8, groups),
+    createTree(`${namespace}.north-west`, -17.5, 13.5, 7.2, groups),
   );
   return group;
 }
@@ -581,21 +581,21 @@ export class PlazaWorld extends THREE.Group {
 }
 
 /** Renderer implementation for the source-owned WorldEditor catalog. */
-export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroupRegistry): THREE.Group {
+export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroupRegistry, instanceId = assetId): THREE.Group {
   switch (assetId) {
     case "plaza.paving-base": return createPaving();
     case "plaza.paving-patch": return createPavingPatch();
     case "street.sidewalk-tile": return createStreetTile(PALETTE.plaza.concrete, 0);
     case "street.road-tile": return createStreetTile(PALETTE.stone.dark, -0.15);
     case "street.curb-straight": return createStraightCurb();
-    case "plaza.building-frontage": return createLongSideBuildings(groups);
+    case "plaza.building-frontage": return createLongSideBuildings(groups, instanceId);
     case "plaza.goose-fountain": return createFountain();
     case "plaza.splash-pad": return createSplashPad();
     case "plaza.play-area": return createPlayArea();
-    case "plaza.pavilion-stage": return createPavilion(groups);
+    case "plaza.pavilion-stage": return createPavilion(groups, instanceId);
     case "plaza.cafe-table-set": return createCafeTable();
     case "plaza.planter-cluster": return createPlanterCluster();
-    case "plaza.tree-cluster": return createTreeCluster(groups);
+    case "plaza.tree-cluster": return createTreeCluster(groups, instanceId);
     case "plaza.string-lights": return createStringLights();
     default: throw new Error(`No renderer for world asset: ${assetId}`);
   }

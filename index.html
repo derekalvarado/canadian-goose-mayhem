@@ -75,8 +75,9 @@
       </section>
 
       <div id="webgl-error" class="webgl-error" hidden role="alert">
-        <strong>This goose needs WebGL.</strong>
-        <span>Try a current browser with hardware acceleration enabled.</span>
+        <strong>This goose couldn't start.</strong>
+        <span id="startup-error-detail">Try again. If the problem persists, check hardware acceleration and the startup details.</span>
+        <button id="startup-retry" type="button">Try again</button>
       </div>
     </main>
     <script type="module" src="/src/main.ts"></script>

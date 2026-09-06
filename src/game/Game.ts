@@ -87,6 +87,7 @@ export class Game {
   private readonly gamepadControls = requireElement<HTMLElement>("#gamepad-controls");
   private readonly deviceLabel = requireElement<HTMLElement>("#device-label");
   private paused = false;
+  private disposed = false;
   private lastInputTime = performance.now();
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -124,6 +125,7 @@ export class Game {
     window.addEventListener("blur", this.handleBlur);
     window.addEventListener("focus", this.handleFocus);
     document.addEventListener("visibilitychange", this.handleVisibility);
+    window.addEventListener("pagehide", this.dispose, { once: true });
     this.resize();
   }
 
@@ -314,5 +316,18 @@ export class Game {
   private readonly handleFocus = (): void => { this.setPaused(document.hidden); };
   private readonly handleVisibility = (): void => {
     this.setPaused(document.hidden || !document.hasFocus());
+  };
+
+  /** Explicitly release the GPU context before a Play/Edit page transition. */
+  private readonly dispose = (): void => {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.renderer.setAnimationLoop(null);
+    window.removeEventListener("resize", this.resize);
+    window.removeEventListener("blur", this.handleBlur);
+    window.removeEventListener("focus", this.handleFocus);
+    document.removeEventListener("visibilitychange", this.handleVisibility);
+    this.renderer.dispose();
+    this.renderer.forceContextLoss();
   };
 }

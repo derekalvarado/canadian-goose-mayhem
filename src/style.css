@@ -447,6 +447,11 @@ kbd,
   color: var(--ink-muted);
 }
 
+.webgl-error button {
+  justify-self: center;
+  margin-top: 10px;
+}
+
 .editor-mode .hud,
 .editor-mode .chapter-complete {
   display: none;

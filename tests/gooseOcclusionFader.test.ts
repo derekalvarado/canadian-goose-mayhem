@@ -4,6 +4,8 @@ import * as THREE from "three";
 import { GooseOcclusionFader } from "../src/game/GooseOcclusionFader.ts";
 import { OcclusionFadeGroupRegistry } from "../src/game/OcclusionFadeGroups.ts";
 import { PlazaWorld } from "../src/game/PlazaWorld.ts";
+import { WorldView } from "../src/game/WorldView.ts";
+import { CANONICAL_WORLD_LAYOUT, cloneWorldLayout, getWorldArea } from "../src/game/worldLayout.ts";
 
 function createCamera(): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera();
@@ -99,4 +101,19 @@ test("plaza metadata groups complete façades and trees while leaving stage deck
   assert.ok(pavilion);
   const stageDeck = pavilion.children[0].children[0] as THREE.Mesh;
   assert.equal(groups.groupForMesh(stageDeck), undefined);
+});
+
+test("separate world instances namespace their fade groups and survive a view rebuild", () => {
+  const world = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+  const area = getWorldArea(world);
+  area.instances.push({
+    id: "plaza.buildings-copy",
+    assetId: "plaza.building-frontage",
+    label: "Building frontage copy",
+    transform: { x: 64, y: 0, z: 0, rotationY: 0 },
+  });
+  const view = new WorldView(area);
+  assert.ok(view.occlusionFadeGroups.groupById("plaza.buildings.north.1"));
+  assert.ok(view.occlusionFadeGroups.groupById("plaza.buildings-copy.north.1"));
+  assert.doesNotThrow(() => view.applyArea(area));
 });

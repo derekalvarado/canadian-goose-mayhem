@@ -40,4 +40,9 @@ export class OcclusionFadeGroupRegistry {
   groupById(id: string): OcclusionFadeGroup | undefined {
     return this.groupsById.get(id);
   }
+
+  clear(): void {
+    this.groupsById.clear();
+    this.groupsByMesh.clear();
+  }
 }
