@@ -1,13 +1,14 @@
 import * as THREE from "three";
-import { PlazaWorld } from "./PlazaWorld";
+import { WorldView } from "./WorldView";
 import { Goose } from "./Goose";
 import { InputController, type InputDevice } from "./InputController";
 import { GameAudio } from "./GameAudio";
 import { Simulation, HURRY_SPEED } from "./simulation/Simulation";
-import { FOUNTAIN_OBJECTIVE_ID, createPlazaRules } from "./simulation/plaza";
+import { FOUNTAIN_OBJECTIVE_ID } from "./simulation/plaza";
 import { PALETTE } from "./palette";
-import { PlazaEditor } from "./PlazaEditor";
-import { loadPlazaLayout } from "./plazaLayout";
+import { WorldEditor } from "./WorldEditor";
+import { getWorldArea, loadWorldLayout } from "./worldLayout";
+import { createCentralPlazaRules } from "./worldLevel";
 import { GooseOcclusionFader } from "./GooseOcclusionFader";
 import { toonMaterial } from "./toonMaterial";
 
@@ -56,9 +57,10 @@ export class Game {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.1, 130);
   private readonly editorMode = new URLSearchParams(window.location.search).has("edit");
-  private readonly layout = loadPlazaLayout();
-  private readonly rules = createPlazaRules(this.layout);
-  private readonly world = new PlazaWorld(this.layout);
+  private readonly worldLayout = loadWorldLayout();
+  private readonly worldArea = getWorldArea(this.worldLayout);
+  private readonly rules = createCentralPlazaRules(this.worldArea);
+  private readonly world = new WorldView(this.worldArea, !this.editorMode);
   private readonly goose = new Goose();
   private readonly poopViews = new Map<string, THREE.Group>();
   private readonly gooseOcclusionFader = new GooseOcclusionFader(this.world.occlusionFadeGroups);
@@ -114,7 +116,7 @@ export class Game {
       this.camera.position.set(30, 36, 30);
       this.camera.lookAt(0, 0, 0);
       this.goose.visible = false;
-      new PlazaEditor(this.scene, this.camera, canvas, this.world, this.layout);
+      new WorldEditor(this.scene, this.camera, canvas, this.worldLayout, this.world);
     }
 
     requireElement<HTMLButtonElement>("#restart-button").addEventListener("click", this.restart);

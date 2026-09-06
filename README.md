@@ -53,13 +53,17 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 - `src/game/simulation/plaza.ts` — active plaza rules and objective definition
 - `src/game/GameAudio.ts` — browser audio output, separate from gameplay decisions
 - `src/game/Goose.ts` — original procedural Canada goose model and animation
-- `src/game/PlazaWorld.ts` — active Old Town plaza architecture and landmarks
+- `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
+- `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
+- `src/game/worldAssets.ts` — source-owned catalog of render, collision, and occlusion metadata
+- `src/game/worldLayout.ts` — sparse 64 m chunk documents, playable regions, browser drafts, import/export, and plaza migration
+- `src/game/worldLevel.ts` — renderer-independent collision, chunk, and stepped-surface queries for placed catalog assets
+- `src/game/PlazaWorld.ts` — procedural asset-view factories retained by the world catalog
 - `src/game/ForestWorld.ts` — earlier forest presentation retained as a reference
 - `src/game/InputController.ts` — keyboard and standard gamepad input
 - `src/game/plazaLevel.ts` — shared plaza bounds, landmark placement, and collision
-- `src/game/plazaLayout.ts` — layout validation, browser draft storage, and import/export
-- `src/game/content/plaza-layout.json` — canonical editable plaza arrangement
-- `src/game/PlazaEditor.ts` — in-game move/rotate world-building tools
+- `src/game/plazaLayout.ts` — legacy PlazaEditor document validation used for automatic migration
+- `src/game/content/plaza-layout.json` — legacy canonical plaza arrangement migrated into the world document
 - `src/game/level.ts` — earlier forest bounds and collision helpers
 - `src/game/toonMaterial.ts` — shared three-band material for all characters and solid props
 - `src/game/palette.ts` — canonical named colors shared by the 3D scene

@@ -81,6 +81,38 @@ function createPaving(): THREE.Group {
   return group;
 }
 
+/** A reusable eight-metre authored paving unit for the WorldEditor catalog. */
+function createPavingPatch(): THREE.Group {
+  const group = new THREE.Group();
+  group.add(box(8, 0.16, 8, PALETTE.stone.dark, 0, -0.12, 0));
+  const geometry = new THREE.BoxGeometry(0.93, 0.035, 0.43);
+  const colors = [PALETTE.plaza.paverLight, PALETTE.plaza.paver, PALETTE.plaza.paverDark];
+  const meshes = colors.map((color) => new THREE.InstancedMesh(geometry, toonMaterial(color), 128));
+  const counts = colors.map(() => 0); const matrix = new THREE.Matrix4();
+  for (let row = 0; row < 16; row += 1) {
+    for (let column = 0; column < 8; column += 1) {
+      const x = -3.5 + column + (row % 2 ? 0.5 : 0); const z = -3.75 + row * 0.5;
+      const variant = (row * 7 + column * 3) % colors.length;
+      matrix.makeTranslation(x, 0.018, z); meshes[variant].setMatrixAt(counts[variant], matrix); counts[variant] += 1;
+    }
+  }
+  meshes.forEach((mesh, index) => { mesh.count = counts[index]; mesh.castShadow = false; mesh.receiveShadow = true; mesh.instanceMatrix.needsUpdate = true; group.add(mesh); });
+  return group;
+}
+
+function createStreetTile(color: number, elevation: number): THREE.Group {
+  const group = new THREE.Group();
+  group.add(box(8, 0.16, 8, color, 0, elevation - 0.08, 0));
+  return group;
+}
+
+function createStraightCurb(): THREE.Group {
+  const group = new THREE.Group();
+  // Top aligns with the sidewalk while the road rests 0.15 m below it.
+  group.add(box(8, 0.15, 0.32, PALETTE.plaza.concrete, 0, -0.075, 0));
+  return group;
+}
+
 function createRock(x: number, y: number, z: number, radius: number, color: number): THREE.Mesh {
   const rock = finishMesh(new THREE.Mesh(
     new THREE.DodecahedronGeometry(radius, 0),
@@ -449,17 +481,28 @@ function createCafeTable(): THREE.Group {
   return group;
 }
 
-function createFurnitureAndPlanting(groups: OcclusionFadeGroupRegistry): THREE.Group {
+function createPlanterCluster(): THREE.Group {
   const group = new THREE.Group();
   for (const planter of PLAZA_STATIC_COLLIDERS) {
     group.add(createPlanter(planter));
   }
+  return group;
+}
+
+function createTreeCluster(groups: OcclusionFadeGroupRegistry): THREE.Group {
+  const group = new THREE.Group();
   group.add(
     createTree("plaza.tree.east-north", 19.35, -7.2, 6.7, groups),
     createTree("plaza.tree.east-south", 19.35, 6.2, 6.2, groups),
     createTree("plaza.tree.south", 7.8, 16.7, 6.8, groups),
     createTree("plaza.tree.north-west", -17.5, 13.5, 7.2, groups),
   );
+  return group;
+}
+
+function createFurnitureAndPlanting(groups: OcclusionFadeGroupRegistry): THREE.Group {
+  const group = new THREE.Group();
+  group.add(createPlanterCluster(), createTreeCluster(groups));
   return group;
 }
 
@@ -534,5 +577,26 @@ export class PlazaWorld extends THREE.Group {
       group.position.set(definition.position.x, 0, definition.position.z);
       group.rotation.set(0, definition.rotationY, 0);
     }
+  }
+}
+
+/** Renderer implementation for the source-owned WorldEditor catalog. */
+export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroupRegistry): THREE.Group {
+  switch (assetId) {
+    case "plaza.paving-base": return createPaving();
+    case "plaza.paving-patch": return createPavingPatch();
+    case "street.sidewalk-tile": return createStreetTile(PALETTE.plaza.concrete, 0);
+    case "street.road-tile": return createStreetTile(PALETTE.stone.dark, -0.15);
+    case "street.curb-straight": return createStraightCurb();
+    case "plaza.building-frontage": return createLongSideBuildings(groups);
+    case "plaza.goose-fountain": return createFountain();
+    case "plaza.splash-pad": return createSplashPad();
+    case "plaza.play-area": return createPlayArea();
+    case "plaza.pavilion-stage": return createPavilion(groups);
+    case "plaza.cafe-table-set": return createCafeTable();
+    case "plaza.planter-cluster": return createPlanterCluster();
+    case "plaza.tree-cluster": return createTreeCluster(groups);
+    case "plaza.string-lights": return createStringLights();
+    default: throw new Error(`No renderer for world asset: ${assetId}`);
   }
 }
