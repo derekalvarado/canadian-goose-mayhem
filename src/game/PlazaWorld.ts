@@ -211,33 +211,139 @@ function createFountain(): THREE.Group {
   return group;
 }
 
-function createSplashPad(): THREE.Group {
-  const group = new THREE.Group();
-  const border = finishMesh(new THREE.Mesh(
-    new THREE.RingGeometry(SPLASH_PAD_RADIUS, SPLASH_PAD_RADIUS + 0.52, 64),
-    toonMaterial(PALETTE.plaza.concrete, { side: THREE.DoubleSide }),
-  ), false);
-  border.rotation.x = -Math.PI / 2;
-  border.position.y = 0.08;
-  group.add(border);
+interface SplashJet {
+  readonly mesh: THREE.Mesh;
+  readonly baseHeight: number;
+  readonly phase: number;
+  readonly interval: number;
+  readonly duration: number;
+  nextBurst: number;
+}
 
-  const water = finishMesh(new THREE.Mesh(
-    new THREE.CircleGeometry(SPLASH_PAD_RADIUS, 64),
-    toonMaterial(PALETTE.plaza.waterLight, { side: THREE.DoubleSide }),
-  ), false);
-  water.rotation.x = -Math.PI / 2;
-  water.position.y = 0.07;
-  group.add(water);
+function splashVariation(index: number, salt: number): number {
+  const value = Math.sin((index + 1) * (12.9898 + salt * 78.233)) * 43758.5453;
+  return value - Math.floor(value);
+}
 
-  const jetMaterial = toonMaterial(PALETTE.plaza.water);
-  for (let index = 0; index < 9; index += 1) {
-    const angle = index * 2.4;
-    const radius = index % 3 === 0 ? 2.7 : 1.65;
-    const height = 0.2 + (index % 4) * 0.08;
-    const jet = finishMesh(new THREE.Mesh(new THREE.ConeGeometry(0.055, height, 7), jetMaterial), false);
-    jet.position.set(Math.cos(angle) * radius, height / 2 + 0.08, Math.sin(angle) * radius);
-    group.add(jet);
+/** Presentation-only splash pad animation; it has no gameplay or simulation state. */
+export class SplashPadView extends THREE.Group {
+  private readonly jets: SplashJet[] = [];
+
+  constructor() {
+    super();
+    this.name = "Splash pad";
+
+    const border = finishMesh(new THREE.Mesh(
+      new THREE.RingGeometry(SPLASH_PAD_RADIUS, SPLASH_PAD_RADIUS + 0.52, 64),
+      toonMaterial(PALETTE.plaza.concrete, { side: THREE.DoubleSide }),
+    ), false);
+    border.rotation.x = -Math.PI / 2;
+    border.position.y = 0.08;
+    this.add(border);
+
+    const surface = finishMesh(new THREE.Mesh(
+      new THREE.CircleGeometry(SPLASH_PAD_RADIUS, 64),
+      toonMaterial(PALETTE.stone.mid, { side: THREE.DoubleSide }),
+    ), false);
+    surface.rotation.x = -Math.PI / 2;
+    surface.position.y = 0.06;
+    this.add(surface);
+
+    const paverGeometry = new THREE.BoxGeometry(0.95, 0.045, 0.62);
+    const paverColors = [PALETTE.stone.light, PALETTE.stone.mid, PALETTE.stone.dark];
+    const pavers = paverColors.map((color) => new THREE.InstancedMesh(
+      paverGeometry,
+      toonMaterial(color),
+      180,
+    ));
+    const counts = paverColors.map(() => 0);
+    const matrix = new THREE.Matrix4();
+    for (let row = -7; row <= 7; row += 1) {
+      for (let column = -7; column <= 7; column += 1) {
+        const x = column * 1.02 + (row & 1 ? 0.51 : 0);
+        const z = row * 0.66;
+        if (Math.hypot(x, z) > SPLASH_PAD_RADIUS - 0.18) continue;
+        const variant = ((row * 5 + column * 3 + 30) % paverColors.length + paverColors.length) % paverColors.length;
+        matrix.makeTranslation(x, 0.085, z);
+        pavers[variant].setMatrixAt(counts[variant], matrix);
+        counts[variant] += 1;
+      }
+    }
+    pavers.forEach((mesh, index) => {
+      mesh.count = counts[index];
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.instanceMatrix.needsUpdate = true;
+      this.add(mesh);
+    });
+
+    const nozzleMaterial = toonMaterial(PALETTE.plaza.iron);
+    const jetMaterial = toonMaterial(PALETTE.plaza.water, { transparent: true, opacity: 0.9 });
+    for (let index = 0; index < 12; index += 1) {
+      const angle = index * Math.PI * 2 / 12 + (index % 2) * 0.12;
+      const radius = index % 3 === 0 ? 3.15 : index % 3 === 1 ? 2.05 : 1.1;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+
+      const nozzle = finishMesh(new THREE.Mesh(
+        new THREE.CylinderGeometry(0.115, 0.115, 0.028, 12),
+        nozzleMaterial,
+      ), false);
+      nozzle.position.set(x, 0.12, z);
+      nozzle.userData.splashPadNozzle = true;
+      this.add(nozzle);
+
+      const jet = finishMesh(new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.07, 1, 8),
+        jetMaterial,
+      ), false);
+      jet.position.set(x, 0.13, z);
+      jet.scale.y = 0.001;
+      jet.visible = false;
+      this.add(jet);
+
+      const phase = splashVariation(index, 0.31);
+      this.jets.push({
+        mesh: jet,
+        baseHeight: 0.62 + splashVariation(index, 0.73) * 0.65,
+        phase,
+        interval: 1.45 + splashVariation(index, 1.17) * 2.7,
+        duration: 0.42 + splashVariation(index, 1.91) * 0.34,
+        nextBurst: 0.4 + phase * 2.1,
+      });
+    }
   }
+
+  update(delta: number): void {
+    for (const jet of this.jets) {
+      jet.nextBurst -= delta;
+      if (jet.nextBurst > 0) continue;
+      jet.nextBurst += jet.interval;
+
+      const burstDuration = jet.duration;
+      jet.mesh.userData.splashPadBurstRemaining = burstDuration;
+    }
+
+    for (const jet of this.jets) {
+      const remaining = Math.max(0, Number(jet.mesh.userData.splashPadBurstRemaining ?? 0) - delta);
+      jet.mesh.userData.splashPadBurstRemaining = remaining;
+      if (remaining <= 0) {
+        jet.mesh.visible = false;
+        continue;
+      }
+      const progress = 1 - remaining / jet.duration;
+      const envelope = Math.sin(Math.PI * progress);
+      const wobble = 0.92 + Math.sin(progress * Math.PI * 2 + jet.phase * 5) * 0.08;
+      const height = Math.max(0.02, jet.baseHeight * envelope * wobble);
+      jet.mesh.visible = true;
+      jet.mesh.scale.y = height;
+      jet.mesh.position.y = 0.13 + height / 2;
+    }
+  }
+}
+
+function createSplashPad(): SplashPadView {
+  const group = new SplashPadView();
   return group;
 }
 
@@ -623,6 +729,10 @@ function createPlanterCluster(): THREE.Group {
   return group;
 }
 
+function createSinglePlanter(halfWidth: number, halfDepth: number): THREE.Group {
+  return createPlanter({ id: "editor.planter", shape: "box", x: 0, z: 0, halfWidth, halfDepth });
+}
+
 function createTreeCluster(groups: OcclusionFadeGroupRegistry, namespace = "plaza.tree"): THREE.Group {
   const group = new THREE.Group();
   group.add(
@@ -731,6 +841,9 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.pavilion-stage": return createPavilion(groups, instanceId);
     case "plaza.cafe-table-set": return createCafeTable();
     case "plaza.planter-cluster": return createPlanterCluster();
+    case "plaza.planter-east-north": return createSinglePlanter(1.45, 3.3);
+    case "plaza.planter-east-south": return createSinglePlanter(1.45, 3.1);
+    case "plaza.planter-south": return createSinglePlanter(3.5, 1.3);
     case "plaza.tree-cluster": return createTreeCluster(groups, instanceId);
     case "plaza.string-lights": return createStringLights();
     default: throw new Error(`No renderer for world asset: ${assetId}`);

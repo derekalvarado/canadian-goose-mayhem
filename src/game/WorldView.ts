@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createWorldAssetView } from "./PlazaWorld.ts";
+import { createWorldAssetView, SplashPadView } from "./PlazaWorld.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { isWorldChunkPlayable, WORLD_CHUNK_SIZE, type WorldArea, type WorldInstance } from "./worldLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
@@ -10,6 +10,7 @@ export class WorldView extends THREE.Group {
   private activeArea?: WorldArea;
   private editorFocus?: Readonly<{ x: number; z: number }>;
   private readonly playableOnly: boolean;
+  private presentationViews: SplashPadView[] = [];
 
   constructor(area: WorldArea, playableOnly = false) {
     super();
@@ -22,6 +23,7 @@ export class WorldView extends THREE.Group {
     this.occlusionFadeGroups.clear();
     this.clear();
     this.instances.clear();
+    this.presentationViews = [];
     for (const instance of area.instances) {
       if (!this.playableOnly || isWorldChunkPlayable(area, instance.transform.x, instance.transform.z)) this.addInstance(instance);
     }
@@ -36,14 +38,20 @@ export class WorldView extends THREE.Group {
     wrapper.userData.worldPivotOffset = pivotOffset;
     wrapper.position.set(instance.transform.x + pivotOffset.x, instance.transform.y, instance.transform.z + pivotOffset.z);
     wrapper.rotation.y = instance.transform.rotationY;
-    wrapper.add(createWorldAssetView(
+    const view = createWorldAssetView(
       instance.assetId,
       registerOcclusion ? this.occlusionFadeGroups : new OcclusionFadeGroupRegistry(),
       instance.id,
-    ));
+    );
+    wrapper.add(view);
+    if (view instanceof SplashPadView) this.presentationViews.push(view);
     this.instances.set(instance.id, wrapper);
     this.add(wrapper);
     return wrapper;
+  }
+
+  updatePresentation(delta: number): void {
+    for (const view of this.presentationViews) view.update(delta);
   }
 
   /** Keeps large authoring worlds responsive while leaving a local chunk halo visible. */

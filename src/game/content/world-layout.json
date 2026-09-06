@@ -1,0 +1,350 @@
+{
+  "schemaVersion": 2,
+  "worldId": "old-town-square",
+  "canonicalRevision": 2,
+  "units": "meters",
+  "coordinateSystem": "right-handed-y-up",
+  "areas": [
+    {
+      "id": "old-town-square.central-plaza",
+      "label": "Central Plaza",
+      "chunks": [
+        {
+          "x": -1,
+          "z": -1,
+          "playable": true
+        },
+        {
+          "x": 0,
+          "z": -1,
+          "playable": true
+        },
+        {
+          "x": -1,
+          "z": 0,
+          "playable": true
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "playable": true
+        },
+        {
+          "x": -2,
+          "z": 0,
+          "playable": false
+        }
+      ],
+      "instances": [
+        {
+          "id": "plaza.paving",
+          "assetId": "plaza.paving-base",
+          "label": "Plaza paving",
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.buildings",
+          "assetId": "plaza.building-frontage",
+          "label": "Building frontage",
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.goose-fountain",
+          "assetId": "plaza.goose-fountain",
+          "label": "Goose fountain",
+          "transform": {
+            "x": -12.5,
+            "y": 0,
+            "z": -3.25,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.splash-pad",
+          "assetId": "plaza.splash-pad",
+          "label": "Splash pad",
+          "transform": {
+            "x": 1,
+            "y": 0,
+            "z": 1.75,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.play-area",
+          "assetId": "plaza.play-area",
+          "label": "Play area",
+          "transform": {
+            "x": -32.5,
+            "y": 0,
+            "z": -3.75,
+            "rotationY": -6.546914373228742e-16
+          }
+        },
+        {
+          "id": "plaza.pavilion-stage",
+          "assetId": "plaza.pavilion-stage",
+          "label": "Stage and pavilion",
+          "transform": {
+            "x": 14,
+            "y": 0,
+            "z": -0.25,
+            "rotationY": -1.5707963267948966
+          }
+        },
+        {
+          "id": "plaza.cafe-table-1",
+          "assetId": "plaza.cafe-table-set",
+          "label": "Table set 1",
+          "transform": {
+            "x": -2.25,
+            "y": 0,
+            "z": -14.25,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.cafe-table-2",
+          "assetId": "plaza.cafe-table-set",
+          "label": "Table set 2",
+          "transform": {
+            "x": 3.25,
+            "y": 0,
+            "z": -14.5,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.cafe-table-3",
+          "assetId": "plaza.cafe-table-set",
+          "label": "Table set 3",
+          "transform": {
+            "x": 1.25,
+            "y": 0,
+            "z": -11,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.planter-east-north",
+          "assetId": "plaza.planter-east-north",
+          "label": "East north planter",
+          "transform": {
+            "x": 19.35,
+            "y": 0,
+            "z": -7.2,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.planter-east-south",
+          "assetId": "plaza.planter-east-south",
+          "label": "East south planter",
+          "transform": {
+            "x": 19.35,
+            "y": 0,
+            "z": 6.2,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.planter-south",
+          "assetId": "plaza.planter-south",
+          "label": "South planter",
+          "transform": {
+            "x": 5,
+            "y": 0,
+            "z": 12.25,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.trees",
+          "assetId": "plaza.tree-cluster",
+          "label": "Tree cluster",
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.lights",
+          "assetId": "plaza.string-lights",
+          "label": "String lights",
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "building-frontage-mtp3gnqm",
+          "assetId": "plaza.building-frontage",
+          "label": "Building frontage",
+          "transform": {
+            "x": -72,
+            "y": 0,
+            "z": 2.5,
+            "rotationY": -0.17453292519943311
+          }
+        },
+        {
+          "id": "paving-patch-mtp3kvs9",
+          "assetId": "plaza.paving-patch",
+          "label": "Paving patch",
+          "transform": {
+            "x": -26,
+            "y": 0,
+            "z": 1,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "paving-patch-mtp3l5so",
+          "assetId": "plaza.paving-patch",
+          "label": "Paving patch",
+          "transform": {
+            "x": -25,
+            "y": 0,
+            "z": -14,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "paving-patch-mtp3la70",
+          "assetId": "plaza.paving-patch",
+          "label": "Paving patch",
+          "transform": {
+            "x": -25.5,
+            "y": 0,
+            "z": -6.5,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "corner-market-building-mtpv4wkt",
+          "assetId": "plaza.corner-market-building",
+          "label": "Corner market building",
+          "transform": {
+            "x": -24.5,
+            "y": 0,
+            "z": 26.25,
+            "rotationY": 1.5707963267948966
+          }
+        },
+        {
+          "id": "paving-patch-mtpve565",
+          "assetId": "plaza.paving-patch",
+          "label": "Paving patch",
+          "transform": {
+            "x": -25.5,
+            "y": 0,
+            "z": 8.5,
+            "rotationY": -2.4492935982947064e-16
+          }
+        },
+        {
+          "id": "paving-patch-large-mtpvlhny",
+          "assetId": "plaza.paving-patch-large",
+          "label": "Large paving patch",
+          "transform": {
+            "x": -37,
+            "y": 0,
+            "z": -10,
+            "rotationY": -2.4492935982947064e-16
+          }
+        },
+        {
+          "id": "paving-patch-large-mtpvljf2",
+          "assetId": "plaza.paving-patch-large",
+          "label": "Large paving patch",
+          "transform": {
+            "x": -37,
+            "y": 0,
+            "z": 5,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "corner-market-building-mtpvltvy",
+          "assetId": "plaza.corner-market-building",
+          "label": "Corner market building",
+          "transform": {
+            "x": -38.75,
+            "y": 0,
+            "z": -20.75,
+            "rotationY": 5.967448757360215e-16
+          }
+        },
+        {
+          "id": "building-frontage-mtpvs6gz",
+          "assetId": "plaza.building-frontage",
+          "label": "Building frontage",
+          "transform": {
+            "x": 3.5,
+            "y": 0,
+            "z": 41.25,
+            "rotationY": 2.7755575615628914e-16
+          }
+        },
+        {
+          "id": "paving-patch-large-mtpw1pxr",
+          "assetId": "plaza.paving-patch-large",
+          "label": "Large paving patch",
+          "transform": {
+            "x": 10.5,
+            "y": 0,
+            "z": 26,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "paving-patch-large-mtpw1yo5",
+          "assetId": "plaza.paving-patch-large",
+          "label": "Large paving patch",
+          "transform": {
+            "x": -5.5,
+            "y": 0,
+            "z": 26,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "paving-patch-large-mtpwdpzn",
+          "assetId": "plaza.paving-patch-large",
+          "label": "Large paving patch",
+          "transform": {
+            "x": -30,
+            "y": 0,
+            "z": 20,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "paving-patch-large-mtpwe5g4",
+          "assetId": "plaza.paving-patch-large",
+          "label": "Large paving patch",
+          "transform": {
+            "x": -21.25,
+            "y": 0,
+            "z": 26,
+            "rotationY": 0
+          }
+        }
+      ]
+    }
+  ]
+}

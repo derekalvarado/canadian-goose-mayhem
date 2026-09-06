@@ -30,6 +30,32 @@ test("canonical world serializes a multi-instance central plaza using catalog ID
   assert.equal(plaza.instances.find((instance) => instance.id === "plaza.paving")?.assetId, "plaza.paving-base");
 });
 
+test("the canonical planters are separate movable world instances", () => {
+  const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT);
+  const planters = plaza.instances.filter((instance) => instance.assetId.startsWith("plaza.planter-"));
+  assert.deepEqual(planters.map((instance) => instance.id), [
+    "plaza.planter-east-north",
+    "plaza.planter-east-south",
+    "plaza.planter-south",
+  ]);
+  assert.equal(plaza.instances.some((instance) => instance.assetId === "plaza.planter-cluster"), false);
+  assert.ok(planters.every((instance) => getWorldAsset(instance.assetId)?.colliders.length === 1));
+});
+
+test("saved layouts migrate the legacy planter cluster into separate instances", () => {
+  const legacy = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+  const plaza = getWorldArea(legacy);
+  plaza.instances = plaza.instances.filter((instance) => !instance.assetId.startsWith("plaza.planter-"));
+  plaza.instances.push({ id: "plaza.planters", assetId: "plaza.planter-cluster", label: "Planter cluster", transform: { x: 2, y: 0, z: 3, rotationY: Math.PI / 2 } });
+
+  const migrated = getWorldArea(validateWorldLayout(legacy));
+  const eastNorth = migrated.instances.find((instance) => instance.id === "plaza.planter-east-north");
+  assert.ok(eastNorth);
+  assert.ok(Math.abs(eastNorth.transform.x - (-5.2)) < 1e-9);
+  assert.ok(Math.abs(eastNorth.transform.z - (-16.35)) < 1e-9);
+  assert.equal(migrated.instances.some((instance) => instance.assetId === "plaza.planter-cluster"), false);
+});
+
 test("legacy plaza layouts migrate their landmark transforms into world instances", () => {
   const old = JSON.parse(JSON.stringify(CANONICAL_PLAZA_LAYOUT));
   old.groups["plaza.goose-fountain"].position.x = 5;

@@ -1,4 +1,5 @@
-import { CANONICAL_PLAZA_LAYOUT, PLAZA_LAYOUT_STORAGE_KEY, type PlazaLayout, validatePlazaLayout } from "./plazaLayout.ts";
+import canonicalWorldLayoutJson from "./content/world-layout.json" with { type: "json" };
+import { PLAZA_LAYOUT_STORAGE_KEY, type PlazaLayout, validatePlazaLayout } from "./plazaLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
 
 export const WORLD_LAYOUT_SCHEMA_VERSION = 2;
@@ -46,7 +47,7 @@ export function validateWorldLayout(value: unknown): WorldLayout {
     if (!record(candidate)) throw new Error(`areas[${areaIndex}] must be an object`);
     const id = validId(candidate.id, `areas[${areaIndex}].id`); if (areaIds.has(id)) throw new Error(`Duplicate area ID: ${id}`); areaIds.add(id);
     if (!Array.isArray(candidate.instances)) throw new Error(`${id}.instances must be an array`);
-    const instances = candidate.instances.map((item, index) => {
+    let instances = candidate.instances.map((item, index) => {
       if (!record(item)) throw new Error(`${id}.instances[${index}] must be an object`);
       const instanceId = validId(item.id, `${id}.instances[${index}].id`); if (instanceIds.has(instanceId)) throw new Error(`Duplicate instance ID: ${instanceId}`); instanceIds.add(instanceId);
       let assetId = validId(item.assetId, `${instanceId}.assetId`);
@@ -57,6 +58,7 @@ export function validateWorldLayout(value: unknown): WorldLayout {
       if (Math.abs(x) > 10_000_000 || Math.abs(y) > 1000 || Math.abs(z) > 10_000_000) throw new Error(`${instanceId}.transform is outside supported editing limits`);
       return { id: instanceId, assetId, label: cleanLabel(item.label, `${instanceId}.label`), transform: { x, y, z, rotationY } };
     });
+    instances = migrateLegacyPlanterCluster(instances, instanceIds);
     const chunks = sourceSchema === 1 ? legacyChunks(instances, id === CENTRAL_PLAZA_AREA_ID) : validateChunks(candidate.chunks, id);
     return { id, label: cleanLabel(candidate.label, `${id}.label`), chunks, instances };
   });
@@ -65,6 +67,31 @@ export function validateWorldLayout(value: unknown): WorldLayout {
 }
 
 function instance(id: string, assetId: string, label: string, x: number, z: number, rotationY = 0): WorldInstance { return { id, assetId, label, transform: { x, y: 0, z, rotationY } }; }
+const LEGACY_PLANTER_PARTS = [
+  { id: "plaza.planter-east-north", assetId: "plaza.planter-east-north", label: "East north planter", x: 19.35, z: -7.2 },
+  { id: "plaza.planter-east-south", assetId: "plaza.planter-east-south", label: "East south planter", x: 19.35, z: 6.2 },
+  { id: "plaza.planter-south", assetId: "plaza.planter-south", label: "South planter", x: 7.8, z: 16.7 },
+] as const;
+
+function migrateLegacyPlanterCluster(instances: WorldInstance[], instanceIds: Set<string>): WorldInstance[] {
+  const legacy = instances.find((item) => item.assetId === "plaza.planter-cluster");
+  if (!legacy) return instances;
+  instanceIds.delete(legacy.id);
+  const cosine = Math.cos(legacy.transform.rotationY);
+  const sine = Math.sin(legacy.transform.rotationY);
+  const replacements = LEGACY_PLANTER_PARTS.map((part) => {
+    const x = legacy.transform.x + part.x * cosine + part.z * sine;
+    const z = legacy.transform.z - part.x * sine + part.z * cosine;
+    const replacement = instance(part.id, part.assetId, part.label, x, z, legacy.transform.rotationY);
+    replacement.transform.y = legacy.transform.y;
+    if (instanceIds.has(replacement.id)) throw new Error(`Duplicate instance ID: ${replacement.id}`);
+    instanceIds.add(replacement.id);
+    return replacement;
+  });
+  const index = instances.indexOf(legacy);
+  return [...instances.slice(0, index), ...replacements, ...instances.slice(index + 1)];
+}
+
 export function migratePlazaLayout(layout: PlazaLayout): WorldLayout {
   const l = validatePlazaLayout(layout); const group = l.groups;
   const instances = [
@@ -74,12 +101,12 @@ export function migratePlazaLayout(layout: PlazaLayout): WorldLayout {
     instance("plaza.play-area", "plaza.play-area", group["plaza.play-area"].label, group["plaza.play-area"].position.x, group["plaza.play-area"].position.z, group["plaza.play-area"].rotationY),
     instance("plaza.pavilion-stage", "plaza.pavilion-stage", group["plaza.pavilion-stage"].label, group["plaza.pavilion-stage"].position.x, group["plaza.pavilion-stage"].position.z, group["plaza.pavilion-stage"].rotationY),
     ...(["plaza.cafe-table-1", "plaza.cafe-table-2", "plaza.cafe-table-3"] as const).map((id) => instance(id, "plaza.cafe-table-set", group[id].label, group[id].position.x, group[id].position.z, group[id].rotationY)),
-    instance("plaza.planters", "plaza.planter-cluster", "Planter cluster", 0, 0), instance("plaza.trees", "plaza.tree-cluster", "Tree cluster", 0, 0), instance("plaza.lights", "plaza.string-lights", "String lights", 0, 0),
+    instance("plaza.planter-east-north", "plaza.planter-east-north", "East north planter", 19.35, -7.2), instance("plaza.planter-east-south", "plaza.planter-east-south", "East south planter", 19.35, 6.2), instance("plaza.planter-south", "plaza.planter-south", "South planter", 7.8, 16.7), instance("plaza.trees", "plaza.tree-cluster", "Tree cluster", 0, 0), instance("plaza.lights", "plaza.string-lights", "String lights", 0, 0),
   ];
   return validateWorldLayout({ schemaVersion: 2, worldId: "old-town-square", canonicalRevision: l.canonicalRevision, units: "meters", coordinateSystem: "right-handed-y-up", areas: [{ id: CENTRAL_PLAZA_AREA_ID, label: "Central Plaza", chunks: [{ x: -1, z: -1, playable: true }, { x: 0, z: -1, playable: true }, { x: -1, z: 0, playable: true }, { x: 0, z: 0, playable: true }], instances }] });
 }
 
-export const CANONICAL_WORLD_LAYOUT = migratePlazaLayout(CANONICAL_PLAZA_LAYOUT);
+export const CANONICAL_WORLD_LAYOUT = validateWorldLayout(canonicalWorldLayoutJson);
 export function cloneWorldLayout(layout: WorldLayout): WorldLayout { return validateWorldLayout(JSON.parse(JSON.stringify(layout)) as unknown); }
 export function serializeWorldLayout(layout: WorldLayout): string { return `${JSON.stringify(validateWorldLayout(layout), null, 2)}\n`; }
 function storage(): WorldLayoutStorage | undefined { try { return typeof window === "undefined" ? undefined : window.localStorage; } catch { return undefined; } }

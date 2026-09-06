@@ -32,7 +32,7 @@ export interface PlazaBoxCollider {
 
 export type PlazaCollider = PlazaCircleCollider | PlazaBoxCollider;
 
-/** Fixed fixtures that are deliberately outside the editable feature set. */
+/** Legacy PlazaWorld fixtures; the active world uses individual catalog assets. */
 export const PLAZA_STATIC_COLLIDERS: readonly PlazaBoxCollider[] = [
   { id: "plaza.planter-east-north", shape: "box", x: 19.35, z: -7.2, halfWidth: 1.45, halfDepth: 3.3 },
   { id: "plaza.planter-east-south", shape: "box", x: 19.35, z: 6.2, halfWidth: 1.45, halfDepth: 3.1 },

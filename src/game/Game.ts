@@ -213,6 +213,7 @@ export class Game {
     }
 
     this.updateCamera(delta);
+    this.world.updatePresentation(delta);
     this.gooseOcclusionFader.update(this.world, this.camera, this.goose, delta);
     this.renderer.render(this.scene, this.camera);
   };
