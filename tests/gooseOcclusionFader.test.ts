@@ -91,7 +91,7 @@ test("plaza metadata groups complete façades and trees while leaving stage deck
   const canopy = groups.groupById("plaza.pavilion-stage.canopy");
   assert.ok(facade && facade.meshes.length > 5);
   assert.equal(groups.groupById("plaza.building.south.1"), undefined, "building frontage should contain one row");
-  assert.ok(tree && tree.meshes.length === 4);
+  assert.ok(tree && tree.meshes.length >= 10, "trees include a fuller trunk, roots, branches, and clustered foliage");
   assert.ok(canopy && canopy.meshes.length === 6);
 
   for (const mesh of [...facade.meshes, ...tree.meshes, ...canopy.meshes]) {

@@ -43,6 +43,36 @@ test("each planter asset renders independently", () => {
   }
 });
 
+test("visual detail landmarks keep their authored construction relationships", () => {
+  const corner = createWorldAssetView("plaza.corner-market-building", new OcclusionFadeGroupRegistry(), "test.corner");
+  const ledges: THREE.Mesh[] = [];
+  const upperWindows: THREE.Group[] = [];
+  corner.traverse((object) => {
+    if (object instanceof THREE.Mesh && object.userData.assetRole === "window-ledge") ledges.push(object);
+    if (object instanceof THREE.Group && object.userData.assetRole === "window" && object.userData.windowCenterY === 5.05) upperWindows.push(object);
+  });
+  assert.equal(ledges.length, 2);
+  assert.equal(upperWindows.length, 8);
+  const ledgeTop = ledges.map((ledge) => ledge.position.y + (ledge.geometry as THREE.BoxGeometry).parameters.height / 2);
+  const windowBottom = 5.05 - 1.85 / 2;
+  assert.ok(ledgeTop.every((top) => top < windowBottom && windowBottom - top < 0.1), "the ledge sits just below, without intersecting, the upper windows");
+
+  const playArea = createWorldAssetView("plaza.play-area", new OcclusionFadeGroupRegistry(), "test.play-area");
+  let bear: THREE.Group | undefined;
+  let fish: THREE.Group | undefined;
+  playArea.traverse((object) => {
+    if (!(object instanceof THREE.Group)) return;
+    if (object.userData.playSculpture === "bear") bear = object;
+    if (object.userData.playSculpture === "fish") fish = object;
+  });
+  assert.ok(bear && fish);
+  const bearBounds = new THREE.Box3().setFromObject(bear);
+  const fishBounds = new THREE.Box3().setFromObject(fish);
+  const bearSize = bearBounds.getSize(new THREE.Vector3());
+  const fishSize = fishBounds.getSize(new THREE.Vector3());
+  assert.ok(Math.max(bearSize.x, bearSize.y, bearSize.z) >= Math.max(fishSize.x, fishSize.y, fishSize.z) * 1.75, "bear should read as about twice the size of fish");
+});
+
 test("the splash pad uses pavers and nozzle dots instead of spike geometry", () => {
   const view = createWorldAssetView("plaza.splash-pad", new OcclusionFadeGroupRegistry(), "test.splash-pad");
   assert.ok(view instanceof SplashPadView);

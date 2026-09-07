@@ -98,6 +98,12 @@ Instanced props use a white base material with per-instance palette colors.
 Use flat normals for deliberate rock/building planes and smooth normals for
 rounded bodies and foliage; cel shading does not require faceting every model.
 
+New stylized cel-shaded assets should aim for a roughly 6/10 detail tier:
+clear silhouettes, modest construction or material cues, and a few layered
+forms that make the object recognizable at play distance. Avoid primitive-only
+models and photorealism; detail should support the established storybook style
+without becoming surface micro-detail.
+
 The nearest-filtered three-step ramp is paired with a neutral ambient light
 (55%) and a single directional sun (45%). The brightest band retains the palette
 color, with two darker tones defining volume. Keep `NoToneMapping` and crisp cast

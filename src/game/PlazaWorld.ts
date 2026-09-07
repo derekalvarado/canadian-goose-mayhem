@@ -127,6 +127,9 @@ function createRock(x: number, y: number, z: number, radius: number, color: numb
 
 function createBronzeGoose(): THREE.Group {
   const goose = new THREE.Group();
+  goose.name = "landing goose fountain statue";
+  goose.userData.visualDetailTier = 6;
+  goose.userData.pose = "landing";
   const bronze = toonMaterial(PALETTE.plaza.bronze);
 
   const body = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.52, 24, 16), bronze));
@@ -154,10 +157,35 @@ function createBronzeGoose(): THREE.Group {
   goose.add(bill);
 
   for (const side of [-1, 1] as const) {
-    const wing = finishMesh(new THREE.Mesh(new THREE.ConeGeometry(0.46, 2.7, 4), bronze));
-    wing.position.set(side * 0.92, 0.86, 0.12);
-    wing.rotation.set(0.12, 0, side * -Math.PI / 2);
-    wing.scale.set(0.34, 1, 0.72);
+    const wing = new THREE.Group();
+    wing.name = "curved landing wing";
+    wing.position.set(side * 0.42, 0.9, 0.1);
+    wing.rotation.z = side * -0.18;
+
+    const shoulder = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 12), bronze));
+    shoulder.scale.set(0.58, 0.72, 0.78);
+    shoulder.position.set(side * 0.2, 0.02, 0);
+    wing.add(shoulder);
+
+    const primary = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.7, 20, 12), bronze));
+    primary.scale.set(0.34, 0.2, 1.18);
+    primary.position.set(side * 0.47, -0.18, 0.18);
+    primary.rotation.set(-0.24, 0, side * -0.5);
+    wing.add(primary);
+
+    const secondary = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.52, 18, 12), bronze));
+    secondary.scale.set(0.3, 0.16, 0.94);
+    secondary.position.set(side * 0.85, -0.43, 0.31);
+    secondary.rotation.set(-0.2, 0, side * -0.78);
+    wing.add(secondary);
+
+    for (const [index, featherY] of [0, -0.16, -0.3].entries()) {
+      const feather = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 10), bronze));
+      feather.scale.set(0.2, 0.11, 0.62);
+      feather.position.set(side * (0.98 + index * 0.12), featherY - 0.39, 0.47 + index * 0.06);
+      feather.rotation.set(-0.17, 0, side * (-0.9 - index * 0.1));
+      wing.add(feather);
+    }
     goose.add(wing);
   }
 
@@ -199,7 +227,8 @@ function createFountain(): THREE.Group {
 
   const statue = createBronzeGoose();
   statue.position.set(-0.45, 2.22, -0.05);
-  statue.scale.setScalar(1.08);
+  statue.scale.setScalar(1.42);
+  statue.userData.scaleComparedToFish = 1.42;
   group.add(statue);
 
   const streamMaterial = toonMaterial(PALETTE.plaza.waterLight);
@@ -352,6 +381,10 @@ function createPlaySculptures(): THREE.Group {
   const sculptureMaterial = toonMaterial(PALETTE.plaza.concreteShade);
 
   const bear = new THREE.Group();
+  bear.name = "oversized bear sculpture";
+  bear.userData.playSculpture = "bear";
+  bear.userData.visualDetailTier = 6;
+  bear.userData.relativeScale = "about twice the fish sculpture";
   bear.position.set(-3.1, 0, -0.1);
   const bearBody = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 14), sculptureMaterial));
   bearBody.scale.set(0.82, 1.02, 0.75);
@@ -365,9 +398,13 @@ function createPlaySculptures(): THREE.Group {
     ear.position.set(side * 0.3, 1.72, -0.12);
     bear.add(ear);
   }
+  bear.scale.setScalar(2.8);
   group.add(bear);
 
   const fish = new THREE.Group();
+  fish.name = "fish sculpture";
+  fish.userData.playSculpture = "fish";
+  fish.userData.visualDetailTier = 6;
   fish.position.set(1.3, 0.62, 0);
   const fishBody = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.72, 22, 14), sculptureMaterial));
   fishBody.scale.set(1.5, 0.62, 0.68);
@@ -454,15 +491,36 @@ function createLongSideFacade(spec: LongSideFacadeSpec, side: -1 | 1, rowCenterZ
     box(spec.width + 0.08, 0.2, 0.24, spec.trim, spec.centerX, 3.08, frontZ),
   );
 
+  const pilasterMaterial = PALETTE.plaza.brickDark;
+  for (const x of [spec.centerX - spec.width / 2 + 0.18, spec.centerX + spec.width / 2 - 0.18]) {
+    group.add(box(0.28, spec.height - 0.45, 0.2, pilasterMaterial, x, (spec.height - 0.45) / 2, frontZ - side * 0.03));
+    group.add(box(0.42, 0.16, 0.28, spec.trim, x, spec.height - 0.43, frontZ - side * 0.04));
+  }
+
   const doorX = spec.centerX - spec.width * 0.28;
-  group.add(box(1.12, 2.32, 0.12, PALETTE.earth.woodDark, doorX, 1.2, frontZ));
+  group.add(
+    box(1.12, 2.32, 0.12, PALETTE.earth.woodDark, doorX, 1.2, frontZ),
+    box(1.34, 0.14, 0.18, spec.trim, doorX, 2.43, frontZ - side * 0.03),
+    box(0.1, 2.42, 0.18, spec.trim, doorX - 0.62, 1.2, frontZ - side * 0.03),
+    box(0.1, 2.42, 0.18, spec.trim, doorX + 0.62, 1.2, frontZ - side * 0.03),
+  );
+  const doorHandle = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), toonMaterial(PALETTE.accent.sunlight)), false);
+  doorHandle.position.set(doorX + 0.3, 1.2, frontZ - side * 0.1);
+  group.add(doorHandle);
 
   const storefrontX = spec.centerX + spec.width * 0.14;
   const storefrontWidth = Math.max(2.35, spec.width * 0.56);
   group.add(
     box(storefrontWidth, 2.08, 0.11, PALETTE.plaza.window, storefrontX, 1.18, frontZ),
     box(storefrontWidth + 0.18, 0.3, 0.72, spec.awning, storefrontX, 2.55, awningZ),
+    box(storefrontWidth + 0.26, 0.12, 0.16, spec.trim, storefrontX, 2.28, frontZ - side * 0.04),
   );
+  for (const x of [storefrontX - storefrontWidth / 3, storefrontX, storefrontX + storefrontWidth / 3]) {
+    group.add(box(0.07, 1.96, 0.16, spec.trim, x, 1.18, frontZ - side * 0.05));
+  }
+  for (const index of [-1, 0, 1] as const) {
+    group.add(box(0.2, 0.12, 0.18, spec.trim, storefrontX + index * storefrontWidth * 0.34, 2.75, awningZ - side * 0.06));
+  }
 
   const upperFloors = Math.max(1, Math.floor((spec.height - 3.6) / 2.25));
   const windowCount = Math.max(2, Math.floor(spec.width / 2));
@@ -473,6 +531,8 @@ function createLongSideFacade(spec: LongSideFacadeSpec, side: -1 | 1, rowCenterZ
       group.add(
         box(0.98, 1.3, 0.1, PALETTE.plaza.window, x, y, frontZ),
         box(1.22, 0.12, 0.18, spec.trim, x, y + 0.72, frontZ - side * 0.02),
+        box(1.22, 0.12, 0.18, spec.trim, x, y - 0.72, frontZ - side * 0.02),
+        box(0.08, 1.18, 0.18, spec.trim, x, y, frontZ - side * 0.03),
       );
     }
   }
@@ -498,6 +558,10 @@ function createLongSideBuildings(groups: OcclusionFadeGroupRegistry, namespace =
 
 function createCornerWindow(front: boolean, coordinate: number, y: number, width: number, height: number, trim: number): THREE.Group {
   const group = new THREE.Group();
+  group.userData.assetRole = "window";
+  group.userData.windowCenterY = y;
+  group.userData.windowHeight = height;
+  group.userData.windowSurface = front ? "front" : "side";
   const x = front ? coordinate : 7.34;
   const z = front ? -6.04 : coordinate;
   group.add(front
@@ -564,11 +628,18 @@ function createCornerMarketBuilding(groups: OcclusionFadeGroupRegistry, namespac
   const iron = PALETTE.plaza.iron;
   const trim = PALETTE.accent.cream;
 
+  const windowLedgeY = 3.95;
+  const frontWindowLedge = box(14.78, 0.28, 0.32, trim, 0, windowLedgeY, -6.04);
+  frontWindowLedge.name = "corner-window-ledge-front";
+  frontWindowLedge.userData.assetRole = "window-ledge";
+  const sideWindowLedge = box(0.32, 0.28, 12.08, trim, 7.28, windowLedgeY, 0);
+  sideWindowLedge.name = "corner-window-ledge-side";
+  sideWindowLedge.userData.assetRole = "window-ledge";
   group.add(
     box(14.5, 10.2, 11.8, brick, 0, 5.1, 0),
     box(14.85, 0.42, 12.1, stone, 0, 0.3, 0),
-    box(14.78, 0.28, 0.32, trim, 0, 3.45, -6.04),
-    box(0.32, 0.28, 12.08, trim, 7.28, 3.45, 0),
+    frontWindowLedge,
+    sideWindowLedge,
     box(14.82, 0.24, 0.3, trim, 0, 6.98, -6.04),
     box(0.3, 0.24, 12.04, trim, 7.28, 6.98, 0),
   );
@@ -643,24 +714,64 @@ function createCornerMarketBuilding(groups: OcclusionFadeGroupRegistry, namespac
 
 function createPlanter(obstacle: PlazaBoxCollider): THREE.Group {
   const group = new THREE.Group();
+  const width = obstacle.halfWidth * 2;
+  const depth = obstacle.halfDepth * 2;
+  const x = obstacle.x;
+  const z = obstacle.z;
   group.add(box(
-    obstacle.halfWidth * 2,
+    width + 0.22,
+    0.14,
+    depth + 0.22,
+    PALETTE.plaza.concreteShade,
+    x,
+    0.07,
+    z,
+  ));
+  group.add(box(
+    width,
     0.68,
-    obstacle.halfDepth * 2,
+    depth,
     PALETTE.plaza.sandstone,
-    obstacle.x,
-    0.34,
-    obstacle.z,
+    x,
+    0.42,
+    z,
   ));
-  group.add(box(
-    obstacle.halfWidth * 1.7,
-    0.26,
-    obstacle.halfDepth * 1.72,
-    PALETTE.green.deep,
-    obstacle.x,
-    0.72,
-    obstacle.z,
-  ));
+
+  const trim = PALETTE.accent.cream;
+  const rimY = 0.78;
+  group.add(
+    box(width + 0.2, 0.12, 0.2, trim, x, rimY, z - depth / 2),
+    box(width + 0.2, 0.12, 0.2, trim, x, rimY, z + depth / 2),
+    box(0.2, 0.12, depth - 0.16, trim, x - width / 2, rimY, z),
+    box(0.2, 0.12, depth - 0.16, trim, x + width / 2, rimY, z),
+  );
+  const soil = box(
+    Math.max(0.2, width - 0.34),
+    0.12,
+    Math.max(0.2, depth - 0.34),
+    PALETTE.earth.pathShade,
+    x,
+    0.78,
+    z,
+  );
+  soil.name = "planter soil";
+  soil.userData.assetRole = "soil";
+  group.add(soil);
+
+  const panelMaterial = PALETTE.plaza.brickDark;
+  const panelInset = PALETTE.plaza.sandstone;
+  const longSide = obstacle.halfWidth >= obstacle.halfDepth;
+  const panelCount = Math.max(1, Math.floor((longSide ? width : depth) / 2.2));
+  for (let index = 0; index < panelCount; index += 1) {
+    const progress = panelCount === 1 ? 0 : index / (panelCount - 1) * 2 - 1;
+    const panel = longSide
+      ? box(0.9, 0.3, 0.035, panelMaterial, x + progress * obstacle.halfWidth * 0.72, 0.4, z - depth / 2 - 0.02)
+      : box(0.035, 0.3, 0.9, panelMaterial, x - width / 2 - 0.02, 0.4, z + progress * obstacle.halfDepth * 0.72);
+    const inset = longSide
+      ? box(0.56, 0.16, 0.045, panelInset, x + progress * obstacle.halfWidth * 0.72, 0.4, z - depth / 2 - 0.045)
+      : box(0.045, 0.16, 0.56, panelInset, x - width / 2 - 0.045, 0.4, z + progress * obstacle.halfDepth * 0.72);
+    group.add(panel, inset);
+  }
 
   const flowerColors = [PALETTE.flower.coral, PALETTE.flower.yellow, PALETTE.flower.pink];
   const count = Math.max(4, Math.floor(obstacle.halfDepth * 2.2 + obstacle.halfWidth * 1.7));
@@ -672,9 +783,9 @@ function createPlanter(obstacle: PlazaBoxCollider): THREE.Group {
       toonMaterial(flowerColors[index % flowerColors.length]),
     ), false);
     flower.position.set(
-      obstacle.x + (alongX ? progress * obstacle.halfWidth * 0.75 : (index % 2 - 0.5) * 0.42),
+      x + (alongX ? progress * obstacle.halfWidth * 0.75 : (index % 2 - 0.5) * 0.42),
       0.93 + (index % 3) * 0.04,
-      obstacle.z + (alongX ? (index % 2 - 0.5) * 0.42 : progress * obstacle.halfDepth * 0.78),
+      z + (alongX ? (index % 2 - 0.5) * 0.42 : progress * obstacle.halfDepth * 0.78),
     );
     group.add(flower);
   }
@@ -683,17 +794,38 @@ function createPlanter(obstacle: PlazaBoxCollider): THREE.Group {
 
 function createTree(id: string, x: number, z: number, height: number, groups: OcclusionFadeGroupRegistry): THREE.Group {
   const group = new THREE.Group();
+  group.userData.visualDetailTier = 6;
   const trunk = finishMesh(new THREE.Mesh(
-    new THREE.CylinderGeometry(0.28, 0.4, height * 0.62, 12),
+    new THREE.CylinderGeometry(0.3, 0.5, height * 0.64, 12),
     toonMaterial(PALETTE.earth.woodDark),
   ));
-  trunk.position.set(x, height * 0.31, z);
+  trunk.position.set(x, height * 0.32, z);
   group.add(trunk);
-  const crownMaterial = toonMaterial(PALETTE.green.leaf);
-  for (const [offsetX, offsetY, offsetZ, scale] of [
-    [0, 0.72, 0, 1.35], [-0.7, 0.64, 0.15, 0.9], [0.65, 0.66, -0.1, 0.95],
+  const rootMaterial = toonMaterial(PALETTE.earth.wood);
+  for (const [angle, scale] of [[0.2, 1], [2.25, 0.86], [4.35, 0.9]] as const) {
+    const root = finishMesh(new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.36, 7), rootMaterial));
+    root.position.set(x + Math.cos(angle) * 0.34, 0.18, z + Math.sin(angle) * 0.34);
+    root.scale.set(scale, 1, 0.68);
+    root.rotation.y = angle;
+    group.add(root);
+  }
+  const branchMaterial = toonMaterial(PALETTE.earth.wood);
+  for (const [offsetX, offsetY, offsetZ, length, tilt] of [
+    [-0.34, 0.47, 0.02, 1.45, -0.65], [0.32, 0.52, -0.04, 1.55, 0.62],
+    [-0.18, 0.63, 0.08, 1.2, -0.38], [0.22, 0.68, 0.02, 1.05, 0.4],
   ] as const) {
-    const crown = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(1, 22, 14), crownMaterial));
+    const branch = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.16, length, 8), branchMaterial));
+    branch.position.set(x + offsetX, height * offsetY, z + offsetZ);
+    branch.rotation.z = tilt;
+    branch.rotation.x = 0.18;
+    group.add(branch);
+  }
+  const crownMaterials = [toonMaterial(PALETTE.green.leaf), toonMaterial(PALETTE.green.hedge), toonMaterial(PALETTE.green.grass)];
+  for (const [index, [offsetX, offsetY, offsetZ, scale]] of [
+    [0, 0.72, 0, 1.35], [-0.82, 0.62, 0.18, 0.9], [0.78, 0.65, -0.15, 0.96],
+    [-0.36, 0.84, -0.2, 0.86], [0.38, 0.86, 0.18, 0.82], [0.02, 0.57, 0.42, 0.72],
+  ].entries()) {
+    const crown = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(1, 22, 14), crownMaterials[index % crownMaterials.length]));
     crown.position.set(x + offsetX, height * offsetY, z + offsetZ);
     crown.scale.set(scale, scale * 0.82, scale);
     group.add(crown);
@@ -705,17 +837,33 @@ function createTree(id: string, x: number, z: number, height: number, groups: Oc
 function createCafeTable(): THREE.Group {
   const group = new THREE.Group();
   const metal = toonMaterial(PALETTE.plaza.awningBlue);
-  const stem = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.72, 10), metal));
+  group.add(
+    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.72, 10), metal)),
+    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.08, 12), metal)),
+  );
+  const stem = group.children[0] as THREE.Mesh;
   stem.position.set(0, 0.36, 0);
-  group.add(stem);
-  const top = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.08, 18), metal));
+  const foot = group.children[1] as THREE.Mesh;
+  foot.position.set(0, 0.06, 0);
+  const top = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.1, 18), metal));
   top.position.set(0, 0.76, 0);
   group.add(top);
+  const topInset = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.025, 18), toonMaterial(PALETTE.plaza.awningGreen)), false);
+  topInset.position.set(0, 0.82, 0);
+  group.add(topInset);
   for (let index = 0; index < 3; index += 1) {
     const angle = index / 3 * Math.PI * 2;
-    const chair = box(0.5, 0.48, 0.48, PALETTE.plaza.awningBlue);
-    chair.position.set(Math.cos(angle) * 0.88, 0.24, Math.sin(angle) * 0.88);
+    const chair = new THREE.Group();
+    chair.name = "cafe chair";
+    chair.position.set(Math.cos(angle) * 0.88, 0, Math.sin(angle) * 0.88);
     chair.rotation.y = -angle;
+    chair.add(
+      box(0.52, 0.11, 0.52, PALETTE.plaza.awningBlue, 0, 0.48, 0),
+      box(0.52, 0.62, 0.1, PALETTE.plaza.awningBlue, 0, 0.78, 0.22),
+    );
+    for (const legX of [-0.18, 0.18] as const) {
+      chair.add(box(0.08, 0.42, 0.08, PALETTE.plaza.iron, legX, 0.26, -0.16));
+    }
     group.add(chair);
   }
   return group;
