@@ -61,6 +61,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.planter-east-north", label: "East north planter", category: "planting", halfWidth: 1.45, halfDepth: 3.3, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.45, halfDepth: 3.3 }], warnForOverlap: false },
   { assetId: "plaza.planter-east-south", label: "East south planter", category: "planting", halfWidth: 1.45, halfDepth: 3.1, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.45, halfDepth: 3.1 }], warnForOverlap: false },
   { assetId: "plaza.planter-south", label: "South planter", category: "planting", halfWidth: 3.5, halfDepth: 1.3, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.5, halfDepth: 1.3 }], warnForOverlap: false },
+  { assetId: "nature.deciduous-tree", label: "Deciduous tree", category: "planting", halfWidth: 5, halfDepth: 3.8, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.67 }], occludesCamera: true },
   { assetId: "plaza.tree-cluster", label: "Tree cluster", category: "planting", halfWidth: 22, halfDepth: 18, colliders: [] , occludesCamera: true, warnForOverlap: false },
   { assetId: "plaza.string-lights", label: "String-light span", category: "lighting", halfWidth: 19, halfDepth: 11, colliders: [], warnForOverlap: false },
 ] as const;

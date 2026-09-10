@@ -17,6 +17,7 @@ export const PALETTE = {
     canadaBrownDark: 0x5b554a,
   },
   green: {
+    deciduous: 0x71915b,
     lawn: 0x739b7d,
     grass: 0x668d6f,
     leaf: 0x477653,

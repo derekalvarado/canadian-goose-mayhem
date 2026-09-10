@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { DeciduousTreeView } from "./DeciduousTreeView.ts";
 import {
   FOUNTAIN_RADIUS,
   PAVILION_SIZE,
@@ -992,6 +993,11 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.planter-east-north": return createSinglePlanter(1.45, 3.3);
     case "plaza.planter-east-south": return createSinglePlanter(1.45, 3.1);
     case "plaza.planter-south": return createSinglePlanter(3.5, 1.3);
+    case "nature.deciduous-tree": {
+      const tree = new DeciduousTreeView();
+      groups.register(instanceId, tree);
+      return tree;
+    }
     case "plaza.tree-cluster": return createTreeCluster(groups, instanceId);
     case "plaza.string-lights": return createStringLights();
     default: throw new Error(`No renderer for world asset: ${assetId}`);
