@@ -9,10 +9,14 @@ not in the model file.
 
 ## Deciduous tree
 
-`deciduous_tree.glb` matches the far-left green tree in the Parks & Nature row of
-`concepts/asset-concepts.png`: rounded muted-green canopy with distinct overlapping leaf tufts and a chunky
-brown forked trunk. Height is 10 m, with a ground-level origin centered on the trunk (glTF Y-up).
-The asset uses 8,692 triangles, two rough nonmetallic materials, and no textures.
+`deciduous_tree.glb`, `deciduous_tree_2.glb`, and `deciduous_tree_3.glb` form a
+coordinated set based on the far-left green tree in the Parks & Nature row of
+`concepts/asset-concepts.png`. Each has three or four separated, softly faceted
+muted-green crowns supported by a continuous, tapered, bending trunk and visible
+forks. All are 10 m tall with a ground-level origin centered on the trunk (glTF
+Y-up), two rough nonmetallic materials, and no textures. A stable hash of each
+world instance ID selects its presentation variant, so trees vary without changing
+after reloads or adding presentation state to the world layout.
 Runtime rendering uses the shared toon factory and palette. Find **Deciduous tree**
 under **planting** in the world editor; its stable ID is `nature.deciduous-tree`.
 Only the trunk blocks movement; camera fading applies to the complete tree.
@@ -23,7 +27,7 @@ Rebuild from the repository root with:
 /Applications/Blender.app/Contents/MacOS/Blender --background --python assets/props/build_deciduous_tree.py
 ```
 
-The recipe writes the GLB alongside itself and a preview to
+The recipe writes all three GLBs alongside itself and a comparison preview to
 `/private/tmp/deciduous_tree_preview.png`.
 
 ## Building 1

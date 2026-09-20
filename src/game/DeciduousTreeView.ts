@@ -3,23 +3,38 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { PALETTE } from "./palette.ts";
 import { toonMaterial } from "./toonMaterial.ts";
 
-const MODEL_URL = new URL("../../assets/props/deciduous_tree.glb", import.meta.url).href;
-let modelPromise: Promise<THREE.Group> | undefined;
-function loadModel(): Promise<THREE.Group> {
-  modelPromise ??= new GLTFLoader().loadAsync(MODEL_URL).then((gltf) => gltf.scene).catch((error: unknown) => {
-    modelPromise = undefined;
+const MODEL_URLS = [
+  new URL("../../assets/props/deciduous_tree.glb", import.meta.url).href,
+  new URL("../../assets/props/deciduous_tree_2.glb", import.meta.url).href,
+  new URL("../../assets/props/deciduous_tree_3.glb", import.meta.url).href,
+] as const;
+
+export type DeciduousTreeVariant = 0 | 1 | 2;
+
+const modelPromises: Array<Promise<THREE.Group> | undefined> = [];
+function loadModel(variant: DeciduousTreeVariant): Promise<THREE.Group> {
+  modelPromises[variant] ??= new GLTFLoader().loadAsync(MODEL_URLS[variant]).then((gltf) => gltf.scene).catch((error: unknown) => {
+    modelPromises[variant] = undefined;
     throw error;
   });
-  return modelPromise;
+  return modelPromises[variant];
+}
+
+/** Presentation variation remains stable for every persistent world instance. */
+export function deciduousTreeVariantForId(instanceId: string): DeciduousTreeVariant {
+  let hash = 0;
+  for (const character of instanceId) hash = (Math.imul(hash, 31) + character.charCodeAt(0)) >>> 0;
+  return hash % MODEL_URLS.length as DeciduousTreeVariant;
 }
 
 /** Stable meshes let editor previews and camera fading work before the GLB arrives. */
 export class DeciduousTreeView extends THREE.Group {
   readonly ready: Promise<void>;
 
-  constructor(loader?: () => Promise<THREE.Group>) {
+  constructor(loader?: () => Promise<THREE.Group>, variant: DeciduousTreeVariant = 0) {
     super();
     this.name = "Deciduous tree";
+    this.userData.treeVariant = variant;
     const meshes = new Map<string, THREE.Mesh>();
     for (const [name, color] of [
       ["Deciduous foliage", PALETTE.green.deciduous],
@@ -35,7 +50,7 @@ export class DeciduousTreeView extends THREE.Group {
       this.ready = Promise.resolve();
       return;
     }
-    this.ready = (loader ?? loadModel)().then((source) => {
+    this.ready = (loader ?? (() => loadModel(variant)))().then((source) => {
       source.updateMatrixWorld(true);
       source.traverse((object) => {
         if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
@@ -47,6 +62,6 @@ export class DeciduousTreeView extends THREE.Group {
         target.castShadow = this.userData.editorIgnore !== true;
       });
     });
-    void this.ready.catch((error: unknown) => console.error("Unable to load the deciduous tree model", error));
+    void this.ready.catch((error: unknown) => console.error(`Unable to load deciduous tree variant ${variant + 1}`, error));
   }
 }

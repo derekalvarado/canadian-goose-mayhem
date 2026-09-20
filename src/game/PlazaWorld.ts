@@ -1,7 +1,7 @@
 import { createOldTownPaving, createTownBench, createTownBed, createTownLamp, createTownLights, createTownFireplace, createTownStage, createTownBlock, createTownInlay } from "./OldTownViews.ts";
 import * as THREE from "three";
 import { JanitorView } from "./JanitorView.ts";
-import { DeciduousTreeView } from "./DeciduousTreeView.ts";
+import { DeciduousTreeView, deciduousTreeVariantForId } from "./DeciduousTreeView.ts";
 import { Building1View } from "./Building1View.ts";
 import { TrashCanView } from "./TrashCanView.ts";
 import {
@@ -807,13 +807,17 @@ function createTree(id: string, x: number, z: number, height: number, groups: Oc
     group.add(branch);
   }
   const crownMaterials = [toonMaterial(PALETTE.green.leaf), toonMaterial(PALETTE.green.hedge), toonMaterial(PALETTE.green.grass)];
-  for (const [index, [offsetX, offsetY, offsetZ, scale]] of [
-    [0, 0.72, 0, 1.35], [-0.82, 0.62, 0.18, 0.9], [0.78, 0.65, -0.15, 0.96],
-    [-0.36, 0.84, -0.2, 0.86], [0.38, 0.86, 0.18, 0.82], [0.02, 0.57, 0.42, 0.72],
+  // Three separated crowns keep the forks readable and avoid a single green
+  // bubble, while the modest geometry stays inexpensive when camera-faded.
+  const crownGeometry = new THREE.IcosahedronGeometry(1, 2);
+  for (const [index, [offsetX, offsetY, offsetZ, scaleX, scaleY, scaleZ]] of [
+    [0, 0.86, 0, 0.86, 0.74, 0.92],
+    [-1.35, 0.7, 0.1, 0.78, 0.68, 0.78],
+    [1.38, 0.71, -0.12, 0.8, 0.7, 0.8],
   ].entries()) {
-    const crown = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(1, 22, 14), crownMaterials[index % crownMaterials.length]));
+    const crown = finishMesh(new THREE.Mesh(crownGeometry, crownMaterials[index % crownMaterials.length]));
     crown.position.set(x + offsetX, height * offsetY, z + offsetZ);
-    crown.scale.set(scale, scale * 0.82, scale);
+    crown.scale.set(scaleX, scaleY, scaleZ);
     group.add(crown);
   }
   groups.register(id, group);
@@ -977,7 +981,7 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.street-janitor": return new JanitorView();
     case "oldtown.shade-tree":
     case "nature.deciduous-tree": {
-      const tree = new DeciduousTreeView();
+      const tree = new DeciduousTreeView(undefined, deciduousTreeVariantForId(instanceId));
       if (assetId === "oldtown.shade-tree") tree.scale.setScalar(0.72);
       groups.register(instanceId, tree);
       return tree;

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { DeciduousTreeView } from "../src/game/DeciduousTreeView.ts";
+import { DeciduousTreeView, deciduousTreeVariantForId } from "../src/game/DeciduousTreeView.ts";
 import { createWorldAssetView } from "../src/game/PlazaWorld.ts";
 import { OcclusionFadeGroupRegistry } from "../src/game/OcclusionFadeGroups.ts";
 import { getWorldAsset } from "../src/game/worldAssets.ts";
@@ -55,6 +55,26 @@ test("tree GLB preserves scale, ground pivot, simple geometry, and independent p
   assert.ok(Math.abs(trunkBounds.min.x + trunkBounds.max.x) < 0.2);
 });
 
+test("all tree variations retain the shared placement envelope", async () => {
+  const asset = getWorldAsset("nature.deciduous-tree")!;
+  for (const [variant, filename] of [
+    [0, "deciduous_tree.glb"],
+    [1, "deciduous_tree_2.glb"],
+    [2, "deciduous_tree_3.glb"],
+  ] as const) {
+    const bytes = await readFile(new URL(`../assets/props/${filename}`, import.meta.url));
+    const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
+    const tree = new DeciduousTreeView(async () => gltf.scene, variant);
+    await tree.ready;
+    const bounds = new THREE.Box3().setFromObject(tree);
+    assert.ok(Math.abs(bounds.min.y) < 1e-5, `${filename} must remain grounded`);
+    assert.ok(Math.abs(bounds.max.y - 10) < 1e-5, `${filename} must remain 10 m tall`);
+    assert.ok(Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x)) <= asset.halfWidth, `${filename} exceeds its width envelope`);
+    assert.ok(Math.max(Math.abs(bounds.min.z), Math.abs(bounds.max.z)) <= asset.halfDepth, `${filename} exceeds its depth envelope`);
+    assert.equal(tree.userData.treeVariant, variant);
+  }
+});
+
 test("tree placements round-trip and only their trunks block the goose", () => {
   const world = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   const area = getWorldArea(world);
@@ -69,4 +89,15 @@ test("tree placements round-trip and only their trunks block the goose", () => {
   const groups = new OcclusionFadeGroupRegistry();
   assert.ok(createWorldAssetView(item.assetId, groups, item.id) instanceof DeciduousTreeView);
   assert.ok(groups.groupById(item.id));
+});
+
+test("persistent tree IDs select all three canopy variants deterministically", () => {
+  const ids = ["oldtown.north.tree-0", "oldtown.north.tree-1", "oldtown.north.tree-2"];
+  const variants = ids.map(deciduousTreeVariantForId);
+  assert.equal(new Set(variants).size, 3);
+  assert.deepEqual(ids.map(deciduousTreeVariantForId), variants);
+
+  const groups = new OcclusionFadeGroupRegistry();
+  const views = ids.map((id) => createWorldAssetView("oldtown.shade-tree", groups, id));
+  assert.deepEqual(views.map((view) => view.userData.treeVariant), variants);
 });
