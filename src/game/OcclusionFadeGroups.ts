@@ -13,6 +13,7 @@ export interface OcclusionFadeGroup {
 export class OcclusionFadeGroupRegistry {
   private readonly groupsById = new Map<string, OcclusionFadeGroup>();
   private readonly groupsByMesh = new Map<THREE.Mesh, OcclusionFadeGroup>();
+  private readonly raycastMeshes: THREE.Mesh[] = [];
 
   register(id: string, root: THREE.Object3D): OcclusionFadeGroup {
     if (this.groupsById.has(id)) throw new Error(`Duplicate occlusion fade group: ${id}`);
@@ -29,8 +30,16 @@ export class OcclusionFadeGroupRegistry {
 
     const group: OcclusionFadeGroup = { id, meshes };
     this.groupsById.set(id, group);
-    for (const mesh of meshes) this.groupsByMesh.set(mesh, group);
+    for (const mesh of meshes) {
+      this.groupsByMesh.set(mesh, group);
+      this.raycastMeshes.push(mesh);
+    }
     return group;
+  }
+
+  /** The small authored subset eligible to block the camera. */
+  meshesForRaycast(): THREE.Mesh[] {
+    return this.raycastMeshes;
   }
 
   groupForMesh(mesh: THREE.Mesh): OcclusionFadeGroup | undefined {
@@ -44,5 +53,6 @@ export class OcclusionFadeGroupRegistry {
   clear(): void {
     this.groupsById.clear();
     this.groupsByMesh.clear();
+    this.raycastMeshes.length = 0;
   }
 }

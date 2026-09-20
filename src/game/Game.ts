@@ -106,6 +106,7 @@ export class Game {
   private disposed = false;
   private lastInputTime = performance.now();
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  private readonly canvasResizeObserver: ResizeObserver;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -147,7 +148,10 @@ export class Game {
     }
 
     if (!this.editorMode && !this.overviewMode) this.setupMobileControls();
+    this.canvasResizeObserver = new ResizeObserver(this.resize);
+    this.canvasResizeObserver.observe(canvas);
     window.addEventListener("resize", this.resize);
+    window.visualViewport?.addEventListener("resize", this.resize);
     window.addEventListener("blur", this.handleBlur);
     window.addEventListener("focus", this.handleFocus);
     document.addEventListener("visibilitychange", this.handleVisibility);
@@ -424,6 +428,8 @@ export class Game {
     this.disposed = true;
     this.renderer.setAnimationLoop(null);
     window.removeEventListener("resize", this.resize);
+    window.visualViewport?.removeEventListener("resize", this.resize);
+    this.canvasResizeObserver.disconnect();
     window.removeEventListener("blur", this.handleBlur);
     window.removeEventListener("focus", this.handleFocus);
     document.removeEventListener("visibilitychange", this.handleVisibility);

@@ -29,6 +29,10 @@ function setOpacity(material: THREE.Material | THREE.Material[], opacity: number
   }
 }
 
+function disposeMaterials(material: THREE.Material | THREE.Material[]): void {
+  for (const entry of Array.isArray(material) ? material : [material]) entry.dispose();
+}
+
 /**
  * Keeps the player readable when foreground scenery lies between the follow
  * camera and the goose. This is deliberately view-only: world collision and
@@ -62,7 +66,7 @@ export class GooseOcclusionFader {
       if (distance === 0) continue;
 
       this.raycaster.set(this.raycaster.ray.origin, this.direction.multiplyScalar(1 / distance));
-      for (const hit of this.raycaster.intersectObject(world, true)) {
+      for (const hit of this.raycaster.intersectObjects(this.groups.meshesForRaycast(), false)) {
         if (hit.distance >= distance - 0.04 || !(hit.object instanceof THREE.Mesh)) continue;
         const group = this.groups.groupForMesh(hit.object);
         if (group) this.blockedGroups.add(group);
@@ -108,6 +112,7 @@ export class GooseOcclusionFader {
   private restore(group: OcclusionFadeGroup, meshes: Map<THREE.Mesh, FadedMesh>): void {
     for (const [mesh, state] of meshes) {
       mesh.material = state.originalMaterial;
+      disposeMaterials(state.fadedMaterial);
     }
     this.fadedGroups.delete(group);
   }
