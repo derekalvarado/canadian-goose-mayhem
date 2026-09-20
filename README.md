@@ -43,6 +43,14 @@ to the checked-in canonical layout.
 - Hurry: `Shift` or the right trigger
 - Honk: `Space` or the controller south face button
 
+On touch-first devices, play in landscape with the floating left-side joystick
+(18 px dead zone, 86 px full deflection); push past 62 CSS pixels to hurry (it
+releases below 52 pixels) and use the separate right-side **Honk** button. The Settings button offers touch controls Auto, Show,
+or Hide; this preference is local to the browser, not a game save. Portrait pauses
+only on coarse-pointer touch devices, so a narrow desktop window remains playable.
+Fullscreen is offered where the browser permits it; mobile browsers may require the
+Fullscreen button's direct tap and may decline the request.
+
 The camera automatically follows the goose from a fixed diagonal, top-down angle.
 
 ## Project layout
@@ -110,3 +118,15 @@ color, with two darker tones defining volume. Keep `NoToneMapping` and crisp cas
 shadows. Avoid hemisphere/fill lights, bloom, fog, glossy materials, and additive
 glows: these reintroduce gradients or wash out the color blocks. Animated character
 parts cast shadows onto the world but do not receive tiny self-shadow seams.
+
+## Photo-informed Old Town Square
+
+The current square uses the approved muted-brick storefront style and a composition
+informed by the DDA site plan and renovation photos. Open `?overview` for an orbitable
+view of the complete square, with links to walking and editing modes. The editor
+catalog includes all five GLB storefronts and the new landmark blocks and street
+furniture. See [reconstruction references and approximations](docs/old-town-reconstruction.md).
+
+Older browser drafts are archived before the new composition is loaded. Use
+**Restore previous square** in the editor to recover one; other authored areas stay
+intact. If browser storage cannot retain the backup, the previous draft stays active.

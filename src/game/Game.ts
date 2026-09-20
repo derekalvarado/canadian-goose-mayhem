@@ -1,7 +1,11 @@
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { ViewSunShadow } from "./ViewSunShadow.ts";
 import * as THREE from "three";
 import { WorldView } from "./WorldView";
 import { Goose } from "./Goose";
 import { InputController, type InputDevice } from "./InputController";
+import { TouchControls } from "./TouchControls";
+import { PauseReasons, parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
 import { Simulation, HURRY_SPEED } from "./simulation/Simulation";
 import { FOUNTAIN_OBJECTIVE_ID } from "./simulation/plaza";
@@ -55,12 +59,14 @@ export class Game {
   private readonly canvas: HTMLCanvasElement;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.1, 130);
+  private readonly sunShadow = new ViewSunShadow();
+  private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.1, 300);
+  private readonly overviewMode = new URLSearchParams(window.location.search).has("overview");
   private readonly editorMode = new URLSearchParams(window.location.search).has("edit");
   private readonly worldLayout = loadWorldLayout();
   private readonly worldArea = getWorldArea(this.worldLayout);
   private readonly rules = createCentralPlazaRules(this.worldArea);
-  private readonly world = new WorldView(this.worldArea, !this.editorMode);
+  private readonly world = new WorldView(this.worldArea, !this.editorMode && !this.overviewMode);
   private readonly goose = new Goose();
   private readonly poopViews = new Map<string, THREE.Group>();
   private readonly gooseOcclusionFader = new GooseOcclusionFader(this.world.occlusionFadeGroups);
@@ -86,7 +92,17 @@ export class Game {
   private readonly keyboardControls = requireElement<HTMLElement>("#keyboard-controls");
   private readonly gamepadControls = requireElement<HTMLElement>("#gamepad-controls");
   private readonly deviceLabel = requireElement<HTMLElement>("#device-label");
+  private readonly touchControlsRoot = requireElement<HTMLElement>("#touch-controls");
+  private readonly settingsMenu = requireElement<HTMLElement>("#settings-menu");
+  private readonly rotateMessage = requireElement<HTMLElement>("#rotate-message");
+  private readonly settingsButton = requireElement<HTMLButtonElement>("#settings-button");
+  private readonly fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
+  private readonly touchPreferenceSelect = requireElement<HTMLSelectElement>("#touch-controls-preference");
+  private readonly pauseReasons = new PauseReasons();
+  private touchControls: TouchControls | null = null;
   private paused = false;
+  private touchPreference: TouchControlsPreference = "auto";
+  private coarseTouchDevice = window.matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints > 0;
   private disposed = false;
   private lastInputTime = performance.now();
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -114,17 +130,29 @@ export class Game {
     this.input = new InputController(this.handleDeviceChanged);
 
     if (this.editorMode) {
-      this.camera.position.set(30, 36, 30);
+      this.camera.position.set(37, 58, 65);
       this.camera.lookAt(0, 0, 0);
       this.goose.visible = false;
       new WorldEditor(this.scene, this.camera, canvas, this.worldLayout, this.world);
     }
 
+    if (this.overviewMode && !this.editorMode) {
+      this.camera.position.set(-55, 78, 82); this.camera.lookAt(-5, 0, 0);
+      this.goose.visible = false;
+      const orbit = new OrbitControls(this.camera, canvas); orbit.target.set(-5, 0, 0); orbit.update();
+      document.body.classList.add("overview-mode");
+      const links = document.createElement("nav"); links.className = "square-overview";
+      links.innerHTML = '<strong>Old Town Square</strong><span>Drag to orbit · scroll to zoom</span><a href="?">Walk the square</a><a href="?edit">Edit the square</a>';
+      document.querySelector("#game-shell")?.append(links);
+    }
+
     requireElement<HTMLButtonElement>("#restart-button").addEventListener("click", this.restart);
+    if (!this.editorMode && !this.overviewMode) this.setupMobileControls();
     window.addEventListener("resize", this.resize);
     window.addEventListener("blur", this.handleBlur);
     window.addEventListener("focus", this.handleFocus);
     document.addEventListener("visibilitychange", this.handleVisibility);
+    document.addEventListener("fullscreenchange", this.syncFullscreenLabel);
     window.addEventListener("pagehide", this.dispose, { once: true });
     this.resize();
   }
@@ -139,19 +167,7 @@ export class Game {
     // Hemisphere lights and colored fills introduce gradients between the bands.
     this.scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.55));
 
-    const sun = new THREE.DirectionalLight(0xffffff, Math.PI * 0.45);
-    sun.position.set(-9, 18, 8);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -22;
-    sun.shadow.camera.right = 22;
-    sun.shadow.camera.top = 24;
-    sun.shadow.camera.bottom = -24;
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 52;
-    sun.shadow.bias = -0.00018;
-    sun.shadow.normalBias = 0.025;
-    this.scene.add(sun);
+    this.scene.add(this.sunShadow.light, this.sunShadow.light.target);
   }
 
   private setupCamera(): void {
@@ -163,7 +179,9 @@ export class Game {
     let delta = Math.min(this.clock.getDelta(), 8 / 60);
     if (this.paused) delta = 0;
 
-    if (this.editorMode) {
+    if (this.editorMode || this.overviewMode) {
+      this.world.updatePresentation(delta);
+      this.sunShadow.update(this.camera);
       this.renderer.render(this.scene, this.camera);
       return;
     }
@@ -215,6 +233,7 @@ export class Game {
     this.updateCamera(delta);
     this.world.updatePresentation(delta);
     this.gooseOcclusionFader.update(this.world, this.camera, this.goose, delta);
+    this.sunShadow.update(this.camera);
     this.renderer.render(this.scene, this.camera);
   };
 
@@ -287,7 +306,9 @@ export class Game {
     const usingGamepad = device === "gamepad";
     this.keyboardControls.hidden = usingGamepad;
     this.gamepadControls.hidden = !usingGamepad;
-    this.deviceLabel.textContent = usingGamepad
+    this.deviceLabel.textContent = device === "touch"
+      ? "Touch controls active"
+      : usingGamepad
       ? "Controller active"
       : controllerConnected
         ? "Keyboard · controller ready"
@@ -303,20 +324,96 @@ export class Game {
     this.camera.updateProjectionMatrix();
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, width < 700 ? 1.25 : 1.5));
     this.renderer.setSize(width, height, false);
+    this.updateOrientationPause();
   };
 
-  private setPaused(paused: boolean): void {
-    this.paused = paused;
-    this.simulation.suspend();
-    this.input.clear();
-    this.audio.setPaused(paused);
-    this.clock.getDelta();
+  private setupMobileControls(): void {
+    this.touchPreference = this.loadTouchPreference();
+    this.touchPreferenceSelect.value = this.touchPreference;
+    this.touchControls = new TouchControls(
+      requireElement<HTMLElement>("#touch-movement-area"),
+      requireElement<HTMLElement>("#touch-stick"),
+      requireElement<HTMLElement>("#touch-knob"),
+      requireElement<HTMLButtonElement>("#honk-button"),
+      {
+        onMove: ({ moveX, moveY, hurry }) => this.input.setTouchMovement(moveX, moveY, hurry),
+        onHonk: () => this.input.queueTouchHonk(),
+        onTouchUsed: () => { this.coarseTouchDevice = true; },
+      },
+    );
+    this.settingsButton.addEventListener("click", this.openSettings);
+    requireElement<HTMLButtonElement>("#settings-close").addEventListener("click", this.closeSettings);
+    this.touchPreferenceSelect.addEventListener("change", this.updateTouchPreference);
+    this.fullscreenButton.addEventListener("click", this.toggleFullscreen);
+    this.updateTouchControlsVisibility();
+    this.syncFullscreenLabel();
   }
 
-  private readonly handleBlur = (): void => { this.setPaused(true); };
-  private readonly handleFocus = (): void => { this.setPaused(document.hidden); };
+  private loadTouchPreference(): TouchControlsPreference {
+    try { return parseTouchControlsPreference(window.localStorage.getItem(TOUCH_CONTROLS_STORAGE_KEY)); }
+    catch { return "auto"; }
+  }
+
+  private readonly updateTouchPreference = (): void => {
+    this.touchPreference = parseTouchControlsPreference(this.touchPreferenceSelect.value);
+    try { window.localStorage.setItem(TOUCH_CONTROLS_STORAGE_KEY, this.touchPreference); } catch { /* Storage is optional. */ }
+    this.touchControls?.clear();
+    this.updateTouchControlsVisibility();
+  };
+
+  private updateTouchControlsVisibility(): void {
+    this.touchControlsRoot.hidden = !shouldShowTouchControls(this.touchPreference, this.coarseTouchDevice)
+      || this.pauseReasons.paused;
+  }
+
+  private readonly openSettings = (): void => {
+    this.settingsMenu.hidden = false;
+    this.setPauseReason("settings", true);
+    this.touchPreferenceSelect.focus({ preventScroll: true });
+  };
+
+  private readonly closeSettings = (): void => {
+    this.settingsMenu.hidden = true;
+    this.setPauseReason("settings", false);
+    this.settingsButton.focus({ preventScroll: true });
+  };
+
+  private readonly toggleFullscreen = async (): Promise<void> => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await requireElement<HTMLElement>("#game-shell").requestFullscreen();
+    } catch { /* Fullscreen is optional; normal play remains available. */ }
+    this.syncFullscreenLabel();
+  };
+
+  private readonly syncFullscreenLabel = (): void => {
+    this.fullscreenButton.hidden = !document.fullscreenEnabled && !document.fullscreenElement;
+    this.fullscreenButton.textContent = document.fullscreenElement ? "Exit fullscreen" : "Fullscreen";
+  };
+
+  private updateOrientationPause(): void {
+    const portrait = shouldPauseForPortrait(this.coarseTouchDevice, window.innerWidth, window.innerHeight);
+    this.rotateMessage.hidden = !portrait;
+    this.setPauseReason("portrait", portrait);
+  }
+
+  private setPauseReason(reason: string, active: boolean): void {
+    const changed = this.pauseReasons.set(reason, active);
+    this.paused = this.pauseReasons.paused;
+    if (changed) {
+      this.simulation.suspend();
+      this.input.clear();
+      this.touchControls?.clear();
+      this.audio.setPaused(this.paused);
+      this.clock.getDelta();
+    }
+    this.updateTouchControlsVisibility();
+  }
+
+  private readonly handleBlur = (): void => { this.setPauseReason("focus", true); };
+  private readonly handleFocus = (): void => { this.setPauseReason("focus", document.hidden); };
   private readonly handleVisibility = (): void => {
-    this.setPaused(document.hidden || !document.hasFocus());
+    this.setPauseReason("hidden", document.hidden || !document.hasFocus());
   };
 
   /** Explicitly release the GPU context before a Play/Edit page transition. */
@@ -328,6 +425,7 @@ export class Game {
     window.removeEventListener("blur", this.handleBlur);
     window.removeEventListener("focus", this.handleFocus);
     document.removeEventListener("visibilitychange", this.handleVisibility);
+    document.removeEventListener("fullscreenchange", this.syncFullscreenLabel);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
   };

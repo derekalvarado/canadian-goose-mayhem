@@ -1,5 +1,9 @@
+import { createOldTownPaving, createTownBench, createTownBed, createTownLamp, createTownLights, createTownFireplace, createTownStage, createTownBlock, createTownInlay } from "./OldTownViews.ts";
 import * as THREE from "three";
+import { JanitorView } from "./JanitorView.ts";
 import { DeciduousTreeView } from "./DeciduousTreeView.ts";
+import { Building1View } from "./Building1View.ts";
+import { TrashCanView } from "./TrashCanView.ts";
 import {
   FOUNTAIN_RADIUS,
   PAVILION_SIZE,
@@ -82,26 +86,6 @@ function createPaving(): THREE.Group {
   return group;
 }
 
-/** A reusable authored paving unit for the WorldEditor catalog. */
-function createPavingPatch(halfExtent = 4): THREE.Group {
-  const group = new THREE.Group();
-  const cells = halfExtent * 2;
-  group.add(box(halfExtent * 2, 0.16, halfExtent * 2, PALETTE.stone.dark, 0, -0.12, 0));
-  const geometry = new THREE.BoxGeometry(0.93, 0.035, 0.43);
-  const colors = [PALETTE.plaza.paverLight, PALETTE.plaza.paver, PALETTE.plaza.paverDark];
-  const meshes = colors.map((color) => new THREE.InstancedMesh(geometry, toonMaterial(color), cells * cells * 2));
-  const counts = colors.map(() => 0); const matrix = new THREE.Matrix4();
-  for (let row = 0; row < cells * 2; row += 1) {
-    for (let column = 0; column < cells; column += 1) {
-      const x = -halfExtent + 0.5 + column + (row % 2 ? 0.5 : 0); const z = -halfExtent + 0.25 + row * 0.5;
-      const variant = (row * 7 + column * 3) % colors.length;
-      matrix.makeTranslation(x, 0.018, z); meshes[variant].setMatrixAt(counts[variant], matrix); counts[variant] += 1;
-    }
-  }
-  meshes.forEach((mesh, index) => { mesh.count = counts[index]; mesh.castShadow = false; mesh.receiveShadow = true; mesh.instanceMatrix.needsUpdate = true; group.add(mesh); });
-  return group;
-}
-
 function createStreetTile(color: number, elevation: number): THREE.Group {
   const group = new THREE.Group();
   group.add(box(8, 0.16, 8, color, 0, elevation - 0.08, 0));
@@ -125,6 +109,7 @@ function createRock(x: number, y: number, z: number, radius: number, color: numb
   rock.rotation.set(-0.1, x * 0.37 + z * 0.2, 0.08);
   return rock;
 }
+
 
 function createBronzeGoose(): THREE.Group {
   const goose = new THREE.Group();
@@ -976,9 +961,9 @@ export class PlazaWorld extends THREE.Group {
 /** Renderer implementation for the source-owned WorldEditor catalog. */
 export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroupRegistry, instanceId = assetId): THREE.Group {
   switch (assetId) {
-    case "plaza.paving-base": return createPaving();
-    case "plaza.paving-patch": return createPavingPatch();
-    case "plaza.paving-patch-large": return createPavingPatch(8);
+    case "plaza.paving-base": return createOldTownPaving();
+    case "plaza.paving-patch": return createOldTownPaving(4, 4);
+    case "plaza.paving-patch-large": return createOldTownPaving(8, 8);
     case "street.sidewalk-tile": return createStreetTile(PALETTE.plaza.concrete, 0);
     case "street.road-tile": return createStreetTile(PALETTE.stone.dark, -0.15);
     case "street.curb-straight": return createStraightCurb();
@@ -989,15 +974,42 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.play-area": return createPlayArea();
     case "plaza.pavilion-stage": return createPavilion(groups, instanceId);
     case "plaza.cafe-table-set": return createCafeTable();
+    case "plaza.street-janitor": return new JanitorView();
+    case "oldtown.shade-tree":
+    case "nature.deciduous-tree": {
+      const tree = new DeciduousTreeView();
+      if (assetId === "oldtown.shade-tree") tree.scale.setScalar(0.72);
+      groups.register(instanceId, tree);
+      return tree;
+    }
+    case "street.building1":
+    case "street.building2":
+    case "street.building3":
+    case "street.building4":
+    case "street.building5": {
+      const building = new Building1View(undefined, Number(assetId.at(-1)));
+      groups.register(instanceId, building);
+      return building;
+    }
+    case "oldtown.miller-block":
+    case "oldtown.coopersmith-block": {
+      const block = createTownBlock(assetId === "oldtown.miller-block" ? "miller" : "coopersmith");
+      groups.register(instanceId, block); return block;
+    }
+    case "oldtown.stage": {
+      const stage = createTownStage(); groups.register(instanceId, stage); return stage;
+    }
+    case "oldtown.oval-inlay": return createTownInlay();
+    case "oldtown.bench": return createTownBench();
+    case "oldtown.flower-bed": return createTownBed();
+    case "oldtown.lamp": return createTownLamp();
+    case "oldtown.light-span": return createTownLights();
+    case "oldtown.fireplace": return createTownFireplace();
+    case "street.trash-can": return new TrashCanView();
     case "plaza.planter-cluster": return createPlanterCluster();
     case "plaza.planter-east-north": return createSinglePlanter(1.45, 3.3);
     case "plaza.planter-east-south": return createSinglePlanter(1.45, 3.1);
     case "plaza.planter-south": return createSinglePlanter(3.5, 1.3);
-    case "nature.deciduous-tree": {
-      const tree = new DeciduousTreeView();
-      groups.register(instanceId, tree);
-      return tree;
-    }
     case "plaza.tree-cluster": return createTreeCluster(groups, instanceId);
     case "plaza.string-lights": return createStringLights();
     default: throw new Error(`No renderer for world asset: ${assetId}`);

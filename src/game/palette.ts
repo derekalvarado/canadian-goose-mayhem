@@ -57,6 +57,27 @@ export const PALETTE = {
     bronze: 0x47736b,
     iron: 0x263d3b,
   },
+  oldTown: {
+    paving: 0xc3af98,
+    pavingLight: 0xcbb9a3,
+    pavingShade: 0xbca58d,
+  },
+  building1: {
+    brick: 0xb77961,
+    brickAccent: 0xc28b72,
+    limestone: 0xd6c9b5,
+    glass: 0x455d61,
+    frames: 0x866e57,
+    awning: 0x648a78,
+    awningSeams: 0x567868,
+    roof: 0x85827c,
+  },
+  trashCan: {
+    body: 0x414647,
+    ribs: 0x55595a,
+    lid: 0x626668,
+    opening: 0x262d2d,
+  },
   flower: {
     coral: 0xd86650,
     yellow: 0xe0b84e,
@@ -68,6 +89,12 @@ export const PALETTE = {
     navy: 0x2f4059,
     cream: 0xd8c58f,
     sunlight: 0xf1d38b,
+  },
+  workwear: {
+    safetyVest: 0xb8d83a,
+    skin: 0xe3b375,
+    trousers: 0x586f7b,
+    reflective: 0xdadbd0,
   },
   atmosphere: {
     sky: 0xa9b9ae,

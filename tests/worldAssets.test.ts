@@ -3,7 +3,7 @@ import test from "node:test";
 import * as THREE from "three";
 import { OcclusionFadeGroupRegistry } from "../src/game/OcclusionFadeGroups.ts";
 import { createWorldAssetView, SplashPadView } from "../src/game/PlazaWorld.ts";
-import { getWorldAsset } from "../src/game/worldAssets.ts";
+import { getWorldAsset, WORLD_ASSETS } from "../src/game/worldAssets.ts";
 
 test("the corner market building is a detailed catalog asset with matching solid footprint", () => {
   const asset = getWorldAsset("plaza.corner-market-building");
@@ -41,6 +41,18 @@ test("each planter asset renders independently", () => {
     view.traverse((object) => { if (object instanceof THREE.Mesh) meshCount += 1; });
     assert.ok(meshCount > 1, `${assetId} should have planter and planting meshes`);
   }
+});
+
+test("the street janitor remains a non-blocking presentation asset", () => {
+  const asset = WORLD_ASSETS.find((entry) => entry.assetId === "plaza.street-janitor");
+  assert.ok(asset);
+  assert.equal(asset.category, "character");
+  assert.deepEqual(asset.colliders, []);
+
+  const view = createWorldAssetView(asset.assetId, new OcclusionFadeGroupRegistry(), "test.street-janitor");
+  assert.equal(view.userData.assetRole, "rigged-character");
+  assert.equal(view.userData.gameplayState, "none");
+  assert.equal(view.userData.visualDetailTier, 3);
 });
 
 test("visual detail landmarks keep their authored construction relationships", () => {

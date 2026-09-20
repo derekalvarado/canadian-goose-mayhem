@@ -113,6 +113,7 @@ test("separate world instances namespace their fade groups and survive a view re
     label: "Building frontage copy",
     transform: { x: 64, y: 0, z: 64, rotationY: 0 },
   });
+  area.instances.push({ id: "plaza.buildings", assetId: "plaza.building-frontage", label: "Legacy frontage", transform: { x: 0, y: 0, z: 0, rotationY: 0 } });
   const view = new WorldView(area);
   assert.ok(view.occlusionFadeGroups.groupById("plaza.buildings.north.1"));
   assert.ok(view.occlusionFadeGroups.groupById("plaza.buildings-copy.north.1"));

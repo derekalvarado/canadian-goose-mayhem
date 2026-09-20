@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "assets:janitor": "node scripts/generate-janitor-glb.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "node --test --experimental-strip-types tests/*.test.ts"

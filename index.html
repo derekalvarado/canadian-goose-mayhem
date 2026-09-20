@@ -43,6 +43,9 @@
           <span id="device-label">Keyboard ready</span>
         </aside>
 
+        <button id="settings-button" class="hud-action" type="button" aria-haspopup="dialog" aria-controls="settings-menu">Settings</button>
+        <button id="fullscreen-button" class="hud-action hud-action--fullscreen" type="button">Fullscreen</button>
+
         <section class="controls-card" id="controls-card" aria-label="Controls">
           <div class="control-set control-set--keyboard" id="keyboard-controls">
             <div class="control-item">
@@ -61,6 +64,33 @@
           </div>
         </section>
       </div>
+
+      <section id="touch-controls" class="touch-controls" hidden aria-label="Touch controls">
+        <div id="touch-movement-area" class="touch-movement-area" aria-hidden="true">
+          <div id="touch-stick" class="touch-stick" hidden><span id="touch-knob" class="touch-knob"></span></div>
+        </div>
+        <button id="honk-button" class="honk-button" type="button" aria-label="Honk">Honk</button>
+      </section>
+
+      <section id="settings-menu" class="settings-menu" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="settings-card">
+          <p class="complete-kicker">Game settings</p>
+          <h2 id="settings-title">Controls</h2>
+          <label for="touch-controls-preference">Touch controls
+            <select id="touch-controls-preference">
+              <option value="auto">Auto</option>
+              <option value="show">Show</option>
+              <option value="hide">Hide</option>
+            </select>
+          </label>
+          <p class="settings-help">Auto shows controls on touch-first devices. Keyboard and controllers remain available.</p>
+          <button id="settings-close" type="button">Done</button>
+        </div>
+      </section>
+
+      <section id="rotate-message" class="rotate-message" hidden role="status" aria-live="polite">
+        <div class="settings-card"><p class="complete-kicker">Landscape needed</p><h2>Turn your device sideways</h2><p>Play resumes when the game has room to breathe.</p></div>
+      </section>
 
       <section class="chapter-complete" id="chapter-complete" hidden role="status" aria-live="polite" aria-labelledby="complete-title">
         <div class="complete-card">

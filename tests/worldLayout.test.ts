@@ -13,9 +13,11 @@ import {
   createInstance,
   deleteWorldArea,
   getWorldArea,
+  loadWorldLayout,
   migratePlazaLayout,
   serializeWorldLayout,
   validateWorldLayout,
+  WORLD_LAYOUT_STORAGE_KEY,
   toggleWorldChunkPlayable,
   worldChunkCoordinates,
 } from "../src/game/worldLayout.ts";
@@ -32,12 +34,9 @@ test("canonical world serializes a multi-instance central plaza using catalog ID
 
 test("the canonical planters are separate movable world instances", () => {
   const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT);
-  const planters = plaza.instances.filter((instance) => instance.assetId.startsWith("plaza.planter-"));
-  assert.deepEqual(planters.map((instance) => instance.id), [
-    "plaza.planter-east-north",
-    "plaza.planter-east-south",
-    "plaza.planter-south",
-  ]);
+  const planters = plaza.instances.filter((instance) => instance.assetId === "oldtown.flower-bed");
+  assert.equal(planters.length, 6);
+  assert.equal(new Set(planters.map(item => item.id)).size, 6);
   assert.equal(plaza.instances.some((instance) => instance.assetId === "plaza.planter-cluster"), false);
   assert.ok(planters.every((instance) => getWorldAsset(instance.assetId)?.colliders.length === 1));
 });
@@ -45,7 +44,7 @@ test("the canonical planters are separate movable world instances", () => {
 test("saved layouts migrate the legacy planter cluster into separate instances", () => {
   const legacy = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   const plaza = getWorldArea(legacy);
-  plaza.instances = plaza.instances.filter((instance) => !instance.assetId.startsWith("plaza.planter-"));
+  plaza.instances = plaza.instances.filter((instance) => !instance.assetId === "oldtown.flower-bed");
   plaza.instances.push({ id: "plaza.planters", assetId: "plaza.planter-cluster", label: "Planter cluster", transform: { x: 2, y: 0, z: 3, rotationY: Math.PI / 2 } });
 
   const migrated = getWorldArea(validateWorldLayout(legacy));
@@ -61,6 +60,23 @@ test("legacy plaza layouts migrate their landmark transforms into world instance
   old.groups["plaza.goose-fountain"].position.x = 5;
   const migrated = migratePlazaLayout(old);
   assert.equal(getWorldArea(migrated).instances.find((instance) => instance.id === FOUNTAIN_INSTANCE_ID)?.transform.x, 5);
+});
+
+test("saved plaza drafts gain the street janitor content update without resetting authored edits", () => {
+  const saved = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+  saved.canonicalRevision = 2;
+  const plaza = getWorldArea(saved);
+  plaza.instances = plaza.instances.filter((item) => item.id !== "plaza.street-janitor");
+  const store = {
+    getItem: (key: string) => key === WORLD_LAYOUT_STORAGE_KEY ? JSON.stringify(saved) : null,
+    setItem: () => undefined,
+    removeItem: () => undefined,
+  };
+
+  const migrated = getWorldArea(loadWorldLayout(store));
+  const janitor = migrated.instances.find((item) => item.id === "plaza.street-janitor");
+  assert.deepEqual(janitor?.transform, { x: -7.8, y: 0, z: -5.4, rotationY: 0 });
+  assert.equal(migrated.instances.find((item) => item.id === FOUNTAIN_INSTANCE_ID)?.assetId, "plaza.goose-fountain");
 });
 
 test("early world drafts migrate the original plaza paving entry to its fixed base asset", () => {
@@ -123,6 +139,6 @@ test("placed catalog colliders drive the same central-area traversal data as the
   const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT);
   const fountain = plaza.instances.find((instance) => instance.id === FOUNTAIN_INSTANCE_ID)!;
   assert.equal(isWorldAreaPlayable(plaza, fountain.transform.x, fountain.transform.z), false);
-  assert.equal(isWorldAreaPlayable(plaza, 19.35, -7.2), false, "planter cluster blocks at its authored visual location");
+  assert.equal(isWorldAreaPlayable(plaza, -5.2, -8.5), false, "flower bed blocks at its authored visual location");
   assert.equal(isWorldAreaPlayable(plaza, 3.5, -3.25), true, "splash pad has no authored blocker");
 });

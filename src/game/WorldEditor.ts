@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { WORLD_ASSETS, getWorldAsset } from "./worldAssets.ts";
-import { CENTRAL_PLAZA_AREA_ID, addWorldArea, clampWorldInstance, createInstance, deleteWorldArea, getWorldArea, loadWorldLayout, migratePlazaLayout, resetWorldLayout, saveWorldLayout, serializeWorldLayout, toggleWorldChunkPlayable, type WorldArea, type WorldInstance, type WorldLayout, validateWorldLayout, worldChunkCoordinates } from "./worldLayout.ts";
+import { CENTRAL_PLAZA_AREA_ID, addWorldArea, clampWorldInstance, createInstance, deleteWorldArea, getWorldArea, loadWorldLayout, loadPreviousWorldLayout, migratePlazaLayout, resetWorldLayout, saveWorldLayout, serializeWorldLayout, toggleWorldChunkPlayable, type WorldArea, type WorldInstance, type WorldLayout, validateWorldLayout, worldChunkCoordinates } from "./worldLayout.ts";
 import { validatePlazaLayout } from "./plazaLayout.ts";
 import { findWorldInstanceOverlaps, getWorldGroundHeight } from "./worldLevel.ts";
 import { WorldView } from "./WorldView.ts";
@@ -44,6 +44,14 @@ export class WorldEditor {
     const modes = document.createElement("div"); modes.className = "plaza-editor__modes"; modes.append(this.button("Move", () => this.setTransformMode("translate")), this.button("Rotate", () => this.setTransformMode("rotate")));
     const fields = document.createElement("div"); fields.className = "plaza-editor__fields"; fields.append(this.number("X", this.xInput, SNAP), this.number("Z", this.zInput, SNAP), this.number("Rotation", this.rotationInput, 5, "°")); [this.xInput, this.zInput, this.rotationInput].forEach((input) => input.addEventListener("change", this.commitFields));
     const io = document.createElement("div"); io.className = "plaza-editor__actions"; const importInput = document.createElement("input"); importInput.type = "file"; importInput.accept = ".json,application/json"; importInput.hidden = true; importInput.addEventListener("change", () => this.importFile(importInput)); io.append(this.button("Export world", () => download(serializeWorldLayout(this.world))), this.button("Import world", () => importInput.click()), importInput, this.button("Reset defaults", () => this.resetDefaults()), this.button("Reset view", () => this.orbit.reset()));
+    if (loadPreviousWorldLayout()) io.append(this.button("Restore previous square", () => {
+      const previous = loadPreviousWorldLayout();
+      if (!previous) return;
+      this.mutate("Restored the previous square. Undo returns to the new square.", () => {
+        this.world = previous; this.areaId = CENTRAL_PLAZA_AREA_ID;
+        this.view.applyArea(this.area); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id);
+      });
+    }));
     this.status.className = "plaza-editor__status"; this.status.setAttribute("aria-live", "polite"); this.warnings.className = "plaza-editor__warnings"; this.warnings.setAttribute("aria-live", "polite"); const help = document.createElement("p"); help.className = "plaza-editor__help"; help.textContent = "Middle-drag rotates the world; left-click selects. Choose an asset, place its preview with a click, then select an instance to move or rotate it. Arrow keys move the selected asset by 0.25 m. Position snaps to 0.25 m; rotation snaps to 5°. Changes save automatically.";
     this.panel.append(heading, areaLabel, areaActions, assetLabel, historyActions, placement, instanceLabel, modes, fields, io, this.status, this.warnings, help); document.querySelector("#game-shell")?.append(this.panel); this.updateHistoryButtons();
   }
@@ -156,7 +164,7 @@ export class WorldEditor {
     else this.moveSelected(action.dx, action.dz);
   };
   private resetDefaults(): void { this.mutate("Restored the canonical world.", () => { this.world = resetWorldLayout(); this.areaId = CENTRAL_PLAZA_AREA_ID; this.view.applyArea(this.area); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); }); }
-  private async importFile(input: HTMLInputElement): Promise<void> { const file = input.files?.[0]; if (!file) return; try { const raw = JSON.parse(await file.text()); this.history.begin(this.snapshot()); try { this.world = validateWorldLayout(raw); } catch { this.world = migratePlazaLayout(validatePlazaLayout(raw)); } this.areaId = CENTRAL_PLAZA_AREA_ID; this.view.applyArea(this.area); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); if (this.history.commit(this.snapshot())) this.save(`Imported ${file.name}.`); this.updateHistoryButtons(); } catch (error) { this.history.cancel(); this.setStatus(error instanceof Error ? `Import failed: ${error.message}` : "Import failed.", true); } finally { input.value = ""; } }
+  private async importFile(input: HTMLInputElement): Promise<void> { const file = input.files?.[0]; if (!file) return; try { const raw = JSON.parse(await file.text()); this.history.begin(this.snapshot()); try { this.world = validateWorldLayout(raw); } catch { this.world = migratePlazaLayout(validatePlazaLayout(raw)); } this.world.canonicalRevision = Math.max(this.world.canonicalRevision, 4); this.areaId = CENTRAL_PLAZA_AREA_ID; this.view.applyArea(this.area); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); if (this.history.commit(this.snapshot())) this.save(`Imported ${file.name}.`); this.updateHistoryButtons(); } catch (error) { this.history.cancel(); this.setStatus(error instanceof Error ? `Import failed: ${error.message}` : "Import failed.", true); } finally { input.value = ""; } }
   private save(message: string): void { this.setStatus(saveWorldLayout(this.world) ? message : "Browser storage is unavailable."); }
   private setStatus(message: string, error = false): void { this.status.textContent = message; this.status.classList.toggle("has-error", error); }
   private updateSelectedFields(item: WorldInstance): void {

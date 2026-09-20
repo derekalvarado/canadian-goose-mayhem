@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createWorldAssetView, SplashPadView } from "./PlazaWorld.ts";
+import { JanitorView } from "./JanitorView.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { isWorldChunkPlayable, WORLD_CHUNK_SIZE, type WorldArea, type WorldInstance } from "./worldLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
@@ -10,7 +11,7 @@ export class WorldView extends THREE.Group {
   private activeArea?: WorldArea;
   private editorFocus?: Readonly<{ x: number; z: number }>;
   private readonly playableOnly: boolean;
-  private presentationViews: SplashPadView[] = [];
+  private presentationViews: (SplashPadView | JanitorView)[] = [];
 
   constructor(area: WorldArea, playableOnly = false) {
     super();
@@ -44,7 +45,7 @@ export class WorldView extends THREE.Group {
       instance.id,
     );
     wrapper.add(view);
-    if (view instanceof SplashPadView) this.presentationViews.push(view);
+    if (view instanceof SplashPadView || view instanceof JanitorView) this.presentationViews.push(view);
     this.instances.set(instance.id, wrapper);
     this.add(wrapper);
     return wrapper;

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Janitor — model and rig preview</title>
+<style>
+  * { box-sizing: border-box; } body { margin: 0; background: #f2efe7; color: #293e39; font: 16px system-ui; }
+  header { padding: 24px 32px 12px; } h1 { margin: 0 0 8px; font-size: 24px; } p { margin: 0 0 16px; }
+  button { font: inherit; padding: 8px 18px; border: 1px solid #879b8b; background: #fffdf6; border-radius: 6px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #315c52; color: white; }
+  #views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 12px 24px 24px; }
+  figure { margin: 0; min-width: 0; } canvas { width: 100%; height: 480px; display: block; border-radius: 8px; }
+  figcaption { text-align: center; padding: 10px; } #status { padding: 0 32px; }
+  @media(max-width:800px) { #views { grid-template-columns: repeat(2, 1fr); } canvas { height: 350px; } }
+  @media(max-width:480px) { #views { grid-template-columns: 1fr; } canvas { height: 430px; } }
+</style>
+<header>
+  <h1>Street janitor · model & rig</h1>
+  <p>Four views at a 45° downward camera angle, using the game's toon materials and lighting.</p>
+  <button data-clip="idle" aria-pressed="true">Idle</button>
+  <button data-clip="walk" aria-pressed="false">Walk in place</button>
+  <button data-clip="look" aria-pressed="false">Look around</button>
+  <button id="pause" aria-pressed="false">Pause</button>
+  <button id="rig" aria-pressed="false">Show skeleton</button>
+</header>
+<div id="views"></div><p id="status">Loading model…</p>
+<script type="module">
+  import * as THREE from 'three';
+  import { JanitorView } from '/src/game/JanitorView.ts';
+  import { toonMaterial } from '/src/game/toonMaterial.ts';
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf2efe7);
+  scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.55));
+  const sun = new THREE.DirectionalLight(0xffffff, Math.PI * 0.45);
+  sun.position.set(-3, 7, -5); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.1, far: 20 });
+  scene.add(sun);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), toonMaterial(0xe5e0d3));
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -0.005; floor.receiveShadow = true; scene.add(floor);
+  const janitor = new JanitorView(); scene.add(janitor); await janitor.ready;
+  const skeleton = new THREE.SkeletonHelper(janitor); skeleton.visible = false; scene.add(skeleton);
+  const panes = [];
+  for (const [label, x, z] of [['Front left', -4, -4], ['Front right', 4, -4], ['Back left', -4, 4], ['Back right', 4, 4]]) {
+    const figure = document.createElement('figure');
+    const canvas = document.createElement('canvas'); const caption = document.createElement('figcaption');
+    caption.textContent = label; figure.append(canvas, caption); document.querySelector('#views').append(figure);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.toneMapping = THREE.NoToneMapping;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.BasicShadowMap;
+    const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1.8, -1.8, 0.1, 50);
+    camera.position.set(x, 1.25 + Math.hypot(x, z), z); camera.lookAt(0, 1.25, 0);
+    panes.push({ renderer, camera, canvas });
+  }
+  let paused = false;
+  for (const button of document.querySelectorAll('[data-clip]')) button.onclick = () => {
+    janitor.playAnimation(button.dataset.clip);
+    document.querySelectorAll('[data-clip]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+  };
+  document.querySelector('#pause').onclick = (event) => { paused = !paused; event.target.setAttribute('aria-pressed', String(paused)); };
+  document.querySelector('#rig').onclick = (event) => { skeleton.visible = !skeleton.visible; event.target.setAttribute('aria-pressed', String(skeleton.visible)); };
+  document.querySelector('#status').textContent = 'Loaded · 18 bones · idle / walk / look · empty hand sockets · no broom';
+  const clock = new THREE.Clock();
+  function frame() {
+    requestAnimationFrame(frame); const delta = Math.min(clock.getDelta(), 0.1); if (!paused) janitor.update(delta);
+    for (const {renderer, camera, canvas} of panes) {
+      const width = canvas.clientWidth, height = canvas.clientHeight;
+      if (canvas.width !== Math.round(width * renderer.getPixelRatio()) || canvas.height !== Math.round(height * renderer.getPixelRatio())) {
+        renderer.setSize(width, height, false);
+        camera.left = -1.8 * width / height; camera.right = 1.8 * width / height; camera.updateProjectionMatrix();
+      }
+      renderer.render(scene, camera);
+    }
+  }
+  frame();
+</script>
+</html>

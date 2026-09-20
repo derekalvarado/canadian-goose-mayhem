@@ -2,7 +2,7 @@
  * Source-owned catalog metadata. Layout files intentionally reference these
  * stable IDs rather than serialising meshes or material recipes.
  */
-export type WorldAssetCategory = "ground" | "architecture" | "landmark" | "furniture" | "planting" | "lighting";
+export type WorldAssetCategory = "ground" | "architecture" | "landmark" | "furniture" | "planting" | "lighting" | "character";
 
 export interface WorldAssetCollider {
   readonly shape: "box" | "circle";
@@ -40,6 +40,21 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "street.road-tile", label: "Lowered road tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: -0.15, surfacePriority: 2 },
   { assetId: "street.curb-straight", label: "Straight curb", category: "ground", halfWidth: 4, halfDepth: 0.2, colliders: [] },
   { assetId: "plaza.building-frontage", label: "Building frontage", category: "architecture", halfWidth: 22, halfDepth: 22, colliders: [], occludesCamera: true, pivotOffset: { x: 0, z: -20 }, warnForOverlap: false },
+  { assetId: "street.building1", label: "Building 1 — arched brick storefront", category: "architecture", halfWidth: 3.45, halfDepth: 3.45, colliders: [{ shape: "box", x: 0, z: -0.184, halfWidth: 3.289, halfDepth: 3.197 }], occludesCamera: true },
+  { assetId: "street.building2", label: "Café with striped awning", category: "architecture", halfWidth: 3.45, halfDepth: 3.72, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.35, halfDepth: 3.16 }], occludesCamera: true },
+  { assetId: "street.building3", label: "Paired-window shop", category: "architecture", halfWidth: 3.45, halfDepth: 3.42, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.35, halfDepth: 3.16 }], occludesCamera: true },
+  { assetId: "street.building4", label: "Brick arcade", category: "architecture", halfWidth: 3.85, halfDepth: 3.72, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.75, halfDepth: 3.16 }], occludesCamera: true },
+  { assetId: "street.building5", label: "Sage townhouse", category: "architecture", halfWidth: 3.15, halfDepth: 3.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.05, halfDepth: 3.16 }], occludesCamera: true },
+  { assetId: "oldtown.miller-block", label: "Miller Block — historic brick corner", category: "architecture", halfWidth: 8.2, halfDepth: 5.1, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.99, halfDepth: 4.07 }], occludesCamera: true },
+  { assetId: "oldtown.coopersmith-block", label: "CooperSmith’s — glazed canopy block", category: "architecture", halfWidth: 8.9, halfDepth: 5.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 8.69, halfDepth: 4.07 }], occludesCamera: true },
+  { assetId: "oldtown.stage", label: "Old Town performance stage", category: "landmark", halfWidth: 7, halfDepth: 3.65, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 6.3, halfDepth: 2.7 }], occludesCamera: true },
+  { assetId: "oldtown.bench", label: "Old Town bench", category: "furniture", halfWidth: 1.125, halfDepth: 0.35, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.125, halfDepth: 0.35 }], occludesCamera: false },
+  { assetId: "oldtown.flower-bed", label: "Stone-edged flower bed", category: "planting", halfWidth: 2.375, halfDepth: 0.925, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 2.375, halfDepth: 0.925 }], occludesCamera: false },
+  { assetId: "oldtown.lamp", label: "Old Town banner lamp", category: "lighting", halfWidth: 1, halfDepth: 0.24, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.17, halfDepth: 0.17 }], occludesCamera: false },
+  { assetId: "oldtown.fireplace", label: "Communal fireplace", category: "furniture", halfWidth: 1.4, halfDepth: 0.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.4, halfDepth: 0.7 }], occludesCamera: false },
+  { assetId: "oldtown.shade-tree", label: "Old Town shade tree", category: "planting", halfWidth: 3.6, halfDepth: 2.736, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.4824 }], occludesCamera: true },
+  { assetId: "oldtown.oval-inlay", label: "Oval plaza paving inlay", category: "ground", halfWidth: 13.76, halfDepth: 8, colliders: [], warnForOverlap: false },
+  { assetId: "oldtown.light-span", label: "Old Town festoon span", category: "lighting", halfWidth: 0.1, halfDepth: 8.1, colliders: [], warnForOverlap: false },
   { assetId: "plaza.corner-market-building", label: "Corner market building", category: "architecture", halfWidth: 7.8, halfDepth: 6.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.25, halfDepth: 6.1 }], occludesCamera: true },
   { assetId: "plaza.goose-fountain", label: "Goose fountain", category: "landmark", halfWidth: 3.45, halfDepth: 3.45, colliders: [{ shape: "circle", x: 0, z: 0, radius: 3.35 }] },
   { assetId: "plaza.splash-pad", label: "Splash pad", category: "landmark", halfWidth: 4.9, halfDepth: 4.9, colliders: [] },
@@ -53,6 +68,9 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   ] },
   { assetId: "plaza.pavilion-stage", label: "Stage and pavilion", category: "landmark", halfWidth: 7.4, halfDepth: 2.75, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 6.8, halfDepth: 2.25 }], occludesCamera: true },
   { assetId: "plaza.cafe-table-set", label: "Café table set", category: "furniture", halfWidth: 1.25, halfDepth: 1.25, colliders: [{ shape: "circle", x: 0, z: 0, radius: 1.18 }] },
+  { assetId: "street.trash-can", label: "Trash can", category: "furniture", halfWidth: 0.46, halfDepth: 0.46, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.46 }] },
+  // Static presentation asset only. A future NPC owns its simulation state and colliders separately.
+  { assetId: "plaza.street-janitor", label: "Street janitor", category: "character", halfWidth: 0.72, halfDepth: 0.72, colliders: [] },
   { assetId: "plaza.planter-cluster", label: "Planter cluster", category: "planting", halfWidth: 22, halfDepth: 18, colliders: [
     { shape: "box", x: 19.35, z: -7.2, halfWidth: 1.45, halfDepth: 3.3 },
     { shape: "box", x: 19.35, z: 6.2, halfWidth: 1.45, halfDepth: 3.1 },

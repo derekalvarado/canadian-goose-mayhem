@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export type InputDevice = "keyboard" | "gamepad";
+export type InputDevice = "keyboard" | "gamepad" | "touch";
 
 export interface InputFrame {
   move: THREE.Vector2;
@@ -35,6 +35,8 @@ export class InputController {
   private lastDevice: InputDevice = "keyboard";
   private honkQueued = false;
   private gamepadHonkWasDown = false;
+  private touchMove = new THREE.Vector2();
+  private touchHurry = false;
   private connectedGamepad = false;
   private readonly onDeviceChanged: (device: InputDevice, connected: boolean) => void;
 
@@ -86,6 +88,12 @@ export class InputController {
       this.gamepadHonkWasDown = false;
     }
 
+    if (this.touchMove.lengthSq() > 0 || this.touchHurry) {
+      horizontal = this.touchMove.x;
+      vertical = this.touchMove.y;
+      hurry = this.touchHurry;
+    }
+
     this.movement.set(horizontal, vertical);
     if (this.movement.lengthSq() > 1) this.movement.normalize();
 
@@ -101,6 +109,26 @@ export class InputController {
     this.honkQueued = false;
     this.keys.clear();
     this.movement.set(0, 0);
+    this.touchMove.set(0, 0);
+    this.touchHurry = false;
+  }
+
+  setTouchMovement(moveX: number, moveY: number, hurry: boolean): void {
+    this.touchMove.set(moveX, moveY);
+    if (this.touchMove.lengthSq() > 1) this.touchMove.normalize();
+    this.touchHurry = hurry;
+    if (this.lastDevice !== "touch") {
+      this.lastDevice = "touch";
+      this.onDeviceChanged("touch", this.connectedGamepad);
+    }
+  }
+
+  queueTouchHonk(): void {
+    this.honkQueued = true;
+    if (this.lastDevice !== "touch") {
+      this.lastDevice = "touch";
+      this.onDeviceChanged("touch", this.connectedGamepad);
+    }
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {

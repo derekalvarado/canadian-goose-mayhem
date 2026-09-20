@@ -7,6 +7,9 @@ export const WORLD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.v1";
 export const CENTRAL_PLAZA_AREA_ID = "old-town-square.central-plaza";
 export const FOUNTAIN_INSTANCE_ID = "plaza.goose-fountain";
 export const WORLD_CHUNK_SIZE = 64;
+const JANITOR_CONTENT_REVISION = 3;
+const OLD_TOWN_CONTENT_REVISION = 4;
+export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
 export interface WorldInstance { id: string; assetId: string; label: string; transform: WorldTransform }
@@ -92,6 +95,16 @@ function migrateLegacyPlanterCluster(instances: WorldInstance[], instanceIds: Se
   return [...instances.slice(0, index), ...replacements, ...instances.slice(index + 1)];
 }
 
+function migrateStreetJanitor(layout: WorldLayout): WorldLayout {
+  if (layout.canonicalRevision >= JANITOR_CONTENT_REVISION) return layout;
+  const plaza = getWorldArea(layout);
+  if (!plaza.instances.some((item) => item.id === "plaza.street-janitor")) {
+    plaza.instances.push(instance("plaza.street-janitor", "plaza.street-janitor", "Street janitor", -7.8, -5.4));
+  }
+  layout.canonicalRevision = JANITOR_CONTENT_REVISION;
+  return layout;
+}
+
 export function migratePlazaLayout(layout: PlazaLayout): WorldLayout {
   const l = validatePlazaLayout(layout); const group = l.groups;
   const instances = [
@@ -103,14 +116,54 @@ export function migratePlazaLayout(layout: PlazaLayout): WorldLayout {
     ...(["plaza.cafe-table-1", "plaza.cafe-table-2", "plaza.cafe-table-3"] as const).map((id) => instance(id, "plaza.cafe-table-set", group[id].label, group[id].position.x, group[id].position.z, group[id].rotationY)),
     instance("plaza.planter-east-north", "plaza.planter-east-north", "East north planter", 19.35, -7.2), instance("plaza.planter-east-south", "plaza.planter-east-south", "East south planter", 19.35, 6.2), instance("plaza.planter-south", "plaza.planter-south", "South planter", 7.8, 16.7), instance("plaza.trees", "plaza.tree-cluster", "Tree cluster", 0, 0), instance("plaza.lights", "plaza.string-lights", "String lights", 0, 0),
   ];
-  return validateWorldLayout({ schemaVersion: 2, worldId: "old-town-square", canonicalRevision: l.canonicalRevision, units: "meters", coordinateSystem: "right-handed-y-up", areas: [{ id: CENTRAL_PLAZA_AREA_ID, label: "Central Plaza", chunks: [{ x: -1, z: -1, playable: true }, { x: 0, z: -1, playable: true }, { x: -1, z: 0, playable: true }, { x: 0, z: 0, playable: true }], instances }] });
+  return migrateStreetJanitor(validateWorldLayout({ schemaVersion: 2, worldId: "old-town-square", canonicalRevision: l.canonicalRevision, units: "meters", coordinateSystem: "right-handed-y-up", areas: [{ id: CENTRAL_PLAZA_AREA_ID, label: "Central Plaza", chunks: [{ x: -1, z: -1, playable: true }, { x: 0, z: -1, playable: true }, { x: -1, z: 0, playable: true }, { x: 0, z: 0, playable: true }], instances }] }));
 }
 
 export const CANONICAL_WORLD_LAYOUT = validateWorldLayout(canonicalWorldLayoutJson);
 export function cloneWorldLayout(layout: WorldLayout): WorldLayout { return validateWorldLayout(JSON.parse(JSON.stringify(layout)) as unknown); }
 export function serializeWorldLayout(layout: WorldLayout): string { return `${JSON.stringify(validateWorldLayout(layout), null, 2)}\n`; }
 function storage(): WorldLayoutStorage | undefined { try { return typeof window === "undefined" ? undefined : window.localStorage; } catch { return undefined; } }
-export function loadWorldLayout(store = storage()): WorldLayout { try { const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY); if (saved) return validateWorldLayout(JSON.parse(saved)); const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY); return legacy ? migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT); } catch (error) { console.warn("Ignoring invalid saved world layout", error); return cloneWorldLayout(CANONICAL_WORLD_LAYOUT); } }
+/** Refresh the central composition only after the previous draft is safely archived. */
+function upgradeOldTown(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= OLD_TOWN_CONTENT_REVISION || !store) return layout;
+  const previous = serializeWorldLayout(layout);
+  try {
+    if (!store.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY)) {
+      store.setItem(PRE_REBUILD_LAYOUT_STORAGE_KEY, previous);
+      if (store.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY) !== previous) return layout;
+    }
+    const updated = cloneWorldLayout(layout);
+    updated.areas = updated.areas.map(area => area.id === CENTRAL_PLAZA_AREA_ID
+      ? getWorldArea(cloneWorldLayout(CANONICAL_WORLD_LAYOUT)) : area);
+    updated.canonicalRevision = OLD_TOWN_CONTENT_REVISION;
+    store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(updated));
+    return updated;
+  } catch (error) {
+    console.warn("Keeping the previous world because its upgrade could not be saved", error);
+    return layout;
+  }
+}
+export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
+  try {
+    const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
+    if (!raw) return undefined;
+    const layout = validateWorldLayout(JSON.parse(raw));
+    // A deliberate restoration must survive reload without being upgraded again.
+    layout.canonicalRevision = Math.max(layout.canonicalRevision, OLD_TOWN_CONTENT_REVISION);
+    return layout;
+  } catch { return undefined; }
+}
+export function loadWorldLayout(store = storage()): WorldLayout {
+  try {
+    const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
+    if (saved) return upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store);
+    const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
+    return legacy ? upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+  } catch (error) {
+    console.warn("Ignoring invalid saved world layout", error);
+    return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+  }
+}
 export function saveWorldLayout(layout: WorldLayout, store = storage()): boolean { try { if (!store) return false; store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(layout)); return true; } catch (error) { console.warn("Could not save world layout", error); return false; } }
 export function resetWorldLayout(store = storage()): WorldLayout { try { store?.removeItem(WORLD_LAYOUT_STORAGE_KEY); store?.removeItem(PLAZA_LAYOUT_STORAGE_KEY); } catch { /* storage is optional */ } return cloneWorldLayout(CANONICAL_WORLD_LAYOUT); }
 export function getWorldArea(layout: WorldLayout, areaId = CENTRAL_PLAZA_AREA_ID): WorldArea { const area = layout.areas.find((item) => item.id === areaId); if (!area) throw new Error(`Missing world area: ${areaId}`); return area; }
