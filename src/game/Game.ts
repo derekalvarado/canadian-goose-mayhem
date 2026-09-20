@@ -94,6 +94,8 @@ export class Game {
   private readonly settingsMenu = requireElement<HTMLElement>("#settings-menu");
   private readonly rotateMessage = requireElement<HTMLElement>("#rotate-message");
   private readonly settingsButton = requireElement<HTMLButtonElement>("#settings-button");
+  private readonly installButton = requireElement<HTMLButtonElement>("#install-button");
+  private readonly installMenu = requireElement<HTMLElement>("#install-menu");
   private readonly fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
   private readonly touchPreferenceSelect = requireElement<HTMLSelectElement>("#touch-controls-preference");
   private readonly pauseReasons = new PauseReasons();
@@ -319,11 +321,14 @@ export class Game {
       },
     );
     this.settingsButton.addEventListener("click", this.openSettings);
+    this.installButton.addEventListener("click", this.openInstallHelp);
+    requireElement<HTMLButtonElement>("#install-close").addEventListener("click", this.closeInstallHelp);
     requireElement<HTMLButtonElement>("#settings-close").addEventListener("click", this.closeSettings);
     this.touchPreferenceSelect.addEventListener("change", this.updateTouchPreference);
     this.fullscreenButton.addEventListener("click", this.toggleFullscreen);
     this.updateTouchControlsVisibility();
     this.syncFullscreenLabel();
+    this.installButton.hidden = !this.isIPhoneSafariTab();
   }
 
   private loadTouchPreference(): TouchControlsPreference {
@@ -353,6 +358,26 @@ export class Game {
     this.settingsMenu.hidden = true;
     this.setPauseReason("settings", false);
     this.settingsButton.focus({ preventScroll: true });
+  };
+
+  private isIPhoneSafariTab(): boolean {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    const isIPadDesktopMode = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    return !standalone && (/iPad|iPhone|iPod/.test(navigator.userAgent) || isIPadDesktopMode)
+      && /Safari/.test(navigator.userAgent);
+  }
+
+  private readonly openInstallHelp = (): void => {
+    this.installMenu.hidden = false;
+    this.setPauseReason("install-help", true);
+    requireElement<HTMLButtonElement>("#install-close").focus({ preventScroll: true });
+  };
+
+  private readonly closeInstallHelp = (): void => {
+    this.installMenu.hidden = true;
+    this.setPauseReason("install-help", false);
+    this.installButton.focus({ preventScroll: true });
   };
 
   private readonly toggleFullscreen = async (): Promise<void> => {

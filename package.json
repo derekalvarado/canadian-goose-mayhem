@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --host 0.0.0.0",
     "assets:janitor": "node scripts/generate-janitor-glb.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",

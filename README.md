@@ -22,6 +22,9 @@ npm run dev
 
 Open the local URL Vite prints in a browser.
 
+To test from another device on the same network, run `npm run dev:lan` and open
+the Network URL Vite prints on that device.
+
 ## Arrange the plaza
 
 Open the same local URL with `?edit` at the end (for example,
@@ -50,6 +53,14 @@ or Hide; this preference is local to the browser, not a game save. Portrait paus
 only on coarse-pointer touch devices, so a narrow desktop window remains playable.
 Fullscreen is offered where the browser permits it; mobile browsers may require the
 Fullscreen button's direct tap and may decline the request.
+
+## Install on iPhone or iPad
+
+For a true app-like view without Safari's address bar, open the game in Safari,
+tap **Share**, choose **Add to Home Screen**, then launch it from the Goose Game 2
+Home Screen icon. The included web-app manifest requests standalone landscape
+presentation; Safari's address bar cannot be removed reliably from an ordinary
+browser tab.
 
 The camera automatically follows the goose from a fixed diagonal, top-down angle.
 

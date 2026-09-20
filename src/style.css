@@ -45,6 +45,13 @@ body,
   margin: 0;
 }
 
+@supports (height: 100dvh) {
+  body,
+  #game-shell {
+    height: 100dvh;
+  }
+}
+
 body {
   min-width: 320px;
   overflow: hidden;
@@ -317,6 +324,7 @@ kbd,
 .hud-action { position: absolute; z-index: 4; pointer-events: auto; min-height: 36px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgb(15 26 18 / 76%); color: var(--ink); font-size: .72rem; font-weight: 700; cursor: pointer; }
 #settings-button { right: max(24px, env(safe-area-inset-right)); top: max(70px, calc(env(safe-area-inset-top) + 46px)); }
 #fullscreen-button { right: max(24px, env(safe-area-inset-right)); top: max(114px, calc(env(safe-area-inset-top) + 90px)); }
+#install-button { right: max(24px, env(safe-area-inset-right)); top: max(158px, calc(env(safe-area-inset-top) + 134px)); }
 .touch-controls { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .touch-movement-area { position: absolute; inset: 30% 45% 0 0; pointer-events: auto; touch-action: none; }
 .touch-stick { position: fixed; width: 104px; height: 104px; margin: -52px; border: 2px solid rgb(243 242 233 / 42%); border-radius: 50%; background: rgb(15 26 18 / 26%); pointer-events: none; }

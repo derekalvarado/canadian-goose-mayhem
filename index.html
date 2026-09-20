@@ -8,6 +8,12 @@
       content="A small 3D Old Town adventure starring one determined Canada goose."
     />
     <meta name="theme-color" content="#17261d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Goose Game 2" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/goose-game-icon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Goose Game 2 — Old Town Square</title>
   </head>
   <body>
@@ -28,6 +34,7 @@
         </aside>
 
         <button id="settings-button" class="hud-action" type="button" aria-haspopup="dialog" aria-controls="settings-menu">Settings</button>
+        <button id="install-button" class="hud-action hud-action--install" type="button" hidden aria-haspopup="dialog" aria-controls="install-menu">Install app</button>
         <button id="fullscreen-button" class="hud-action hud-action--fullscreen" type="button">Fullscreen</button>
 
         <section class="controls-card" id="controls-card" aria-label="Controls">
@@ -74,6 +81,15 @@
 
       <section id="rotate-message" class="rotate-message" hidden role="status" aria-live="polite">
         <div class="settings-card"><p class="complete-kicker">Landscape needed</p><h2>Turn your device sideways</h2><p>Play resumes when the game has room to breathe.</p></div>
+      </section>
+
+      <section id="install-menu" class="settings-menu" hidden role="dialog" aria-modal="true" aria-labelledby="install-title">
+        <div class="settings-card">
+          <p class="complete-kicker">Play without Safari chrome</p>
+          <h2 id="install-title">Add Goose Game 2 to your Home Screen</h2>
+          <p class="settings-help">In Safari, tap Share, choose <strong>Add to Home Screen</strong>, then open Goose Game 2 from its new icon. It will launch without the address bar.</p>
+          <button id="install-close" type="button">Got it</button>
+        </div>
       </section>
 
       <div id="webgl-error" class="webgl-error" hidden role="alert">

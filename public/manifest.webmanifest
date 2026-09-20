@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Goose Game 2 — Old Town Square",
+  "short_name": "Goose Game 2",
+  "description": "A small 3D Old Town adventure starring one determined Canada goose.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#203f31",
+  "theme_color": "#203f31",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/icons/goose-game-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
