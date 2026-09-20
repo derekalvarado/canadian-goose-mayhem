@@ -8,7 +8,6 @@ import { TouchControls } from "./TouchControls";
 import { PauseReasons, parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
 import { Simulation, HURRY_SPEED } from "./simulation/Simulation";
-import { FOUNTAIN_OBJECTIVE_ID } from "./simulation/plaza";
 import { PALETTE } from "./palette";
 import { WorldEditor } from "./WorldEditor";
 import { getWorldArea, loadWorldLayout } from "./worldLayout";
@@ -87,7 +86,6 @@ export class Game {
   private readonly cameraFocus = new THREE.Vector3();
   private readonly desiredCameraFocus = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
-  private readonly chapterComplete = requireElement<HTMLElement>("#chapter-complete");
   private readonly controlsCard = requireElement<HTMLElement>("#controls-card");
   private readonly keyboardControls = requireElement<HTMLElement>("#keyboard-controls");
   private readonly gamepadControls = requireElement<HTMLElement>("#gamepad-controls");
@@ -146,7 +144,6 @@ export class Game {
       document.querySelector("#game-shell")?.append(links);
     }
 
-    requireElement<HTMLButtonElement>("#restart-button").addEventListener("click", this.restart);
     if (!this.editorMode && !this.overviewMode) this.setupMobileControls();
     window.addEventListener("resize", this.resize);
     window.addEventListener("blur", this.handleBlur);
@@ -217,8 +214,6 @@ export class Game {
           this.goose.honk();
           void this.audio.playHonk();
           this.lastInputTime = performance.now();
-        } else if (event.type === "objective-completed" && event.objectiveId === FOUNTAIN_OBJECTIVE_ID) {
-          this.showFountainMilestone();
         }
       }
     }
@@ -283,24 +278,6 @@ export class Game {
       this.poopViews.delete(id);
     }
   }
-
-  private showFountainMilestone(): void {
-    this.chapterComplete.hidden = false;
-    requireElement<HTMLElement>("#objective").textContent = "✓ Find the goose fountain";
-  }
-
-  private readonly restart = (): void => {
-    this.simulation.reset();
-    this.input.clear();
-    this.syncPlayerView();
-    this.syncPoopViews();
-    this.snapCameraToGoose();
-    this.chapterComplete.hidden = true;
-    requireElement<HTMLElement>("#objective").textContent = this.rules.objectives[0].description;
-    this.lastInputTime = performance.now();
-    this.controlsCard.classList.remove("controls-card--quiet");
-    this.canvas.focus({ preventScroll: true });
-  };
 
   private readonly handleDeviceChanged = (device: InputDevice, controllerConnected: boolean): void => {
     const usingGamepad = device === "gamepad";

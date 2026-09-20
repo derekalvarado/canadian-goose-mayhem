@@ -1,7 +1,6 @@
 import { getWorldAsset, type WorldAssetCollider } from "./worldAssets.ts";
-import { CENTRAL_PLAZA_AREA_ID, FOUNTAIN_INSTANCE_ID, isWorldChunkPlayable, type WorldArea, type WorldInstance } from "./worldLayout.ts";
+import { CENTRAL_PLAZA_AREA_ID, isWorldChunkPlayable, type WorldArea, type WorldInstance } from "./worldLayout.ts";
 import type { Position, WorldRules } from "./simulation/Simulation.ts";
-import { FOUNTAIN_OBJECTIVE_ID } from "./simulation/plaza.ts";
 
 export const WORLD_GOOSE_RADIUS = 0.34;
 export const MAX_WALKABLE_STEP = 0.22;
@@ -54,14 +53,11 @@ export function findWorldInstanceOverlaps(area: WorldArea, instanceId: string): 
   }).map((item) => item.id);
 }
 export function createCentralPlazaRules(area: WorldArea): WorldRules {
-  const fountain = area.instances.find((item) => item.id === FOUNTAIN_INSTANCE_ID);
-  if (!fountain) throw new Error("Central plaza is missing its goose fountain");
-  const radius = getWorldAsset(fountain.assetId)?.colliders.find((item) => item.shape === "circle")?.radius ?? 3.35;
   // Preserve usable entry points when an older authored square is restored.
   const entrance = [{ x: -24, z: -3 }, { x: 11.5, z: 10.5 }, { x: -12, z: -3 }]
     .find(point => isWorldAreaPlayable(area, point.x, point.z));
   if (!entrance) throw new Error("Central plaza has no clear entrance; clear a spawn location in the world editor");
-  return { spawn: { ...entrance, y: getWorldGroundHeight(area, entrance.x, entrance.z)! }, spawnHeading: 0, resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); }, objectives: [{ id: FOUNTAIN_OBJECTIVE_ID, description: "Find the goose fountain", isSatisfied: ({ position }) => Math.hypot(position.x - fountain.transform.x, position.z - fountain.transform.z) <= radius + 2.15 }] };
+  return { spawn: { ...entrance, y: getWorldGroundHeight(area, entrance.x, entrance.z)! }, spawnHeading: 0, resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); }, objectives: [] };
 }
 
 export { CENTRAL_PLAZA_AREA_ID };

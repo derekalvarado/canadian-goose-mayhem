@@ -3,8 +3,8 @@
 The first playable slice is a browser-based 3D interpretation of the central plaza
 in Fort Collins' Old Town Square. You control an original, cel-shaded Canada goose
 among the goose fountain, splash pad, children's play area, pavilion, storefronts,
-patios, planters, and string lights. Finding the fountain crosses off the current
-exploration objective while leaving the square open for wandering.
+patios, planters, and string lights. The square is currently an open movement and
+environment slice; gameplay objectives will arrive with later mechanics.
 
 The intended game is an interconnected social-stealth sandbox. Read the
 [game architecture and development sequence](docs/game-architecture.md) before
@@ -58,7 +58,7 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 - `src/game/Game.ts` — presentation loop, camera, and input/simulation wiring
 - `src/game/simulation/Simulation.ts` — fixed-step gameplay state and typed commands/events
 - `src/game/simulation/Objectives.ts` — independent outcome-based task completion
-- `src/game/simulation/plaza.ts` — active plaza rules and objective definition
+- `src/game/simulation/plaza.ts` — active plaza movement rules
 - `src/game/GameAudio.ts` — browser audio output, separate from gameplay decisions
 - `src/game/Goose.ts` — original procedural Canada goose model and animation
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances

@@ -1,8 +1,6 @@
-import { isNearGooseFountain, resolvePlazaMovement } from "../plazaLevel.ts";
+import { resolvePlazaMovement } from "../plazaLevel.ts";
 import { CANONICAL_PLAZA_LAYOUT, type PlazaLayout } from "../plazaLayout.ts";
 import type { WorldRules } from "./Simulation.ts";
-
-export const FOUNTAIN_OBJECTIVE_ID = "old-town-square.find-goose-fountain";
 
 export function createPlazaRules(layout: PlazaLayout): WorldRules {
   return {
@@ -11,11 +9,7 @@ export function createPlazaRules(layout: PlazaLayout): WorldRules {
     resolveMovement: (current, proposed, output) => {
       resolvePlazaMovement(current, proposed, output, layout);
     },
-    objectives: [{
-      id: FOUNTAIN_OBJECTIVE_ID,
-      description: "Find the goose fountain",
-      isSatisfied: ({ position }) => isNearGooseFountain(position.x, position.z, layout),
-    }],
+    objectives: [],
   };
 }
 

@@ -157,15 +157,6 @@ export function isPlazaPlayable(
   });
 }
 
-export function isNearGooseFountain(
-  x: number,
-  z: number,
-  layout = CANONICAL_PLAZA_LAYOUT,
-): boolean {
-  const local = worldToPlazaGroupLocal(layout, "plaza.goose-fountain", x, z);
-  return Math.hypot(local.x, local.z) <= FOUNTAIN_RADIUS + 2.15;
-}
-
 export function getRotatedGroupExtents(
   layout: PlazaLayout,
   groupId: PlazaGroupId,
