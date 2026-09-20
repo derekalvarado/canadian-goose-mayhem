@@ -64,6 +64,17 @@ button {
   position: relative;
   isolation: isolate;
   background: var(--lawn);
+  /* The play surface is an app UI, not selectable document text on iOS. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep the settings menu's native select usable and accessible. */
+.settings-menu select {
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 
 #game-canvas {
