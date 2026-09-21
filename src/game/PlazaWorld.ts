@@ -243,6 +243,7 @@ function splashVariation(index: number, salt: number): number {
 /** Presentation-only splash pad animation; it has no gameplay or simulation state. */
 export class SplashPadView extends THREE.Group {
   private readonly jets: SplashJet[] = [];
+  private active = true;
 
   constructor() {
     super();
@@ -330,6 +331,10 @@ export class SplashPadView extends THREE.Group {
   }
 
   update(delta: number): void {
+    if (!this.active) {
+      for (const jet of this.jets) jet.mesh.visible = false;
+      return;
+    }
     for (const jet of this.jets) {
       jet.nextBurst -= delta;
       if (jet.nextBurst > 0) continue;
@@ -355,11 +360,54 @@ export class SplashPadView extends THREE.Group {
       jet.mesh.position.y = 0.13 + height / 2;
     }
   }
+
+  setActive(active: boolean): void {
+    if (this.active === active) return;
+    this.active = active;
+    if (!active) for (const jet of this.jets) jet.mesh.visible = false;
+    else for (const jet of this.jets) jet.nextBurst = Math.min(jet.nextBurst, 0.18 + jet.phase * 0.35);
+  }
 }
 
 function createSplashPad(): SplashPadView {
   const group = new SplashPadView();
   return group;
+}
+
+function createSplashFaucet(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = "splash-pad faucet";
+  const metal = toonMaterial(PALETTE.plaza.iron);
+  const handleMaterial = toonMaterial(PALETTE.accent.red);
+  const pedestal = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.23, 0.55, 12), metal));
+  pedestal.position.y = 0.275;
+  const neck = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.34, 10), metal));
+  neck.position.set(0, 0.58, -0.08); neck.rotation.x = Math.PI / 2;
+  const handle = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.075, 0.09), handleMaterial));
+  handle.position.set(0, 0.58, -0.19); handle.name = "faucet-handle"; handle.userData.interactionPoint = true;
+  const center = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.1, 12), metal));
+  center.position.copy(handle.position); center.rotation.z = Math.PI / 2;
+  group.add(pedestal, neck, handle, center);
+  return group;
+}
+
+function createBeerCan(): THREE.Group {
+  const group = new THREE.Group(); group.name = "little beer can";
+  const body = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.145, 16), toonMaterial(PALETTE.accent.red)));
+  body.position.y = 0.073;
+  const top = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.008, 16), toonMaterial(PALETTE.workwear.reflective)));
+  top.position.y = 0.149;
+  const stripe = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.049, 0.049, 0.025, 16, 1, true), toonMaterial(PALETTE.accent.cream)));
+  stripe.position.y = 0.075;
+  const tab = finishMesh(new THREE.Mesh(new THREE.TorusGeometry(0.013, 0.004, 6, 10), toonMaterial(PALETTE.plaza.iron)));
+  tab.rotation.x = Math.PI / 2; tab.position.set(0, 0.155, -0.008);
+  group.add(body, top, stripe, tab); return group;
+}
+
+function createShopEntranceMarker(): THREE.Group {
+  const group = new THREE.Group(); group.name = "shop entrance threshold";
+  const mat = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.025, 0.72), toonMaterial(PALETTE.earth.pathShade)), false, true);
+  mat.position.y = 0.013; mat.userData.gameplayMarker = "shop-entrance"; group.add(mat); return group;
 }
 
 function createPlaySculptures(): THREE.Group {
@@ -975,6 +1023,9 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.corner-market-building": return createCornerMarketBuilding(groups, instanceId);
     case "plaza.goose-fountain": return createFountain();
     case "plaza.splash-pad": return createSplashPad();
+    case "plaza.splash-faucet": return createSplashFaucet();
+    case "prop.beer-can": return createBeerCan();
+    case "gameplay.shop-entrance": return createShopEntranceMarker();
     case "plaza.play-area": return createPlayArea();
     case "plaza.pavilion-stage": return createPavilion(groups, instanceId);
     case "plaza.cafe-table-set": return createCafeTable();

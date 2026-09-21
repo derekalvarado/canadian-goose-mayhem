@@ -44,6 +44,20 @@ test("pause discards a pending honk and partial tick without resetting progress"
   assert.equal(simulation.isObjectiveComplete("visit"), true);
 });
 
+test("held goose poses live in simulation state, count as activity, and clear on pause", () => {
+  const simulation = new Simulation(openWorld);
+  simulation.advance(FIXED_STEP, { ...idle, wingsSpread: true, aggressive: true });
+  assert.equal(simulation.player.wingsSpread, true);
+  assert.equal(simulation.player.aggressive, true);
+  for (let tick = 0; tick < Math.round(GOOSE_POOP_IDLE_SECONDS / FIXED_STEP); tick += 1) {
+    simulation.advance(FIXED_STEP, { ...idle, aggressive: true });
+  }
+  assert.equal(simulation.goosePoops.length, 0);
+  simulation.suspend();
+  assert.equal(simulation.player.wingsSpread, false);
+  assert.equal(simulation.player.aggressive, false);
+});
+
 test("long stalls are bounded and do not create a later catch-up burst", () => {
   const simulation = new Simulation(openWorld);
   simulation.advance(60, { ...idle, moveX: 1 });

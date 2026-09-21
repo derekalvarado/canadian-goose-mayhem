@@ -10,6 +10,6 @@ export const brambleRules: WorldRules = {
   objectives: [{
     id: TRAIL_OBJECTIVE_ID,
     description: "Find the path out of the forest",
-    isSatisfied: ({ position }) => position.z < EXIT_Z && isOnPath(position.x, position.z),
+    isSatisfied: ({ player }) => player.position.z < EXIT_Z && isOnPath(player.position.x, player.position.z),
   }],
 };

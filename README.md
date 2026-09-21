@@ -45,11 +45,15 @@ to the checked-in canonical layout.
 - Move: `WASD`, arrow keys, or the controller left stick
 - Hurry: `Shift` or the right trigger
 - Honk: `Space` or the controller south face button
+- Spread wings while held: `Q` or the controller west face button
+- Lower into a threat posture while held: `E` or the controller north face button
 
 On touch-first devices, play in landscape with the floating left-side joystick
 (18 px dead zone, 86 px full deflection); push past 62 CSS pixels to hurry (it
-releases below 52 pixels) and use the separate right-side **Honk** button. The Settings button offers touch controls Auto, Show,
-or Hide; this preference is local to the browser, not a game save. Portrait pauses
+releases below 52 pixels) and use the separate right-side **Honk**, **Wings**, and
+**Threat** buttons. Wings and Threat remain posed only while their buttons are
+held. The Settings button offers touch controls Auto, Show, or Hide; this
+preference is local to the browser, not a game save. Portrait pauses
 only on coarse-pointer touch devices, so a narrow desktop window remains playable.
 Fullscreen is offered where the browser permits it; mobile browsers may require the
 Fullscreen button's direct tap and may decline the request.
@@ -71,7 +75,9 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 - `src/game/simulation/Objectives.ts` — independent outcome-based task completion
 - `src/game/simulation/plaza.ts` — active plaza movement rules
 - `src/game/GameAudio.ts` — browser audio output, separate from gameplay decisions
-- `src/game/Goose.ts` — original procedural Canada goose model and animation
+- `src/game/Goose.ts` — runtime loader and animation blending for the rigged Canada goose
+- `src/game/GooseModel.ts` — reproducible goose geometry, skeleton, and animation recipe
+- `assets/characters/goose/goose.blend` — editable Blender character source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
 - `src/game/worldAssets.ts` — source-owned catalog of render, collision, and occlusion metadata

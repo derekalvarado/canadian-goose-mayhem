@@ -2,19 +2,21 @@ import canonicalWorldLayoutJson from "./content/world-layout.json" with { type: 
 import { PLAZA_LAYOUT_STORAGE_KEY, type PlazaLayout, validatePlazaLayout } from "./plazaLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
 
-export const WORLD_LAYOUT_SCHEMA_VERSION = 2;
+export const WORLD_LAYOUT_SCHEMA_VERSION = 3;
 export const WORLD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.v1";
 export const CENTRAL_PLAZA_AREA_ID = "old-town-square.central-plaza";
 export const FOUNTAIN_INSTANCE_ID = "plaza.goose-fountain";
 export const WORLD_CHUNK_SIZE = 64;
 const JANITOR_CONTENT_REVISION = 3;
 const OLD_TOWN_CONTENT_REVISION = 4;
+const GAMEPLAY_CONTENT_REVISION = 5;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
 export interface WorldInstance { id: string; assetId: string; label: string; transform: WorldTransform }
 export interface WorldChunk { x: number; z: number; playable: boolean }
-export interface WorldArea { id: string; label: string; chunks: WorldChunk[]; instances: WorldInstance[] }
+export interface WorldControlLink { controllerId: string; targetId: string }
+export interface WorldArea { id: string; label: string; chunks: WorldChunk[]; instances: WorldInstance[]; controlLinks: WorldControlLink[] }
 export interface WorldLayout { schemaVersion: number; worldId: string; canonicalRevision: number; units: "meters"; coordinateSystem: "right-handed-y-up"; areas: WorldArea[] }
 export interface WorldLayoutStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
 
@@ -40,7 +42,7 @@ function validateChunks(value: unknown, areaId: string): WorldChunk[] {
 export function validateWorldLayout(value: unknown): WorldLayout {
   if (!record(value)) throw new Error("World layout must be a JSON object");
   const sourceSchema = value.schemaVersion;
-  if (sourceSchema !== 1 && sourceSchema !== WORLD_LAYOUT_SCHEMA_VERSION) throw new Error(`Unsupported world schema: ${String(sourceSchema)}`);
+  if (sourceSchema !== 1 && sourceSchema !== 2 && sourceSchema !== WORLD_LAYOUT_SCHEMA_VERSION) throw new Error(`Unsupported world schema: ${String(sourceSchema)}`);
   if (value.units !== "meters" || value.coordinateSystem !== "right-handed-y-up") throw new Error("World coordinate system is not supported");
   const worldId = validId(value.worldId, "worldId"); const canonicalRevision = finite(value.canonicalRevision, "canonicalRevision");
   if (!Number.isInteger(canonicalRevision) || canonicalRevision < 1) throw new Error("canonicalRevision must be a positive integer");
@@ -62,8 +64,23 @@ export function validateWorldLayout(value: unknown): WorldLayout {
       return { id: instanceId, assetId, label: cleanLabel(item.label, `${instanceId}.label`), transform: { x, y, z, rotationY } };
     });
     instances = migrateLegacyPlanterCluster(instances, instanceIds);
+    const localInstances = new Map(instances.map((item) => [item.id, item]));
+    const rawLinks = candidate.controlLinks ?? [];
+    if (!Array.isArray(rawLinks)) throw new Error(`${id}.controlLinks must be an array`);
+    const controllerIds = new Set<string>();
+    const controlLinks = rawLinks.flatMap((link, index) => {
+      if (!record(link)) throw new Error(`${id}.controlLinks[${index}] must be an object`);
+      const controllerId = validId(link.controllerId, `${id}.controlLinks[${index}].controllerId`);
+      const targetId = validId(link.targetId, `${id}.controlLinks[${index}].targetId`);
+      if (controllerIds.has(controllerId)) throw new Error(`Duplicate controller link: ${controllerId}`);
+      controllerIds.add(controllerId);
+      const controller = localInstances.get(controllerId); const target = localInstances.get(targetId);
+      if (!controller || !getWorldAsset(controller.assetId)?.controller) return [];
+      if (!target || !getWorldAsset(target.assetId)?.activeTarget) return [];
+      return [{ controllerId, targetId }];
+    });
     const chunks = sourceSchema === 1 ? legacyChunks(instances, id === CENTRAL_PLAZA_AREA_ID) : validateChunks(candidate.chunks, id);
-    return { id, label: cleanLabel(candidate.label, `${id}.label`), chunks, instances };
+    return { id, label: cleanLabel(candidate.label, `${id}.label`), chunks, instances, controlLinks };
   });
   if (!areaIds.has(CENTRAL_PLAZA_AREA_ID)) throw new Error("World must contain the central plaza area");
   return { schemaVersion: WORLD_LAYOUT_SCHEMA_VERSION, worldId, canonicalRevision, units: "meters", coordinateSystem: "right-handed-y-up", areas };
@@ -116,7 +133,7 @@ export function migratePlazaLayout(layout: PlazaLayout): WorldLayout {
     ...(["plaza.cafe-table-1", "plaza.cafe-table-2", "plaza.cafe-table-3"] as const).map((id) => instance(id, "plaza.cafe-table-set", group[id].label, group[id].position.x, group[id].position.z, group[id].rotationY)),
     instance("plaza.planter-east-north", "plaza.planter-east-north", "East north planter", 19.35, -7.2), instance("plaza.planter-east-south", "plaza.planter-east-south", "East south planter", 19.35, 6.2), instance("plaza.planter-south", "plaza.planter-south", "South planter", 7.8, 16.7), instance("plaza.trees", "plaza.tree-cluster", "Tree cluster", 0, 0), instance("plaza.lights", "plaza.string-lights", "String lights", 0, 0),
   ];
-  return migrateStreetJanitor(validateWorldLayout({ schemaVersion: 2, worldId: "old-town-square", canonicalRevision: l.canonicalRevision, units: "meters", coordinateSystem: "right-handed-y-up", areas: [{ id: CENTRAL_PLAZA_AREA_ID, label: "Central Plaza", chunks: [{ x: -1, z: -1, playable: true }, { x: 0, z: -1, playable: true }, { x: -1, z: 0, playable: true }, { x: 0, z: 0, playable: true }], instances }] }));
+  return migrateStreetJanitor(validateWorldLayout({ schemaVersion: WORLD_LAYOUT_SCHEMA_VERSION, worldId: "old-town-square", canonicalRevision: l.canonicalRevision, units: "meters", coordinateSystem: "right-handed-y-up", areas: [{ id: CENTRAL_PLAZA_AREA_ID, label: "Central Plaza", chunks: [{ x: -1, z: -1, playable: true }, { x: 0, z: -1, playable: true }, { x: -1, z: 0, playable: true }, { x: 0, z: 0, playable: true }], instances, controlLinks: [] }] }));
 }
 
 export const CANONICAL_WORLD_LAYOUT = validateWorldLayout(canonicalWorldLayoutJson);
@@ -143,6 +160,36 @@ function upgradeOldTown(layout: WorldLayout, store?: WorldLayoutStorage): WorldL
     return layout;
   }
 }
+function addGameplayContent(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision < OLD_TOWN_CONTENT_REVISION) return layout;
+  if (layout.canonicalRevision >= GAMEPLAY_CONTENT_REVISION) return layout;
+  const updated = cloneWorldLayout(layout);
+  const plaza = getWorldArea(updated);
+  const add = (id: string, assetId: string, label: string, x: number, z: number, rotationY = 0) => {
+    if (!plaza.instances.some((item) => item.id === id)) plaza.instances.push(instance(id, assetId, label, x, z, rotationY));
+  };
+  add("plaza.splash-faucet", "plaza.splash-faucet", "Splash-pad faucet", -7.75, 0, -Math.PI / 2);
+  add("plaza.beer-can", "prop.beer-can", "Little beer can", -20.5, -2.25);
+  add("plaza.shop-entrance", "gameplay.shop-entrance", "North shop entrance", -11, -13.72);
+  const janitor = plaza.instances.find((item) => item.id === "plaza.street-janitor");
+  if (janitor && ((janitor.transform.x === -20 && janitor.transform.z === -6)
+    || (janitor.transform.x === -7.8 && janitor.transform.z === -5.4))) {
+    Object.assign(janitor.transform, { x: -11, y: 0, z: -12.45, rotationY: 0 });
+  }
+  if (!plaza.controlLinks.some((link) => link.controllerId === "plaza.splash-faucet")) {
+    plaza.controlLinks.push({ controllerId: "plaza.splash-faucet", targetId: "plaza.splash-pad" });
+  }
+  updated.canonicalRevision = GAMEPLAY_CONTENT_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) {
+      console.warn("Keeping the previous world because its gameplay update could not be saved", error);
+      return layout;
+    }
+  }
+  return validated;
+}
 export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
   try {
     const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -156,9 +203,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store);
+    if (saved) return addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
@@ -167,7 +214,7 @@ export function loadWorldLayout(store = storage()): WorldLayout {
 export function saveWorldLayout(layout: WorldLayout, store = storage()): boolean { try { if (!store) return false; store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(layout)); return true; } catch (error) { console.warn("Could not save world layout", error); return false; } }
 export function resetWorldLayout(store = storage()): WorldLayout { try { store?.removeItem(WORLD_LAYOUT_STORAGE_KEY); store?.removeItem(PLAZA_LAYOUT_STORAGE_KEY); } catch { /* storage is optional */ } return cloneWorldLayout(CANONICAL_WORLD_LAYOUT); }
 export function getWorldArea(layout: WorldLayout, areaId = CENTRAL_PLAZA_AREA_ID): WorldArea { const area = layout.areas.find((item) => item.id === areaId); if (!area) throw new Error(`Missing world area: ${areaId}`); return area; }
-export function addWorldArea(layout: WorldLayout, id: string, label: string): WorldArea { validId(id, "area ID"); if (layout.areas.some((area) => area.id === id)) throw new Error(`Area already exists: ${id}`); const area = { id, label: cleanLabel(label, "area label"), chunks: [], instances: [] }; layout.areas.push(area); return area; }
+export function addWorldArea(layout: WorldLayout, id: string, label: string): WorldArea { validId(id, "area ID"); if (layout.areas.some((area) => area.id === id)) throw new Error(`Area already exists: ${id}`); const area: WorldArea = { id, label: cleanLabel(label, "area label"), chunks: [], instances: [], controlLinks: [] }; layout.areas.push(area); return area; }
 export function deleteWorldArea(layout: WorldLayout, id: string): void { if (id === CENTRAL_PLAZA_AREA_ID) throw new Error("The central plaza cannot be deleted"); const index = layout.areas.findIndex((area) => area.id === id); if (index < 0) throw new Error(`Unknown area: ${id}`); layout.areas.splice(index, 1); }
 export function getWorldChunk(area: WorldArea, x: number, z: number): WorldChunk | undefined { return area.chunks.find((chunk) => chunk.x === x && chunk.z === z); }
 export function ensureWorldChunk(area: WorldArea, x: number, z: number, playable = false): WorldChunk { const existing = getWorldChunk(area, x, z); if (existing) return existing; const chunk = { x, z, playable }; area.chunks.push(chunk); return chunk; }

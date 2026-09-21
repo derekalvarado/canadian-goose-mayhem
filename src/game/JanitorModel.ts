@@ -201,5 +201,28 @@ function createJanitorClips(): THREE.AnimationClip[] {
     walkTracks.push(rotation(`${side}_shoulder`, times, [-0.24, 0, 0.24, 0, -0.24].map((x) => [x * sign, 0, 0])));
     walkTracks.push(rotation(`${side}_elbow`, times, [-0.08, -0.14, -0.2, -0.14, -0.08].map((x) => [x, 0, 0])));
   }
-  return [idle, look, new THREE.AnimationClip("walk", 1, walkTracks)];
+  const shooTimes = [0, 0.14, 0.34, 0.58, 0.82];
+  const shoo = new THREE.AnimationClip("shoo", 0.82, [
+    rotation("chest", shooTimes, [[0, 0, 0], [-0.08, 0, 0], [0.14, 0, 0], [0.06, 0, 0], [0, 0, 0]]),
+    rotation("head", shooTimes, [[0, 0, 0], [0, 0.12, 0], [0, -0.08, 0], [0, 0.05, 0], [0, 0, 0]]),
+    rotation("left_shoulder", shooTimes, [[0, 0, 0], [-0.65, 0, -0.4], [-1.35, 0, -0.18], [-0.82, 0, -0.32], [0, 0, 0]]),
+    rotation("right_shoulder", shooTimes, [[0, 0, 0], [-0.65, 0, 0.4], [-1.35, 0, 0.18], [-0.82, 0, 0.32], [0, 0, 0]]),
+    rotation("left_elbow", shooTimes, [[0, 0, 0], [-0.32, 0, 0], [-0.08, 0, 0], [-0.28, 0, 0], [0, 0, 0]]),
+    rotation("right_elbow", shooTimes, [[0, 0, 0], [-0.32, 0, 0], [-0.08, 0, 0], [-0.28, 0, 0], [0, 0, 0]]),
+  ]);
+  const inspectTimes = [0, 0.4, 0.8, 1.2, 1.6];
+  const inspect = new THREE.AnimationClip("inspect", 1.6, [
+    rotation("spine", inspectTimes, [[0, 0, 0], [0.22, 0, 0], [0.27, 0, 0], [0.2, 0, 0], [0, 0, 0]]),
+    rotation("head", inspectTimes, [[0, 0, 0], [0.24, 0.3, 0], [0.32, -0.28, 0], [0.22, 0.18, 0], [0, 0, 0]]),
+    rotation("left_shoulder", inspectTimes, [[0, 0, 0], [0.18, 0, -0.08], [0.24, 0, -0.12], [0.16, 0, -0.07], [0, 0, 0]]),
+    rotation("right_shoulder", inspectTimes, [[0, 0, 0], [0.18, 0, 0.08], [0.24, 0, 0.12], [0.16, 0, 0.07], [0, 0, 0]]),
+  ]);
+  const scratchTimes = [0, 0.22, 0.5, 0.78, 1.06, 1.3];
+  const scratch = new THREE.AnimationClip("scratch", 1.3, [
+    rotation("head", scratchTimes, [[0, 0, 0], [0, -0.18, 0.08], [0.05, -0.25, 0.1], [0, 0.2, -0.06], [0.04, -0.18, 0.08], [0, 0, 0]]),
+    rotation("right_shoulder", scratchTimes, [[0, 0, 0], [-1.28, 0.15, 0.48], [-1.38, 0.2, 0.55], [-1.3, 0.12, 0.48], [-1.38, 0.2, 0.55], [0, 0, 0]]),
+    rotation("right_elbow", scratchTimes, [[0, 0, 0], [-1.18, 0, 0], [-1.34, 0, 0], [-1.16, 0, 0], [-1.34, 0, 0], [0, 0, 0]]),
+    rotation("right_wrist", scratchTimes, [[0, 0, 0], [-0.2, 0, 0.1], [-0.3, 0, -0.1], [-0.16, 0, 0.12], [-0.3, 0, -0.1], [0, 0, 0]]),
+  ]);
+  return [idle, look, new THREE.AnimationClip("walk", 1, walkTracks), shoo, inspect, scratch];
 }

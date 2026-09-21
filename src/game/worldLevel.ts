@@ -1,9 +1,11 @@
 import { getWorldAsset, type WorldAssetCollider } from "./worldAssets.ts";
 import { CENTRAL_PLAZA_AREA_ID, isWorldChunkPlayable, type WorldArea, type WorldInstance } from "./worldLayout.ts";
-import type { Position, WorldRules } from "./simulation/Simulation.ts";
+import type { Position, WorldEntityDefinition, WorldRules } from "./simulation/Simulation.ts";
 
 export const WORLD_GOOSE_RADIUS = 0.34;
 export const MAX_WALKABLE_STEP = 0.22;
+export const ENTER_SHOP_OBJECTIVE_ID = "plaza.enter-north-shop";
+export const ENTER_SHOP_FACT_ID = "plaza.entered-north-shop";
 
 function local(instance: WorldInstance, x: number, z: number): { x: number; z: number } {
   const dx = x - instance.transform.x; const dz = z - instance.transform.z;
@@ -57,7 +59,45 @@ export function createCentralPlazaRules(area: WorldArea): WorldRules {
   const entrance = [{ x: -24, z: -3 }, { x: 11.5, z: 10.5 }, { x: -12, z: -3 }]
     .find(point => isWorldAreaPlayable(area, point.x, point.z));
   if (!entrance) throw new Error("Central plaza has no clear entrance; clear a spawn location in the world editor");
-  return { spawn: { ...entrance, y: getWorldGroundHeight(area, entrance.x, entrance.z)! }, spawnHeading: 0, resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); }, objectives: [] };
+  const entities: WorldEntityDefinition[] = area.instances.flatMap((item) => {
+    const asset = getWorldAsset(item.assetId); if (!asset) return [];
+    const link = area.controlLinks.find((candidate) => candidate.controllerId === item.id);
+    const offset = asset.controller?.interactionOffset;
+    const cosine = Math.cos(item.transform.rotationY); const sine = Math.sin(item.transform.rotationY);
+    const interactionPoint = offset ? {
+      x: item.transform.x + offset.x * cosine + offset.z * sine,
+      y: item.transform.y + offset.y,
+      z: item.transform.z - offset.x * sine + offset.z * cosine,
+    } : undefined;
+    if (!asset.activeTarget && !asset.carryable && !(asset.controller && link && interactionPoint)) return [];
+    return [{
+      id: item.id, label: item.label, position: { x: item.transform.x, y: item.transform.y, z: item.transform.z },
+      heading: item.transform.rotationY, active: asset.activeTarget?.initialActive,
+      controller: asset.controller && link && interactionPoint ? { targetId: link.targetId, interactionPoint, interactionRange: asset.controller.range } : undefined,
+      carryable: asset.carryable,
+    }];
+  });
+  const janitorInstance = area.instances.find((item) => getWorldAsset(item.assetId)?.gameplayRole === "janitor");
+  const entranceInstance = area.instances.find((item) => getWorldAsset(item.assetId)?.gameplayRole === "shop-entrance");
+  const splashPad = area.instances.find((item) => getWorldAsset(item.assetId)?.activeTarget);
+  const janitor = janitorInstance && entranceInstance && splashPad ? {
+    id: janitorInstance.id,
+    position: { x: janitorInstance.transform.x, y: janitorInstance.transform.y, z: janitorInstance.transform.z },
+    heading: janitorInstance.transform.rotationY,
+    guardPosition: { x: janitorInstance.transform.x, y: janitorInstance.transform.y, z: janitorInstance.transform.z },
+    investigationPosition: { x: splashPad.transform.x - 4.7, y: splashPad.transform.y, z: splashPad.transform.z },
+    observedTargetId: splashPad.id, walkSpeed: 2.2, guardRadius: 1.75, noticeRadius: 24,
+    inspectSeconds: 3, scratchSeconds: 3, shooSeconds: 0.82,
+  } : undefined;
+  const objectiveZones = entranceInstance ? [{ id: entranceInstance.id,
+    position: { x: entranceInstance.transform.x, y: entranceInstance.transform.y, z: entranceInstance.transform.z },
+    radius: 0.72, factId: ENTER_SHOP_FACT_ID, guardedBy: janitorInstance?.id }] : [];
+  return {
+    spawn: { ...entrance, y: getWorldGroundHeight(area, entrance.x, entrance.z)! }, spawnHeading: 0,
+    resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); },
+    entities, janitor, objectiveZones,
+    objectives: [{ id: ENTER_SHOP_OBJECTIVE_ID, description: "Sneak into the north shop", isSatisfied: (world) => world.durableFacts.includes(ENTER_SHOP_FACT_ID) }],
+  };
 }
 
 export { CENTRAL_PLAZA_AREA_ID };

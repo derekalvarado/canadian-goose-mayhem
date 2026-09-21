@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canada goose — model and rig preview</title>
+<style>
+  * { box-sizing: border-box; } body { margin: 0; background: #f2efe7; color: #293e39; font: 16px system-ui; }
+  header { padding: 24px 32px 12px; } h1 { margin: 0 0 8px; font-size: 24px; } p { margin: 0 0 16px; }
+  button { font: inherit; padding: 8px 16px; border: 1px solid #879b8b; background: #fffdf6; border-radius: 6px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #315c52; color: white; }
+  #views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 12px 24px 24px; }
+  figure { margin: 0; min-width: 0; } canvas { width: 100%; height: 430px; display: block; border-radius: 8px; }
+  figcaption { text-align: center; padding: 10px; } #status { padding: 0 32px; }
+  @media(max-width:800px) { #views { grid-template-columns: repeat(2, 1fr); } }
+</style>
+<header>
+  <h1>Canada goose · model & rig</h1>
+  <p>Runtime GLB, toon materials, four play-camera angles, and every authored animation.</p>
+  <button data-speed="0" aria-pressed="true">Idle</button>
+  <button data-speed="0.6" aria-pressed="false">Walk</button>
+  <button data-speed="1" aria-pressed="false">Hurry</button>
+  <button id="honk">Honk</button>
+  <button id="wings" aria-pressed="false">Hold wings</button>
+  <button id="aggressive" aria-pressed="false">Hold threat</button>
+  <button id="rig" aria-pressed="false">Show skeleton</button>
+</header>
+<div id="views"></div><p id="status">Loading model…</p>
+<script type="module">
+  import * as THREE from 'three';
+  import { Goose } from '/src/game/Goose.ts';
+  import { toonMaterial } from '/src/game/toonMaterial.ts';
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf2efe7);
+  scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.55));
+  const sun = new THREE.DirectionalLight(0xffffff, Math.PI * 0.45); sun.position.set(-3, 7, -5); scene.add(sun);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), toonMaterial(0xe5e0d3));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  const goose = new Goose(); scene.add(goose); await goose.ready;
+  const skeleton = new THREE.SkeletonHelper(goose); skeleton.visible = false; scene.add(skeleton);
+  const panes = [];
+  for (const [label, x, z] of [['Front left', -2, -2], ['Front right', 2, -2], ['Back left', -2, 2], ['Back right', 2, 2]]) {
+    const figure = document.createElement('figure'); const canvas = document.createElement('canvas');
+    const caption = document.createElement('figcaption'); caption.textContent = label; figure.append(canvas, caption);
+    document.querySelector('#views').append(figure);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.toneMapping = THREE.NoToneMapping; renderer.shadowMap.enabled = true;
+    const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.1, 20);
+    camera.position.set(x, 1.8, z); camera.lookAt(0, 0.58, 0); panes.push({ renderer, camera, canvas });
+  }
+  let speed = 0, wings = false, aggressive = false, elapsed = 0;
+  for (const button of document.querySelectorAll('[data-speed]')) button.onclick = () => {
+    speed = Number(button.dataset.speed); document.querySelectorAll('[data-speed]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+  };
+  document.querySelector('#honk').onclick = () => goose.honk();
+  for (const [id, set] of [['wings', (value) => wings = value], ['aggressive', (value) => aggressive = value]]) {
+    document.querySelector(`#${id}`).onclick = (event) => { const value = event.currentTarget.getAttribute('aria-pressed') !== 'true'; set(value); event.currentTarget.setAttribute('aria-pressed', String(value)); };
+  }
+  document.querySelector('#rig').onclick = (event) => { skeleton.visible = !skeleton.visible; event.currentTarget.setAttribute('aria-pressed', String(skeleton.visible)); };
+  document.querySelector('#status').textContent = 'Loaded · 17 bones · idle / walk / hurry / honk / wings spread / threat posture';
+  const clock = new THREE.Clock();
+  function frame() {
+    requestAnimationFrame(frame); const delta = Math.min(clock.getDelta(), 0.1); elapsed += delta;
+    goose.update(delta, elapsed, speed, 0, wings, aggressive);
+    for (const {renderer, camera, canvas} of panes) {
+      const width = canvas.clientWidth, height = canvas.clientHeight;
+      if (canvas.width !== Math.round(width * renderer.getPixelRatio()) || canvas.height !== Math.round(height * renderer.getPixelRatio())) {
+        renderer.setSize(width, height, false); camera.left = -1.05 * width / height; camera.right = 1.05 * width / height; camera.updateProjectionMatrix();
+      }
+      renderer.render(scene, camera);
+    }
+  }
+  frame();
+</script>
+</html>

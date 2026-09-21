@@ -20,9 +20,9 @@ test("square upgrade archives the previous draft, preserves other areas, and can
   old.areas.push({ id: "custom-garden", label: "My garden", chunks: [], instances: [] });
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 4);
+  assert.equal(updated.canonicalRevision, 5);
   assert.equal(getWorldArea(updated).instances.find(i => i.id === "plaza.goose-fountain")!.transform.x, -16);
-  assert.deepEqual(updated.areas[1], old.areas[1]);
+  assert.deepEqual(updated.areas[1], { ...old.areas[1], controlLinks: [] });
   const backup = store.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
   assert.ok(backup);
   assert.equal(JSON.parse(backup).areas[0].instances.find((i: {id: string}) => i.id === "plaza.goose-fountain").transform.x, -7);
@@ -37,6 +37,34 @@ test("a full storage device cannot discard the user's previous layout", () => {
   const old = cloneWorldLayout(CANONICAL_WORLD_LAYOUT); old.canonicalRevision = 3;
   const store = { getItem: (k: string) => k === WORLD_LAYOUT_STORAGE_KEY ? JSON.stringify(old) : null, setItem: () => { throw new Error("quota"); }, removeItem: () => {} };
   assert.deepEqual(loadWorldLayout(store), old);
+});
+
+test("the gameplay content update preserves authored edits and is saved once", () => {
+  const store = memoryStore();
+  const authored = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+  authored.canonicalRevision = 4;
+  const area = getWorldArea(authored);
+  area.instances = area.instances.filter((item) => !["plaza.splash-faucet", "plaza.beer-can", "plaza.shop-entrance"].includes(item.id));
+  area.controlLinks = [];
+  area.instances.find((item) => item.id === "plaza.goose-fountain")!.transform.x = -14.25;
+  saveWorldLayout(authored, store);
+
+  const updated = loadWorldLayout(store);
+  assert.equal(updated.canonicalRevision, 5);
+  assert.equal(getWorldArea(updated).instances.find((item) => item.id === "plaza.goose-fountain")?.transform.x, -14.25);
+  assert.ok(getWorldArea(updated).instances.some((item) => item.id === "plaza.splash-faucet"));
+  assert.deepEqual(getWorldArea(updated).controlLinks, [{ controllerId: "plaza.splash-faucet", targetId: "plaza.splash-pad" }]);
+  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 5);
+});
+
+test("a failed gameplay update leaves the stored authored revision untouched", () => {
+  const authored = cloneWorldLayout(CANONICAL_WORLD_LAYOUT); authored.canonicalRevision = 4;
+  const area = getWorldArea(authored);
+  area.instances = area.instances.filter((item) => item.id !== "plaza.splash-faucet"); area.controlLinks = [];
+  const raw = JSON.stringify(authored);
+  const store = { getItem: (key: string) => key === WORLD_LAYOUT_STORAGE_KEY ? raw : null,
+    setItem: () => { throw new Error("quota"); }, removeItem: () => {} };
+  assert.deepEqual(loadWorldLayout(store), authored);
 });
 
 test("new square has continuous routes from its entrance to the fountain, event space, and patios", () => {

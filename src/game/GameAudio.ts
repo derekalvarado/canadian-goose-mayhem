@@ -1,6 +1,9 @@
+const HONK_URL = "/audio/canada-goose-honk.mp3";
+
 /** Browser audio output consumes gameplay events; it never decides gameplay. */
 export class GameAudio {
   private context: AudioContext | undefined;
+  private honkBuffer: Promise<AudioBuffer> | undefined;
   private paused = false;
   private generation = 0;
 
@@ -14,10 +17,25 @@ export class GameAudio {
     try {
       this.context ??= new AudioContext();
       if (this.context.state === "suspended") void this.context.resume().catch(() => {});
+      void this.loadHonk(this.context).catch(() => {});
     } catch {
       // Unavailable audio must not prevent gameplay.
     }
   };
+
+  private loadHonk(context: AudioContext): Promise<AudioBuffer> {
+    this.honkBuffer ??= fetch(HONK_URL)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Unable to load goose honk: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((data) => context.decodeAudioData(data))
+      .catch((error: unknown) => {
+        this.honkBuffer = undefined;
+        throw error;
+      });
+    return this.honkBuffer;
+  }
 
   setPaused(paused: boolean): void {
     this.paused = paused;
@@ -30,43 +48,25 @@ export class GameAudio {
   async playHonk(): Promise<void> {
     const AudioContextClass = window.AudioContext;
     if (!AudioContextClass) return;
-
     try {
       const generation = this.generation;
       const context = this.context ??= new AudioContextClass();
       if (context.state === "suspended") await context.resume();
+      const buffer = await this.loadHonk(context);
       if (this.paused || generation !== this.generation || context.state !== "running") return;
-      const now = context.currentTime;
-      const master = context.createGain();
-      const resonator = context.createBiquadFilter();
-      resonator.type = "bandpass";
-      resonator.frequency.setValueAtTime(710, now);
-      resonator.Q.setValueAtTime(2.4, now);
-      master.gain.setValueAtTime(0.0001, now);
-      master.gain.exponentialRampToValueAtTime(0.16, now + 0.025);
-      master.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
-      resonator.connect(master);
-      master.connect(context.destination);
-
-      [0, 1].forEach((index) => {
-        const oscillator = context.createOscillator();
-        oscillator.type = index === 0 ? "sawtooth" : "triangle";
-        oscillator.frequency.setValueAtTime(index === 0 ? 390 : 478, now);
-        oscillator.frequency.exponentialRampToValueAtTime(index === 0 ? 305 : 360, now + 0.34);
-        oscillator.detune.value = index === 0 ? -7 : 9;
-        oscillator.connect(resonator);
-        oscillator.onended = () => {
-          oscillator.disconnect();
-          if (index === 1) {
-            resonator.disconnect();
-            master.disconnect();
-          }
-        };
-        oscillator.start(now + index * 0.012);
-        oscillator.stop(now + 0.43);
-      });
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+      source.buffer = buffer;
+      gain.gain.value = 0.72;
+      source.connect(gain);
+      gain.connect(context.destination);
+      source.onended = () => {
+        source.disconnect();
+        gain.disconnect();
+      };
+      source.start();
     } catch {
-      // Audio can be blocked until a browser recognizes the input as a user gesture.
+      // Loading or browser autoplay policy failures must not prevent gameplay.
     }
   }
 }

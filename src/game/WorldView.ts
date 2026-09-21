@@ -4,6 +4,7 @@ import { JanitorView } from "./JanitorView.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { isWorldChunkPlayable, WORLD_CHUNK_SIZE, type WorldArea, type WorldInstance } from "./worldLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
+import type { WorldSnapshot } from "./simulation/Simulation.ts";
 
 export class WorldView extends THREE.Group {
   readonly instances = new Map<string, THREE.Group>();
@@ -12,6 +13,7 @@ export class WorldView extends THREE.Group {
   private editorFocus?: Readonly<{ x: number; z: number }>;
   private readonly playableOnly: boolean;
   private presentationViews: (SplashPadView | JanitorView)[] = [];
+  private readonly gameplayViews = new Map<string, SplashPadView | JanitorView>();
 
   constructor(area: WorldArea, playableOnly = false) {
     super();
@@ -25,6 +27,7 @@ export class WorldView extends THREE.Group {
     this.clear();
     this.instances.clear();
     this.presentationViews = [];
+    this.gameplayViews.clear();
     for (const instance of area.instances) {
       if (!this.playableOnly || isWorldChunkPlayable(area, instance.transform.x, instance.transform.z)) this.addInstance(instance);
     }
@@ -45,7 +48,10 @@ export class WorldView extends THREE.Group {
       instance.id,
     );
     wrapper.add(view);
-    if (view instanceof SplashPadView || view instanceof JanitorView) this.presentationViews.push(view);
+    if (view instanceof SplashPadView || view instanceof JanitorView) {
+      this.presentationViews.push(view);
+      this.gameplayViews.set(instance.id, view);
+    }
     this.instances.set(instance.id, wrapper);
     this.add(wrapper);
     return wrapper;
@@ -53,6 +59,21 @@ export class WorldView extends THREE.Group {
 
   updatePresentation(delta: number): void {
     for (const view of this.presentationViews) view.update(delta);
+  }
+
+  syncGameplay(snapshot: WorldSnapshot): void {
+    for (const entity of snapshot.entities) {
+      const wrapper = this.instances.get(entity.id); if (!wrapper) continue;
+      wrapper.position.set(entity.position.x, entity.position.y, entity.position.z);
+      wrapper.rotation.y = entity.heading;
+      const view = this.gameplayViews.get(entity.id);
+      if (view instanceof SplashPadView && entity.active !== undefined) view.setActive(entity.active);
+    }
+    const janitor = snapshot.janitor;
+    if (!janitor) return;
+    const wrapper = this.instances.get(janitor.id); const view = this.gameplayViews.get(janitor.id);
+    if (wrapper) { wrapper.position.set(janitor.position.x, janitor.position.y, janitor.position.z); wrapper.rotation.y = janitor.heading; }
+    if (view instanceof JanitorView) view.setActivity(janitor.activity);
   }
 
   /** Keeps large authoring worlds responsive while leaving a local chunk halo visible. */

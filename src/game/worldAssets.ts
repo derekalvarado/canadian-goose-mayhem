@@ -2,7 +2,7 @@
  * Source-owned catalog metadata. Layout files intentionally reference these
  * stable IDs rather than serialising meshes or material recipes.
  */
-export type WorldAssetCategory = "ground" | "architecture" | "landmark" | "furniture" | "planting" | "lighting" | "character";
+export type WorldAssetCategory = "ground" | "architecture" | "landmark" | "furniture" | "planting" | "lighting" | "character" | "prop" | "gameplay";
 
 export interface WorldAssetCollider {
   readonly shape: "box" | "circle";
@@ -30,6 +30,13 @@ export interface WorldAssetDefinition {
   readonly surfaceHeight?: number;
   /** Higher surfaces win when authored tiles overlap. */
   readonly surfacePriority?: number;
+  /** A simulation-owned boolean state that authored controls may target. */
+  readonly activeTarget?: Readonly<{ initialActive: boolean }>;
+  /** Local handle point and reach used by the common interaction resolver. */
+  readonly controller?: Readonly<{ interactionOffset: Readonly<{ x: number; y: number; z: number }>; range: number }>;
+  /** Common grab/drop capability; the renderer never decides ownership. */
+  readonly carryable?: Readonly<{ interactionRange: number; carryHeight: number; carryDistance: number }>;
+  readonly gameplayRole?: "janitor" | "shop-entrance";
 }
 
 export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
@@ -57,7 +64,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "oldtown.light-span", label: "Old Town festoon span", category: "lighting", halfWidth: 0.1, halfDepth: 8.1, colliders: [], warnForOverlap: false },
   { assetId: "plaza.corner-market-building", label: "Corner market building", category: "architecture", halfWidth: 7.8, halfDepth: 6.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.25, halfDepth: 6.1 }], occludesCamera: true },
   { assetId: "plaza.goose-fountain", label: "Goose fountain", category: "landmark", halfWidth: 3.45, halfDepth: 3.45, colliders: [{ shape: "circle", x: 0, z: 0, radius: 3.35 }] },
-  { assetId: "plaza.splash-pad", label: "Splash pad", category: "landmark", halfWidth: 4.9, halfDepth: 4.9, colliders: [] },
+  { assetId: "plaza.splash-pad", label: "Splash pad", category: "landmark", halfWidth: 4.9, halfDepth: 4.9, colliders: [], activeTarget: { initialActive: true } },
   { assetId: "plaza.play-area", label: "Play area", category: "landmark", halfWidth: 6.75, halfDepth: 3.25, colliders: [
     { shape: "box", x: 0, z: -3, halfWidth: 6.5, halfDepth: 0.25 },
     { shape: "box", x: 0, z: 3, halfWidth: 6.5, halfDepth: 0.25 },
@@ -69,8 +76,10 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.pavilion-stage", label: "Stage and pavilion", category: "landmark", halfWidth: 7.4, halfDepth: 2.75, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 6.8, halfDepth: 2.25 }], occludesCamera: true },
   { assetId: "plaza.cafe-table-set", label: "Café table set", category: "furniture", halfWidth: 1.25, halfDepth: 1.25, colliders: [{ shape: "circle", x: 0, z: 0, radius: 1.18 }] },
   { assetId: "street.trash-can", label: "Trash can", category: "furniture", halfWidth: 0.46, halfDepth: 0.46, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.46 }] },
-  // Static presentation asset only. A future NPC owns its simulation state and colliders separately.
-  { assetId: "plaza.street-janitor", label: "Street janitor", category: "character", halfWidth: 0.72, halfDepth: 0.72, colliders: [] },
+  { assetId: "plaza.street-janitor", label: "Street janitor", category: "character", halfWidth: 0.72, halfDepth: 0.72, colliders: [], warnForOverlap: false, gameplayRole: "janitor" },
+  { assetId: "plaza.splash-faucet", label: "Splash-pad faucet", category: "gameplay", halfWidth: 0.4, halfDepth: 0.28, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.2 }], warnForOverlap: false, controller: { interactionOffset: { x: 0, y: 0.58, z: -0.19 }, range: 1.05 } },
+  { assetId: "prop.beer-can", label: "Little beer can", category: "prop", halfWidth: 0.09, halfDepth: 0.09, colliders: [], warnForOverlap: false, carryable: { interactionRange: 0.95, carryHeight: 0.72, carryDistance: 0.54 } },
+  { assetId: "gameplay.shop-entrance", label: "Shop entrance", category: "gameplay", halfWidth: 0.72, halfDepth: 0.42, colliders: [], warnForOverlap: false, gameplayRole: "shop-entrance" },
   { assetId: "plaza.planter-cluster", label: "Planter cluster", category: "planting", halfWidth: 22, halfDepth: 18, colliders: [
     { shape: "box", x: 19.35, z: -7.2, halfWidth: 1.45, halfDepth: 3.3 },
     { shape: "box", x: 19.35, z: 6.2, halfWidth: 1.45, halfDepth: 3.1 },

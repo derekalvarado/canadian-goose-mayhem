@@ -98,6 +98,10 @@ export class Game {
   private readonly installMenu = requireElement<HTMLElement>("#install-menu");
   private readonly fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
   private readonly touchPreferenceSelect = requireElement<HTMLSelectElement>("#touch-controls-preference");
+  private readonly objectiveList = requireElement<HTMLUListElement>("#objective-list");
+  private readonly interactionPrompt = requireElement<HTMLElement>("#interaction-prompt");
+  private readonly interactionKey = requireElement<HTMLElement>("#interaction-key");
+  private readonly interactionLabel = requireElement<HTMLElement>("#interaction-label");
   private readonly pauseReasons = new PauseReasons();
   private touchControls: TouchControls | null = null;
   private paused = false;
@@ -125,6 +129,8 @@ export class Game {
     this.scene.background = new THREE.Color(PALETTE.atmosphere.sky);
     this.scene.add(this.world, this.goose);
     this.syncPlayerView();
+    this.world.syncGameplay(this.simulation.world);
+    this.renderObjectives();
 
     this.setupLighting();
     this.setupCamera();
@@ -191,7 +197,7 @@ export class Game {
 
     const frame = this.input.sample();
     if (delta > 0) {
-      if (frame.move.lengthSq() > 0.001 || frame.hurry) {
+      if (frame.move.lengthSq() > 0.001 || frame.hurry || frame.interactPressed || frame.wingsSpread || frame.aggressive) {
         this.lastInputTime = performance.now();
         this.controlsCard.classList.remove("controls-card--quiet");
       }
@@ -212,20 +218,34 @@ export class Game {
         moveZ: this.moveDirection.z,
         hurry: frame.hurry,
         honkPressed: frame.honkPressed,
+        interactPressed: frame.interactPressed,
+        wingsSpread: frame.wingsSpread,
+        aggressive: frame.aggressive,
       });
       this.syncPlayerView();
       this.syncPoopViews();
+      this.world.syncGameplay(this.simulation.world);
       for (const event of events) {
         if (event.type === "goose-honked") {
           this.goose.honk();
           void this.audio.playHonk();
           this.lastInputTime = performance.now();
         }
+        if (event.type === "goose-shooed") this.goose.spook();
+        if (event.type === "objective-completed") this.renderObjectives();
       }
     }
 
     const player = this.simulation.player;
-    this.goose.update(delta, this.simulation.elapsed, player.speed / HURRY_SPEED, player.turnAmount);
+    this.goose.update(
+      delta,
+      this.simulation.elapsed,
+      player.speed / HURRY_SPEED,
+      player.turnAmount,
+      player.wingsSpread,
+      player.aggressive,
+    );
+    this.updateInteractionPrompt(frame.device);
 
     if (performance.now() - this.lastInputTime > 6200) {
       this.controlsCard.classList.add("controls-card--quiet");
@@ -285,6 +305,22 @@ export class Game {
     }
   }
 
+  private renderObjectives(): void {
+    this.objectiveList.replaceChildren(...this.simulation.objectiveList.map((objective) => {
+      const item = document.createElement("li"); item.textContent = objective.description;
+      item.dataset.objectiveId = objective.id; item.classList.toggle("is-complete", objective.completed);
+      return item;
+    }));
+  }
+
+  private updateInteractionPrompt(device: InputDevice): void {
+    const hint = this.simulation.interactionHint;
+    this.interactionPrompt.hidden = !hint;
+    if (!hint) return;
+    this.interactionKey.textContent = device === "gamepad" ? "B" : "F";
+    this.interactionLabel.textContent = hint;
+  }
+
   private readonly handleDeviceChanged = (device: InputDevice, controllerConnected: boolean): void => {
     const usingGamepad = device === "gamepad";
     this.keyboardControls.hidden = usingGamepad;
@@ -318,9 +354,15 @@ export class Game {
       requireElement<HTMLElement>("#touch-stick"),
       requireElement<HTMLElement>("#touch-knob"),
       requireElement<HTMLButtonElement>("#honk-button"),
+      requireElement<HTMLButtonElement>("#interact-button"),
+      requireElement<HTMLButtonElement>("#wings-button"),
+      requireElement<HTMLButtonElement>("#aggressive-button"),
       {
         onMove: ({ moveX, moveY, hurry }) => this.input.setTouchMovement(moveX, moveY, hurry),
         onHonk: () => this.input.queueTouchHonk(),
+        onInteract: () => this.input.queueTouchInteraction(),
+        onWings: (held) => this.input.setTouchPose("wings", held),
+        onAggressive: (held) => this.input.setTouchPose("aggressive", held),
         onTouchUsed: () => { this.coarseTouchDevice = true; },
       },
     );

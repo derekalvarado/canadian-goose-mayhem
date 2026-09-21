@@ -26,7 +26,7 @@ test("exported janitor is broom-free, grounded, and has valid weighted joints an
   assert.ok(bounds.max.y > 2.5 && bounds.max.y < 2.65);
   assert.ok(bounds.max.x - bounds.min.x < 1.45);
   gltf.scene.traverse((object) => assert.doesNotMatch(object.name, /broom/i));
-  assert.deepEqual(gltf.animations.map((clip) => clip.name).sort(), ["idle", "look", "walk"]);
+  assert.deepEqual(gltf.animations.map((clip) => clip.name).sort(), ["idle", "inspect", "look", "scratch", "shoo", "walk"]);
   for (const side of ["left", "right"]) {
     assert.equal(gltf.scene.getObjectByName(`${side}_hand_socket`)?.parent?.name, `${side}_wrist`);
   }

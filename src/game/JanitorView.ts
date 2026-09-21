@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { clone } from "three/addons/utils/SkeletonUtils.js";
 import { JANITOR_COLORS } from "./JanitorModel.ts";
 import { toonMaterial } from "./toonMaterial.ts";
+import type { JanitorActivity } from "./simulation/Simulation.ts";
 
 const MODEL_URL = new URL("../../assets/characters/janitor/models/janitor-street-sweeper.glb", import.meta.url).href;
 let sourcePromise: Promise<GLTF> | undefined;
@@ -14,7 +15,9 @@ function loadModel(): Promise<GLTF> {
   return sourcePromise;
 }
 
-/** Animation is presentation only. Simulation will own future NPC movement/actions. */
+type JanitorClip = "idle" | "walk" | "look" | "shoo" | "inspect" | "scratch";
+
+/** Animation is presentation only; simulation owns movement and activity. */
 export class JanitorView extends THREE.Group {
   readonly ready: Promise<void>;
   private mixer?: THREE.AnimationMixer;
@@ -63,16 +66,24 @@ export class JanitorView extends THREE.Group {
   }
 
   /** Call after ready. Walk is an in-place rig demonstration, not NPC locomotion. */
-  playAnimation(name: "idle" | "walk" | "look", fadeSeconds = 0.2): void {
+  playAnimation(name: JanitorClip, fadeSeconds = 0.2): void {
     const next = this.actions.get(name);
     if (!next || next === this.currentAction) return;
     const previous = this.currentAction;
-    next.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();
+    next.reset().setLoop(THREE.LoopRepeat, Infinity).setEffectiveTimeScale(1).setEffectiveWeight(1).play();
     if (previous) {
       if (fadeSeconds > 0) { previous.fadeOut(fadeSeconds); next.fadeIn(fadeSeconds); }
       else previous.stop();
     }
     this.currentAction = next;
+  }
+
+  setActivity(activity: JanitorActivity): void {
+    this.userData.gameplayState = activity;
+    const clip: JanitorClip = activity === "walking-to-pad" || activity === "returning" ? "walk"
+      : activity === "shooing" ? "shoo"
+      : activity === "inspecting" || activity === "scratching" ? "scratch" : "idle";
+    this.playAnimation(clip, 0.18);
   }
 
   getHandSocket(side: "left" | "right"): THREE.Object3D | undefined {

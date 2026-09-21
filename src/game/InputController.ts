@@ -6,6 +6,9 @@ export interface InputFrame {
   move: THREE.Vector2;
   hurry: boolean;
   honkPressed: boolean;
+  interactPressed: boolean;
+  wingsSpread: boolean;
+  aggressive: boolean;
   device: InputDevice;
 }
 
@@ -21,6 +24,9 @@ const MOVEMENT_KEYS = new Set([
   "ShiftLeft",
   "ShiftRight",
   "Space",
+  "KeyQ",
+  "KeyE",
+  "KeyF",
 ]);
 
 function applyDeadzone(value: number, deadzone = 0.18): number {
@@ -35,6 +41,10 @@ export class InputController {
   private lastDevice: InputDevice = "keyboard";
   private honkQueued = false;
   private gamepadHonkWasDown = false;
+  private interactionQueued = false;
+  private gamepadInteractWasDown = false;
+  private touchWingsSpread = false;
+  private touchAggressive = false;
   private touchMove = new THREE.Vector2();
   private touchHurry = false;
   private connectedGamepad = false;
@@ -55,7 +65,11 @@ export class InputController {
       - Number(this.keys.has("KeyS") || this.keys.has("ArrowDown"));
     let hurry = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
     let honkPressed = this.honkQueued;
+    let interactPressed = this.interactionQueued;
+    let wingsSpread = this.keys.has("KeyQ");
+    let aggressive = this.keys.has("KeyE");
     this.honkQueued = false;
+    this.interactionQueued = false;
 
     const gamepads = navigator.getGamepads?.() ?? [];
     const gamepad = Array.from(gamepads).find((candidate) => candidate?.connected);
@@ -67,14 +81,22 @@ export class InputController {
       const gamepadHurry = (gamepad.buttons[7]?.value ?? 0) > 0.25
         || Boolean(gamepad.buttons[5]?.pressed);
       const gamepadHonkDown = Boolean(gamepad.buttons[0]?.pressed);
+      const gamepadInteractDown = Boolean(gamepad.buttons[1]?.pressed);
+      const gamepadWingsSpread = Boolean(gamepad.buttons[2]?.pressed);
+      const gamepadAggressive = Boolean(gamepad.buttons[3]?.pressed);
       const gamepadActive = Math.hypot(stickX, stickY) > 0.03
         || gamepadHurry
-        || gamepadHonkDown;
+        || gamepadHonkDown
+        || gamepadInteractDown
+        || gamepadWingsSpread
+        || gamepadAggressive;
 
       if (gamepadActive) {
         horizontal = stickX;
         vertical = stickY;
         hurry = gamepadHurry;
+        wingsSpread = gamepadWingsSpread;
+        aggressive = gamepadAggressive;
         if (this.lastDevice !== "gamepad") {
           this.lastDevice = "gamepad";
           this.onDeviceChanged("gamepad", true);
@@ -82,10 +104,13 @@ export class InputController {
       }
 
       if (gamepadHonkDown && !this.gamepadHonkWasDown) honkPressed = true;
+      if (gamepadInteractDown && !this.gamepadInteractWasDown) interactPressed = true;
       this.gamepadHonkWasDown = gamepadHonkDown;
+      this.gamepadInteractWasDown = gamepadInteractDown;
     } else {
       this.connectedGamepad = false;
       this.gamepadHonkWasDown = false;
+      this.gamepadInteractWasDown = false;
     }
 
     if (this.touchMove.lengthSq() > 0 || this.touchHurry) {
@@ -93,6 +118,8 @@ export class InputController {
       vertical = this.touchMove.y;
       hurry = this.touchHurry;
     }
+    wingsSpread ||= this.touchWingsSpread;
+    aggressive ||= this.touchAggressive;
 
     this.movement.set(horizontal, vertical);
     if (this.movement.lengthSq() > 1) this.movement.normalize();
@@ -101,16 +128,22 @@ export class InputController {
       move: this.movement,
       hurry,
       honkPressed,
+      interactPressed,
+      wingsSpread,
+      aggressive,
       device: this.lastDevice,
     };
   }
 
   clear(): void {
     this.honkQueued = false;
+    this.interactionQueued = false;
     this.keys.clear();
     this.movement.set(0, 0);
     this.touchMove.set(0, 0);
     this.touchHurry = false;
+    this.touchWingsSpread = false;
+    this.touchAggressive = false;
   }
 
   setTouchMovement(moveX: number, moveY: number, hurry: boolean): void {
@@ -131,6 +164,23 @@ export class InputController {
     }
   }
 
+  queueTouchInteraction(): void {
+    this.interactionQueued = true;
+    if (this.lastDevice !== "touch") {
+      this.lastDevice = "touch";
+      this.onDeviceChanged("touch", this.connectedGamepad);
+    }
+  }
+
+  setTouchPose(pose: "wings" | "aggressive", held: boolean): void {
+    if (pose === "wings") this.touchWingsSpread = held;
+    else this.touchAggressive = held;
+    if (held && this.lastDevice !== "touch") {
+      this.lastDevice = "touch";
+      this.onDeviceChanged("touch", this.connectedGamepad);
+    }
+  }
+
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     if (!MOVEMENT_KEYS.has(event.code)) return;
     if (event.target instanceof HTMLElement && event.target.closest("button, input, textarea, select, [contenteditable]")) return;
@@ -138,6 +188,7 @@ export class InputController {
     this.keys.add(event.code);
 
     if (event.code === "Space" && !event.repeat) this.honkQueued = true;
+    if (event.code === "KeyF" && !event.repeat) this.interactionQueued = true;
     if (this.lastDevice !== "keyboard") {
       this.lastDevice = "keyboard";
       this.onDeviceChanged("keyboard", this.connectedGamepad);

@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 4,
+  "canonicalRevision": 5,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -245,9 +245,9 @@
           "assetId": "plaza.street-janitor",
           "label": "Street janitor",
           "transform": {
-            "x": -20,
+            "x": -11,
             "y": 0,
-            "z": -6,
+            "z": -12.45,
             "rotationY": 0
           }
         },
@@ -888,6 +888,45 @@
             "z": 11,
             "rotationY": 3.141592653589793
           }
+        },
+        {
+          "id": "plaza.splash-faucet",
+          "assetId": "plaza.splash-faucet",
+          "label": "Splash-pad faucet",
+          "transform": {
+            "x": -7.75,
+            "y": 0,
+            "z": 0,
+            "rotationY": -1.5707963267948966
+          }
+        },
+        {
+          "id": "plaza.beer-can",
+          "assetId": "prop.beer-can",
+          "label": "Little beer can",
+          "transform": {
+            "x": -20.5,
+            "y": 0,
+            "z": -2.25,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.shop-entrance",
+          "assetId": "gameplay.shop-entrance",
+          "label": "North shop entrance",
+          "transform": {
+            "x": -11,
+            "y": 0,
+            "z": -13.72,
+            "rotationY": 0
+          }
+        }
+      ],
+      "controlLinks": [
+        {
+          "controllerId": "plaza.splash-faucet",
+          "targetId": "plaza.splash-pad"
         }
       ]
     }
