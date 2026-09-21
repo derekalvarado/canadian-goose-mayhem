@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 5,
+  "canonicalRevision": 6,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -223,10 +223,10 @@
           "assetId": "oldtown.stage",
           "label": "Old Town Square stage",
           "transform": {
-            "x": 20,
+            "x": 20.25,
             "y": 0,
-            "z": 0,
-            "rotationY": -1.5707963267948966
+            "z": -1.75,
+            "rotationY": -1.1344640137963142
           }
         },
         {
@@ -245,10 +245,43 @@
           "assetId": "plaza.street-janitor",
           "label": "Street janitor",
           "transform": {
-            "x": -11,
+            "x": 21.25,
             "y": 0,
-            "z": -12.45,
-            "rotationY": 0
+            "z": 12.5,
+            "rotationY": -0.2617993877991497
+          }
+        },
+        {
+          "id": "plaza.splash-kid-milo",
+          "assetId": "plaza.splash-kid-runner",
+          "label": "Milo at the splash pad",
+          "transform": {
+            "x": -4.35,
+            "y": 0,
+            "z": -0.85,
+            "rotationY": -0.7
+          }
+        },
+        {
+          "id": "plaza.splash-kid-june",
+          "assetId": "plaza.splash-kid-boots",
+          "label": "June at the splash pad",
+          "transform": {
+            "x": -2.1,
+            "y": 0,
+            "z": 1.15,
+            "rotationY": 2.35
+          }
+        },
+        {
+          "id": "plaza.splash-kid-ari",
+          "assetId": "plaza.splash-kid-runner",
+          "label": "Ari at the splash pad",
+          "transform": {
+            "x": -1.8,
+            "y": 0,
+            "z": -1.2,
+            "rotationY": 1.7
           }
         },
         {
@@ -256,10 +289,10 @@
           "assetId": "oldtown.miller-block",
           "label": "Miller Block (photo interpretation)",
           "transform": {
-            "x": -27,
+            "x": 39,
             "y": 0,
-            "z": -14,
-            "rotationY": 0.2
+            "z": -17.5,
+            "rotationY": -1.508996938995749
           }
         },
         {
@@ -384,17 +417,6 @@
           }
         },
         {
-          "id": "oldtown.north.tree-0",
-          "assetId": "oldtown.shade-tree",
-          "label": "Shade tree",
-          "transform": {
-            "x": -9,
-            "y": 0,
-            "z": -8.5,
-            "rotationY": 0
-          }
-        },
-        {
           "id": "oldtown.north.bed-0",
           "assetId": "oldtown.flower-bed",
           "label": "Flower and shrub bed",
@@ -402,17 +424,6 @@
             "x": -5.2,
             "y": 0,
             "z": -8.5,
-            "rotationY": 0
-          }
-        },
-        {
-          "id": "oldtown.north.bench-0",
-          "assetId": "oldtown.bench",
-          "label": "Bench facing square",
-          "transform": {
-            "x": -9,
-            "y": 0,
-            "z": -6.8,
             "rotationY": 0
           }
         },
@@ -487,9 +498,9 @@
           "assetId": "oldtown.shade-tree",
           "label": "Shade tree",
           "transform": {
-            "x": 16,
+            "x": 22.25,
             "y": 0,
-            "z": -8.5,
+            "z": -8,
             "rotationY": 0
           }
         },
@@ -597,9 +608,9 @@
           "assetId": "oldtown.shade-tree",
           "label": "Shade tree",
           "transform": {
-            "x": 16,
+            "x": 26,
             "y": 0,
-            "z": 8.5,
+            "z": 13.75,
             "rotationY": 0
           }
         },
@@ -883,9 +894,9 @@
           "assetId": "oldtown.fireplace",
           "label": "Communal fireplace",
           "transform": {
-            "x": 14,
+            "x": 20,
             "y": 0,
-            "z": 11,
+            "z": 6.25,
             "rotationY": 3.141592653589793
           }
         },
@@ -894,9 +905,9 @@
           "assetId": "plaza.splash-faucet",
           "label": "Splash-pad faucet",
           "transform": {
-            "x": -7.75,
+            "x": 4,
             "y": 0,
-            "z": 0,
+            "z": 6.25,
             "rotationY": -1.5707963267948966
           }
         },

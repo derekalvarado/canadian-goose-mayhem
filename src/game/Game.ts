@@ -79,9 +79,9 @@ export class Game {
   private readonly cameraRight = new THREE.Vector3();
   // Equal ground axes give a 45° diagonal; √2 vertical keeps a 45° downward pitch.
   private readonly cameraOffset = new THREE.Vector3(
-    CAMERA_AXIS_OFFSET,
+    -CAMERA_AXIS_OFFSET,
     CAMERA_AXIS_OFFSET * Math.SQRT2,
-    CAMERA_AXIS_OFFSET,
+    -CAMERA_AXIS_OFFSET,
   );
   private readonly cameraFocus = new THREE.Vector3();
   private readonly desiredCameraFocus = new THREE.Vector3();
@@ -137,7 +137,7 @@ export class Game {
     this.input = new InputController(this.handleDeviceChanged);
 
     if (this.editorMode) {
-      this.camera.position.set(37, 58, 65);
+      this.camera.position.set(-37, 58, -65);
       this.camera.lookAt(0, 0, 0);
       this.goose.visible = false;
       new WorldEditor(this.scene, this.camera, canvas, this.worldLayout, this.world);
