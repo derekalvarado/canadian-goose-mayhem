@@ -18,7 +18,8 @@ import { toonMaterial, STORYBOOK_LIGHTING } from "./toonMaterial";
 const CAMERA_FOCUS_HEIGHT = 0.55;
 // A closer follow camera keeps the smaller goose readable and makes the plaza
 // landmarks feel larger without changing their gameplay dimensions.
-const CAMERA_AXIS_OFFSET = 9.6;
+const CAMERA_FOLLOW_ZOOM = 1.3;
+const CAMERA_AXIS_OFFSET = 9.6 / CAMERA_FOLLOW_ZOOM;
 const CAMERA_LEAD_SECONDS = 0.2;
 
 function createPoopView(): THREE.Group {
