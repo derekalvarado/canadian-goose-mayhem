@@ -7,6 +7,11 @@ import { isWorldChunkPlayable, WORLD_CHUNK_SIZE, type WorldArea, type WorldInsta
 import { getWorldAsset } from "./worldAssets.ts";
 import type { WorldSnapshot } from "./simulation/Simulation.ts";
 
+const LITTER_PICKER_ASSET_ID = "prop.litter-picker";
+const LITTER_PICKER_GROUND_ROTATION_X = Math.PI / 2;
+const LITTER_PICKER_HELD_ROTATION_Z = Math.PI / 2;
+const LITTER_PICKER_MIDPOINT_OFFSET_X = 0.8;
+
 export class WorldView extends THREE.Group {
   readonly instances = new Map<string, THREE.Group>();
   readonly occlusionFadeGroups = new OcclusionFadeGroupRegistry();
@@ -25,6 +30,9 @@ export class WorldView extends THREE.Group {
   applyArea(area: WorldArea): void {
     this.activeArea = area;
     this.occlusionFadeGroups.clear();
+    for (const wrapper of this.instances.values()) {
+      if (wrapper.parent && wrapper.parent !== this) wrapper.parent.remove(wrapper);
+    }
     this.clear();
     this.instances.clear();
     this.presentationViews = [];
@@ -42,7 +50,11 @@ export class WorldView extends THREE.Group {
     const pivotOffset = getWorldAsset(instance.assetId)?.pivotOffset ?? { x: 0, z: 0 };
     wrapper.userData.worldPivotOffset = pivotOffset;
     wrapper.position.set(instance.transform.x + pivotOffset.x, instance.transform.y, instance.transform.z + pivotOffset.z);
-    wrapper.rotation.y = instance.transform.rotationY;
+    wrapper.rotation.set(
+      instance.assetId === LITTER_PICKER_ASSET_ID ? LITTER_PICKER_GROUND_ROTATION_X : 0,
+      instance.transform.rotationY,
+      0,
+    );
     const view = createWorldAssetView(
       instance.assetId,
       registerOcclusion ? this.occlusionFadeGroups : new OcclusionFadeGroupRegistry(),
@@ -62,7 +74,7 @@ export class WorldView extends THREE.Group {
     for (const view of this.presentationViews) view.update(delta);
   }
 
-  syncGameplay(snapshot: WorldSnapshot): void {
+  syncGameplay(snapshot: WorldSnapshot, gooseMouthSocket?: THREE.Object3D): void {
     const janitor = snapshot.janitor;
     const janitorView = janitor ? this.gameplayViews.get(janitor.id) : undefined;
     for (const entity of snapshot.entities) {
@@ -75,10 +87,20 @@ export class WorldView extends THREE.Group {
         if (wrapper.parent !== socket) socket.add(wrapper);
         wrapper.position.set(0, assetId === "prop.litter-picker" ? -1.48 : -0.58, 0);
         wrapper.rotation.set(0, 0, 0);
+      } else if (assetId === LITTER_PICKER_ASSET_ID && entity.holderId === "goose" && gooseMouthSocket) {
+        if (wrapper.parent !== gooseMouthSocket) gooseMouthSocket.add(wrapper);
+        // The authored picker origin is its jaws. Offset it by half its length
+        // so the goose grips the shaft's midpoint like a dog bone.
+        wrapper.position.set(LITTER_PICKER_MIDPOINT_OFFSET_X, 0, 0);
+        wrapper.rotation.set(0, 0, LITTER_PICKER_HELD_ROTATION_Z);
       } else {
         if (wrapper.parent !== this) this.add(wrapper);
         wrapper.position.set(entity.position.x, entity.position.y, entity.position.z);
-        wrapper.rotation.set(0, entity.heading, 0);
+        wrapper.rotation.set(
+          assetId === LITTER_PICKER_ASSET_ID ? LITTER_PICKER_GROUND_ROTATION_X : 0,
+          entity.heading,
+          0,
+        );
       }
       const view = this.gameplayViews.get(entity.id);
       if (view instanceof SplashPadView && entity.active !== undefined) view.setActive(entity.active);

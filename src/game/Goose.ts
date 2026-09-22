@@ -22,6 +22,7 @@ function loadModel(): Promise<GLTF> {
 /** Rigged player-character view. Gameplay owns movement and held pose state. */
 export class Goose extends THREE.Group {
   readonly ready: Promise<void>;
+  private readonly mouthSocket = new THREE.Object3D();
   private mixer?: THREE.AnimationMixer;
   private readonly actions = new Map<string, THREE.AnimationAction>();
   private readonly heldActions = new Map<HeldClip, THREE.AnimationAction>();
@@ -42,6 +43,9 @@ export class Goose extends THREE.Group {
     super();
     this.name = "goose";
     this.userData = { assetRole: "rigged-player-character", visualDetailTier: 6 };
+    this.mouthSocket.name = "goose-mouth-socket";
+    this.mouthSocket.position.set(0, 0.83, -0.66);
+    this.add(this.mouthSocket);
     if (!loader && typeof window === "undefined") {
       this.ready = Promise.resolve();
       return;
@@ -120,6 +124,11 @@ export class Goose extends THREE.Group {
   grab(): void {
     this.grabQueued = true;
     this.playGrab();
+  }
+
+  /** Presentation-only attachment point for props held between the beak. */
+  getMouthSocket(): THREE.Object3D {
+    return this.mouthSocket;
   }
 
   /** Optional visible point of interest, in world coordinates. */

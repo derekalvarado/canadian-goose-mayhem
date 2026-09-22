@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FIXED_STEP, Simulation, type PlayerCommand, type WorldRules } from "../src/game/simulation/Simulation.ts";
+import { getWorldAsset } from "../src/game/worldAssets.ts";
 
 const idle: PlayerCommand = { moveX: 0, moveZ: 0, hurry: false, honkPressed: false };
 const openMovement: WorldRules["resolveMovement"] = (_current, proposed, output) => { Object.assign(output, proposed); };
@@ -55,6 +56,31 @@ test("a carryable beer can has one durable identity and follows grab then drop o
   assert.equal(dropped.filter((event) => event.type === "entity-dropped").length, 1);
   assert.equal(simulation.player.heldEntityId, undefined);
   assert.equal(simulation.world.entities.filter((entity) => entity.id === "can").length, 1);
+});
+
+test("the litter picker can be grabbed from its expanded interaction radius", () => {
+  const asset = getWorldAsset("prop.litter-picker");
+  assert.ok(asset?.carryable);
+  assert.ok(asset.carryable.interactionRange > 1.05);
+
+  const withinRange = new Simulation({
+    spawn: position(asset.carryable.interactionRange - 0.05),
+    spawnHeading: 0,
+    resolveMovement: openMovement,
+    objectives: [],
+    entities: [{ id: "picker", label: "Litter picker", position: position(0), carryable: asset.carryable }],
+  });
+  const grabbed = withinRange.advance(FIXED_STEP, { ...idle, interactPressed: true });
+  assert.ok(grabbed.some((event) => event.type === "entity-grabbed" && event.entityId === "picker"));
+
+  const outsideRange = new Simulation({
+    spawn: position(asset.carryable.interactionRange + 0.05),
+    spawnHeading: 0,
+    resolveMovement: openMovement,
+    objectives: [],
+    entities: [{ id: "picker", label: "Litter picker", position: position(0), carryable: asset.carryable }],
+  });
+  assert.deepEqual(outsideRange.advance(FIXED_STEP, { ...idle, interactPressed: true }), []);
 });
 
 function janitorRules(spawn = position(0)): WorldRules {

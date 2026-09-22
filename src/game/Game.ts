@@ -133,7 +133,7 @@ export class Game {
     this.scene.background = new THREE.Color(PALETTE.atmosphere.sky);
     this.scene.add(this.world, this.goose);
     this.syncPlayerView();
-    this.world.syncGameplay(this.simulation.world);
+    this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket());
     this.renderObjectives();
 
     this.setupLighting();
@@ -227,7 +227,7 @@ export class Game {
       });
       this.syncPlayerView();
       this.syncPoopViews();
-      this.world.syncGameplay(this.simulation.world);
+      this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket());
       for (const event of events) {
         if (event.type === "goose-honked") {
           this.goose.honk();
