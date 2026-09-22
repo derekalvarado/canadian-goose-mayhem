@@ -405,6 +405,72 @@ function createBeerCan(): THREE.Group {
   group.add(body, top, stripe, tab); return group;
 }
 
+function createTrashBag(): THREE.Group {
+  const group = new THREE.Group(); group.name = "janitor trash bag"; group.userData.cleanupRole = "trash-bag";
+  const plastic = toonMaterial(PALETTE.goose.black);
+  const body = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 8), plastic));
+  body.scale.set(0.82, 1.18, 0.72); body.position.y = 0.29;
+  const neck = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.09, 0.12, 8), plastic));
+  neck.position.y = 0.55;
+  const tie = finishMesh(new THREE.Mesh(new THREE.TorusGeometry(0.064, 0.018, 5, 8), toonMaterial(PALETTE.plaza.iron)));
+  tie.rotation.x = Math.PI / 2; tie.position.y = 0.59;
+  group.add(body, neck, tie); return group;
+}
+
+function createLitterPicker(): THREE.Group {
+  const group = new THREE.Group(); group.name = "litter picker"; group.userData.cleanupRole = "litter-picker";
+  const shaft = finishMesh(new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.018, 1.42, 8),
+    toonMaterial(PALETTE.workwear.reflective),
+  ));
+  shaft.position.y = 0.79;
+  const grip = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.29, 0.075), toonMaterial(PALETTE.plaza.iron)));
+  grip.position.set(0, 1.48, 0.015); grip.rotation.z = -0.12;
+  const handle = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.065, 0.08), toonMaterial(PALETTE.plaza.iron)));
+  handle.position.set(0.055, 1.59, 0.015);
+  const trigger = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.09, 0.035), toonMaterial(PALETTE.plaza.awningBlue)));
+  trigger.position.set(0.045, 1.43, -0.045); trigger.rotation.z = -0.2;
+  const collar = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.12, 8), toonMaterial(PALETTE.plaza.awningBlue)));
+  collar.position.y = 0.12;
+  const jawMaterial = toonMaterial(PALETTE.plaza.iron);
+  const leftJaw = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.035), jawMaterial));
+  leftJaw.position.set(-0.05, 0.04, 0); leftJaw.rotation.z = -0.34;
+  const rightJaw = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.035), jawMaterial));
+  rightJaw.position.set(0.05, 0.04, 0); rightJaw.rotation.z = 0.34;
+  group.add(shaft, grip, handle, trigger, collar, leftJaw, rightJaw); return group;
+}
+
+function createChipBag(): THREE.Group {
+  const group = new THREE.Group(); group.name = "discarded chip bag"; group.userData.cleanupRole = "litter";
+  const body = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.035, 0.18), toonMaterial(PALETTE.plaza.awningBlue)));
+  body.position.y = 0.035; body.rotation.y = 0.16;
+  const sealMaterial = toonMaterial(PALETTE.accent.cream);
+  for (const z of [-0.082, 0.082]) {
+    const seal = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.255, 0.012, 0.028), sealMaterial));
+    seal.position.set(0, 0.056, z); seal.rotation.y = body.rotation.y; group.add(seal);
+  }
+  const badge = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.043, 0.043, 0.008, 12), toonMaterial(PALETTE.flower.yellow)));
+  badge.rotation.x = Math.PI / 2; badge.position.set(0, 0.062, -0.005);
+  group.add(body, badge); return group;
+}
+
+function createCrumpledPaper(): THREE.Group {
+  const group = new THREE.Group(); group.name = "crumpled paper"; group.userData.cleanupRole = "litter";
+  const paper = finishMesh(new THREE.Mesh(new THREE.DodecahedronGeometry(0.115, 0), toonMaterial(PALETTE.accent.cream)));
+  paper.position.y = 0.09; paper.scale.set(1.1, 0.78, 0.9); paper.rotation.set(0.4, 0.7, 0.2);
+  group.add(paper); return group;
+}
+
+function createFoodTray(): THREE.Group {
+  const group = new THREE.Group(); group.name = "paper food tray"; group.userData.cleanupRole = "litter";
+  const paper = toonMaterial(PALETTE.accent.cream);
+  const base = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.23), paper)); base.position.y = 0.03;
+  const rimLong = new THREE.BoxGeometry(0.38, 0.07, 0.025); const rimShort = new THREE.BoxGeometry(0.025, 0.07, 0.25);
+  for (const z of [-0.12, 0.12]) { const rim = finishMesh(new THREE.Mesh(rimLong, paper)); rim.position.set(0, 0.06, z); group.add(rim); }
+  for (const x of [-0.19, 0.19]) { const rim = finishMesh(new THREE.Mesh(rimShort, paper)); rim.position.set(x, 0.06, 0); group.add(rim); }
+  group.rotation.y = -0.24; group.add(base); return group;
+}
+
 function createShopEntranceMarker(): THREE.Group {
   const group = new THREE.Group(); group.name = "shop entrance threshold";
   const mat = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.025, 0.72), toonMaterial(PALETTE.earth.pathShade)), false, true);
@@ -1026,6 +1092,11 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.splash-pad": return createSplashPad();
     case "plaza.splash-faucet": return createSplashFaucet();
     case "prop.beer-can": return createBeerCan();
+    case "prop.trash-bag": return createTrashBag();
+    case "prop.litter-picker": return createLitterPicker();
+    case "litter.chip-bag": return createChipBag();
+    case "litter.crumpled-paper": return createCrumpledPaper();
+    case "litter.food-tray": return createFoodTray();
     case "gameplay.shop-entrance": return createShopEntranceMarker();
     case "plaza.play-area": return createPlayArea();
     case "plaza.pavilion-stage": return createPavilion(groups, instanceId);

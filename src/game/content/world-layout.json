@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 6,
+  "canonicalRevision": 7,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -920,6 +920,61 @@
             "y": 0,
             "z": -2.25,
             "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.janitor-trash-bag",
+          "assetId": "prop.trash-bag",
+          "label": "Janitor's trash bag",
+          "transform": {
+            "x": -10.35,
+            "y": 0,
+            "z": -11.7,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.janitor-litter-picker",
+          "assetId": "prop.litter-picker",
+          "label": "Janitor's litter picker",
+          "transform": {
+            "x": -11.15,
+            "y": 0,
+            "z": -11.45,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.litter-chip-bag",
+          "assetId": "litter.chip-bag",
+          "label": "Discarded chip bag",
+          "transform": {
+            "x": -17.25,
+            "y": 0,
+            "z": -5.2,
+            "rotationY": 0.25
+          }
+        },
+        {
+          "id": "plaza.litter-crumpled-paper",
+          "assetId": "litter.crumpled-paper",
+          "label": "Crumpled paper",
+          "transform": {
+            "x": 2,
+            "y": 0,
+            "z": 6,
+            "rotationY": -0.4
+          }
+        },
+        {
+          "id": "plaza.litter-food-tray",
+          "assetId": "litter.food-tray",
+          "label": "Paper food tray",
+          "transform": {
+            "x": 14,
+            "y": 0,
+            "z": -4,
+            "rotationY": 0.3
           }
         },
         {

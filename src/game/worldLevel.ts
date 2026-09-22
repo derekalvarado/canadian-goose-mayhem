@@ -73,17 +73,21 @@ export function createCentralPlazaRules(area: WorldArea): WorldRules {
       y: item.transform.y + offset.y,
       z: item.transform.z - offset.x * sine + offset.z * cosine,
     } : undefined;
-    if (!asset.activeTarget && !asset.carryable && !(asset.controller && link && interactionPoint)) return [];
+    if (!asset.activeTarget && !asset.carryable && !asset.cleanupRole && !(asset.controller && link && interactionPoint)) return [];
     return [{
       id: item.id, label: item.label, position: { x: item.transform.x, y: item.transform.y, z: item.transform.z },
       heading: item.transform.rotationY, active: asset.activeTarget?.initialActive,
       controller: asset.controller && link && interactionPoint ? { targetId: link.targetId, interactionPoint, interactionRange: asset.controller.range } : undefined,
       carryable: asset.carryable,
+      cleanup: asset.cleanupRole ? { role: asset.cleanupRole } : undefined,
     }];
   });
   const janitorInstance = area.instances.find((item) => getWorldAsset(item.assetId)?.gameplayRole === "janitor");
   const entranceInstance = area.instances.find((item) => getWorldAsset(item.assetId)?.gameplayRole === "shop-entrance");
   const splashPad = area.instances.find((item) => getWorldAsset(item.assetId)?.activeTarget);
+  const hasCleanupRoute = entities.some((entity) => entity.cleanup?.role === "trash-can")
+    && entities.filter((entity) => entity.cleanup?.role === "trash-bag").length === 1
+    && entities.filter((entity) => entity.cleanup?.role === "litter-picker").length === 1;
   const janitor = janitorInstance && entranceInstance && splashPad ? {
     id: janitorInstance.id,
     position: { x: janitorInstance.transform.x, y: janitorInstance.transform.y, z: janitorInstance.transform.z },
@@ -92,6 +96,10 @@ export function createCentralPlazaRules(area: WorldArea): WorldRules {
     investigationPosition: { x: splashPad.transform.x - 4.7, y: splashPad.transform.y, z: splashPad.transform.z },
     observedTargetId: splashPad.id, walkSpeed: 2.2, guardRadius: 1.75, noticeRadius: 24,
     inspectSeconds: 3, scratchSeconds: 3, shooSeconds: 0.82,
+    cleanup: hasCleanupRoute ? {
+      emptySeconds: 1.8, pickupSeconds: 1.35, reactionSeconds: 0.75, toolSearchSeconds: 8,
+      shooRadius: 2.6, shooReach: 1.05, jogSpeed: 3.35, fumbleRadius: 3.4,
+    } : undefined,
   } : undefined;
   const splashKids = splashPad ? area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "splash-kid")
     .map((item, index) => {

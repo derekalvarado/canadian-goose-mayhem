@@ -24,8 +24,12 @@ export class JanitorView extends RiggedCharacterView {
 
   setActivity(activity: JanitorActivity): void {
     this.userData.gameplayState = activity;
-    const clip = activity === "walking-to-pad" || activity === "returning" ? "walk"
+    const clip = activity === "walking-to-pad" || activity === "returning" || activity === "walking-to-trash"
+      || activity === "walking-to-litter" || activity === "retrieving-tool" ? "walk"
+      : activity === "pursuing-tool" || activity === "chasing-goose" ? "walk"
       : activity === "shooing" ? "shoo"
+      : activity === "emptying-trash" || activity === "picking-litter" ? "inspect"
+      : activity === "reacting" ? "look"
       : activity === "inspecting" || activity === "scratching" ? "scratch" : "idle";
     this.playAnimation(clip, 0.18);
   }

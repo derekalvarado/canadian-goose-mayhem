@@ -65,6 +65,7 @@ export class WorldView extends THREE.Group {
   syncGameplay(snapshot: WorldSnapshot): void {
     for (const entity of snapshot.entities) {
       const wrapper = this.instances.get(entity.id); if (!wrapper) continue;
+      wrapper.visible = entity.containedBy === undefined;
       wrapper.position.set(entity.position.x, entity.position.y, entity.position.z);
       wrapper.rotation.y = entity.heading;
       const view = this.gameplayViews.get(entity.id);

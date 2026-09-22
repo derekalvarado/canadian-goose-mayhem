@@ -3,6 +3,7 @@ import test from "node:test";
 import * as THREE from "three";
 import { OcclusionFadeGroupRegistry } from "../src/game/OcclusionFadeGroups.ts";
 import { createWorldAssetView, SplashPadView } from "../src/game/PlazaWorld.ts";
+import { PALETTE } from "../src/game/palette.ts";
 import { getWorldAsset, WORLD_ASSETS } from "../src/game/worldAssets.ts";
 
 test("the corner market building is a detailed catalog asset with matching solid footprint", () => {
@@ -96,4 +97,24 @@ test("the splash pad uses pavers and nozzle dots instead of spike geometry", () 
   });
   assert.equal(nozzles.length, 12);
   assert.equal(cones.length, 0);
+});
+
+test("cleanup props are reusable toon-shaded assets and the picker has its authored visual parts", () => {
+  for (const assetId of ["prop.trash-bag", "prop.litter-picker", "litter.chip-bag", "litter.crumpled-paper", "litter.food-tray"]) {
+    const asset = getWorldAsset(assetId);
+    assert.ok(asset?.carryable);
+    const view = createWorldAssetView(assetId, new OcclusionFadeGroupRegistry(), `test.${assetId}`);
+    const meshes: THREE.Mesh[] = [];
+    view.traverse((object) => { if (object instanceof THREE.Mesh) meshes.push(object); });
+    assert.ok(meshes.length > 0);
+    assert.ok(meshes.every((mesh) => mesh.material instanceof THREE.MeshToonMaterial));
+  }
+  const picker = createWorldAssetView("prop.litter-picker", new OcclusionFadeGroupRegistry(), "test.picker");
+  const colors = new Set<number>();
+  picker.traverse((object) => {
+    if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshToonMaterial) colors.add(object.material.color.getHex());
+  });
+  assert.ok(colors.has(PALETTE.workwear.reflective), "picker has a light-gray shaft");
+  assert.ok(colors.has(PALETTE.plaza.iron), "picker has a dark grip and jaw");
+  assert.ok(colors.has(PALETTE.plaza.awningBlue), "picker has blue trigger accents");
 });

@@ -12,26 +12,44 @@ export interface PlayerCommand {
   readonly moveX: number; readonly moveZ: number; readonly hurry: boolean; readonly honkPressed: boolean;
   readonly interactPressed?: boolean; readonly wingsSpread?: boolean; readonly aggressive?: boolean;
 }
-export interface CarryableDefinition { readonly interactionRange: number; readonly carryHeight: number; readonly carryDistance: number }
+export interface CarryableDefinition {
+  readonly interactionRange: number; readonly carryHeight: number; readonly carryDistance: number;
+  readonly stealableWhileHeld?: boolean;
+}
 export interface ControllerDefinition { readonly targetId: string; readonly interactionPoint: Readonly<Position>; readonly interactionRange: number }
+export type CleanupRole = "trash-can" | "litter" | "trash-bag" | "litter-picker";
+export interface CleanupDefinition { readonly role: CleanupRole; readonly routeOrder?: number }
 export interface WorldEntityDefinition {
   readonly id: string; readonly label: string; readonly position: Readonly<Position>; readonly heading?: number;
   readonly active?: boolean; readonly controller?: ControllerDefinition; readonly carryable?: CarryableDefinition;
+  readonly cleanup?: CleanupDefinition;
 }
 export interface WorldEntityState {
   readonly id: string; readonly label: string; readonly position: Readonly<Position>; readonly heading: number;
-  readonly active?: boolean; readonly holderId?: "goose";
+  readonly active?: boolean; readonly holderId?: string; readonly containedBy?: string; readonly serviceCount: number;
 }
-export type JanitorActivity = "guarding" | "shooing" | "walking-to-pad" | "inspecting" | "scratching" | "returning";
+export type CleanupPhase = "trash" | "litter";
+export type JanitorActivity =
+  | "guarding" | "walking-to-trash" | "emptying-trash" | "walking-to-litter" | "picking-litter"
+  | "walking-to-pad" | "inspecting" | "scratching" | "returning" | "reacting"
+  | "pursuing-tool" | "retrieving-tool" | "chasing-goose" | "shooing";
+export interface JanitorCleanupDefinition {
+  readonly emptySeconds: number; readonly pickupSeconds: number; readonly reactionSeconds: number;
+  readonly toolSearchSeconds: number; readonly shooRadius: number; readonly shooReach: number;
+  readonly jogSpeed: number; readonly fumbleRadius: number;
+}
 export interface JanitorDefinition {
   readonly id: string; readonly position: Readonly<Position>; readonly heading: number;
   readonly guardPosition: Readonly<Position>; readonly investigationPosition: Readonly<Position>;
   readonly observedTargetId: string; readonly walkSpeed: number; readonly guardRadius: number;
   readonly noticeRadius: number; readonly inspectSeconds: number; readonly scratchSeconds: number; readonly shooSeconds: number;
+  readonly cleanup?: JanitorCleanupDefinition;
 }
 export interface JanitorState {
   readonly id: string; readonly position: Readonly<Position>; readonly heading: number;
   readonly activity: JanitorActivity; readonly activitySecondsRemaining: number;
+  readonly cleanupPhase?: CleanupPhase; readonly targetEntityId?: string; readonly heldToolId?: string;
+  readonly completedTrashIdsThisLap: readonly string[];
 }
 export type SplashKidActivity = "playing" | "disappointed" | "walking-away" | "away" | "frightened" | "crying" | "returning";
 export interface SplashKidDefinition {
@@ -52,9 +70,13 @@ export interface WorldSnapshot {
 export type GameplayEvent =
   | { readonly type: "goose-honked"; readonly actorId: "goose"; readonly position: Readonly<Position> }
   | { readonly type: "goose-pooped"; readonly actorId: "goose"; readonly poopId: string; readonly position: Readonly<Position> }
-  | { readonly type: "entity-grabbed"; readonly actorId: "goose"; readonly entityId: string }
-  | { readonly type: "entity-dropped"; readonly actorId: "goose"; readonly entityId: string; readonly position: Readonly<Position> }
+  | { readonly type: "entity-grabbed"; readonly actorId: string; readonly entityId: string }
+  | { readonly type: "entity-dropped"; readonly actorId: string; readonly entityId: string; readonly position: Readonly<Position> }
+  | { readonly type: "entity-recovered"; readonly actorId: string; readonly entityId: string; readonly position: Readonly<Position> }
   | { readonly type: "device-state-changed"; readonly actorId: "goose" | string; readonly controllerId?: string; readonly targetId: string; readonly active: boolean }
+  | { readonly type: "trash-can-emptied"; readonly actorId: string; readonly entityId: string }
+  | { readonly type: "litter-picked-up"; readonly actorId: string; readonly entityId: string; readonly containerId: string }
+  | { readonly type: "janitor-fumbled"; readonly actorId: string; readonly entityId: string }
   | { readonly type: "goose-shooed"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "splash-kid-frightened"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "objective-completed"; readonly objectiveId: string };
@@ -69,11 +91,15 @@ export interface WorldRules {
 
 interface MutableEntity {
   readonly definition: WorldEntityDefinition; readonly position: Position; heading: number;
-  active?: boolean; holderId?: "goose";
+  active?: boolean; holderId?: string; containedBy?: string; serviceCount: number;
 }
+type JanitorResume = Readonly<{ activity: JanitorActivity; targetEntityId?: string }>;
 interface MutableJanitor {
   readonly definition: JanitorDefinition; readonly position: Position; heading: number;
-  activity: JanitorActivity; activitySecondsRemaining: number;
+  activity: JanitorActivity; activitySecondsRemaining: number; cleanupPhase?: CleanupPhase;
+  trashIndex: number; litterIndex: number; targetEntityId?: string; resume?: JanitorResume;
+  stolenToolId?: string; toolSearchSecondsRemaining: number; reactionReason?: "fumble" | "theft";
+  shooCooldownRemaining: number; completedTrashIdsThisLap: string[];
 }
 interface MutableSplashKid {
   readonly definition: SplashKidDefinition; readonly position: Position; heading: number;
@@ -88,6 +114,7 @@ export const MAX_GOOSE_POOPS = 10;
 const MAX_STEPS_PER_FRAME = 8;
 const SHOO_PUSH_SECONDS = 0.72;
 const SHOO_PUSH_SPEED = 3.25;
+const SHOO_COOLDOWN_SECONDS = 1.2;
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 const distance2d = (left: Readonly<Position>, right: Readonly<Position>): number => Math.hypot(left.x - right.x, left.z - right.z);
 
@@ -99,6 +126,7 @@ export class Simulation {
   private readonly velocity: Position = { x: 0, y: 0, z: 0 };
   private readonly pushDirection: Position = { x: 0, y: 0, z: 0 };
   private readonly entitiesById = new Map<string, MutableEntity>();
+  private readonly cleanupRoutes = new Map<CleanupRole, string[]>();
   private readonly durableFacts = new Set<string>();
   private readonly poopRecords: GoosePoop[] = [];
   private readonly splashKids: MutableSplashKid[] = [];
@@ -113,7 +141,14 @@ export class Simulation {
     this.objectives = new Objectives(rules.objectives);
     for (const definition of rules.entities ?? []) {
       if (this.entitiesById.has(definition.id)) throw new Error(`Duplicate world entity ID: ${definition.id}`);
-      this.entitiesById.set(definition.id, { definition, position: { ...definition.position }, heading: definition.heading ?? 0, active: definition.active });
+      this.entitiesById.set(definition.id, { definition, position: { ...definition.position }, heading: definition.heading ?? 0,
+        active: definition.active, serviceCount: 0 });
+    }
+    for (const role of ["trash-can", "litter", "trash-bag", "litter-picker"] as const) {
+      this.cleanupRoutes.set(role, [...this.entitiesById.values()].filter((entity) => entity.definition.cleanup?.role === role)
+        .sort((left, right) => (left.definition.cleanup?.routeOrder ?? Number.MAX_SAFE_INTEGER)
+          - (right.definition.cleanup?.routeOrder ?? Number.MAX_SAFE_INTEGER)
+          || left.definition.id.localeCompare(right.definition.id)).map((entity) => entity.definition.id));
     }
     for (const entity of this.entitiesById.values()) {
       const targetId = entity.definition.controller?.targetId;
@@ -123,7 +158,13 @@ export class Simulation {
     }
     if (rules.janitor) {
       if (!this.entitiesById.has(rules.janitor.observedTargetId)) throw new Error(`Janitor has invalid observed target: ${rules.janitor.observedTargetId}`);
-      this.janitor = { definition: rules.janitor, position: { ...rules.janitor.position }, heading: rules.janitor.heading, activity: "guarding", activitySecondsRemaining: 0 };
+      if (rules.janitor.cleanup) {
+        if (this.route("trash-can").length === 0) throw new Error("Janitor cleanup needs at least one trash can");
+        if (this.route("trash-bag").length !== 1 || this.route("litter-picker").length !== 1) throw new Error("Janitor cleanup needs exactly one trash bag and litter picker");
+      }
+      this.janitor = { definition: rules.janitor, position: { ...rules.janitor.position }, heading: rules.janitor.heading,
+        activity: "guarding", activitySecondsRemaining: 0, trashIndex: 0, litterIndex: 0,
+        toolSearchSecondsRemaining: 0, shooCooldownRemaining: 0, completedTrashIdsThisLap: [] };
     }
     for (const definition of rules.splashKids ?? []) {
       if (this.entitiesById.has(definition.id) || this.splashKids.some((child) => child.definition.id === definition.id)) throw new Error(`Duplicate splash kid ID: ${definition.id}`);
@@ -144,12 +185,16 @@ export class Simulation {
       heldEntityId: this.heldEntityId };
   }
   get world(): WorldSnapshot {
+    const janitorTool = this.janitor ? [...this.entitiesById.values()].find((entity) => entity.holderId === this.janitor?.definition.id
+      && (entity.definition.cleanup?.role === "trash-bag" || entity.definition.cleanup?.role === "litter-picker")) : undefined;
     return { player: this.player, entities: [...this.entitiesById.values()].map((entity) => ({
       id: entity.definition.id, label: entity.definition.label, position: { ...entity.position }, heading: entity.heading,
-      active: entity.active, holderId: entity.holderId,
+      active: entity.active, holderId: entity.holderId, containedBy: entity.containedBy, serviceCount: entity.serviceCount,
     })), janitor: this.janitor ? { id: this.janitor.definition.id, position: { ...this.janitor.position },
       heading: this.janitor.heading, activity: this.janitor.activity,
-      activitySecondsRemaining: this.janitor.activitySecondsRemaining } : undefined,
+      activitySecondsRemaining: this.janitor.activitySecondsRemaining, cleanupPhase: this.janitor.cleanupPhase,
+      targetEntityId: this.janitor.targetEntityId, heldToolId: janitorTool?.definition.id,
+      completedTrashIdsThisLap: [...this.janitor.completedTrashIdsThisLap] } : undefined,
       splashKids: this.splashKids.map((child) => ({ id: child.definition.id, position: { ...child.position }, heading: child.heading,
         activity: child.activity, activitySecondsRemaining: child.activitySecondsRemaining })),
       durableFacts: [...this.durableFacts] };
@@ -166,6 +211,8 @@ export class Simulation {
       const target = this.entitiesById.get(candidate.definition.controller.targetId);
       return `${target?.active ? "Turn off" : "Turn on"} ${candidate.definition.label}`;
     }
+    if (candidate.containedBy) return `Pull out ${candidate.definition.label}`;
+    if (candidate.holderId) return `Steal ${candidate.definition.label}`;
     return candidate.definition.carryable ? `Pick up ${candidate.definition.label}` : undefined;
   }
   isObjectiveComplete(id: string): boolean { return this.objectives.isComplete(id); }
@@ -195,18 +242,23 @@ export class Simulation {
     this.poopRecords.length = 0; this.durableFacts.clear();
     for (const entity of this.entitiesById.values()) {
       Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0;
-      entity.active = entity.definition.active; entity.holderId = undefined;
+      entity.active = entity.definition.active; entity.holderId = undefined; entity.containedBy = undefined; entity.serviceCount = 0;
     }
     if (this.janitor) {
-      Object.assign(this.janitor.position, this.janitor.definition.position); this.janitor.heading = this.janitor.definition.heading;
-      this.janitor.activity = "guarding"; this.janitor.activitySecondsRemaining = 0;
+      const janitor = this.janitor;
+      Object.assign(janitor.position, janitor.definition.position); janitor.heading = janitor.definition.heading;
+      janitor.activity = "guarding"; janitor.activitySecondsRemaining = 0; janitor.cleanupPhase = undefined;
+      janitor.trashIndex = 0; janitor.litterIndex = 0; janitor.targetEntityId = undefined; janitor.resume = undefined;
+      janitor.stolenToolId = undefined; janitor.toolSearchSecondsRemaining = 0; janitor.reactionReason = undefined;
+      janitor.shooCooldownRemaining = 0; janitor.completedTrashIdsThisLap = [];
+      if (janitor.definition.cleanup) this.beginPass("trash");
     }
     for (const child of this.splashKids) {
       Object.assign(child.position, child.definition.position); child.heading = child.definition.heading;
       child.activity = "playing"; child.activitySecondsRemaining = 0;
       child.routeIndex = Math.min(1, child.definition.playRoute.length - 1); child.destination = undefined;
     }
-    this.suspend(); this.objectives.reset();
+    this.suspend(); this.objectives.reset(); this.syncOwnedEntities();
   }
 
   private step(command: PlayerCommand, events: GameplayEvent[]): void {
@@ -237,11 +289,12 @@ export class Simulation {
       const angularVelocity = (this.heading - previous) / FIXED_STEP;
       this.turnAmount = clamp(difference * 1.8, -1, 1) + clamp(angularVelocity * 0.02, -0.25, 0.25);
     }
-    this.syncHeldEntity();
+    this.syncOwnedEntities();
     const honked = this.honkQueued;
     if (honked) { events.push({ type: "goose-honked", actorId: "goose", position: { ...this.position } }); this.honkQueued = false; }
     this.updateSplashKids(events);
-    this.updateJanitor(events);
+    this.updateJanitor(events, honked);
+    this.syncOwnedEntities();
     for (const zone of this.rules.objectiveZones ?? []) {
       const guarded = zone.guardedBy === this.janitor?.definition.id
         && (this.janitor?.activity === "guarding" || this.janitor?.activity === "shooing");
@@ -263,42 +316,290 @@ export class Simulation {
       events.push({ type: "device-state-changed", actorId: "goose", controllerId: candidate.definition.id, targetId: target.definition.id, active: target.active });
       return;
     }
-    if (!candidate.definition.carryable || candidate.holderId) return;
-    candidate.holderId = "goose"; this.heldEntityId = candidate.definition.id; this.syncHeldEntity();
+    if (!candidate.definition.carryable) return;
+    const previousHolder = candidate.holderId;
+    if (previousHolder && !candidate.definition.carryable.stealableWhileHeld) return;
+    if (previousHolder) this.releaseEntity(candidate, false);
+    candidate.containedBy = undefined;
+    this.acquireEntity(candidate, "goose");
+    if (previousHolder === this.janitor?.definition.id) this.onJanitorToolStolen(candidate);
     events.push({ type: "entity-grabbed", actorId: "goose", entityId: candidate.definition.id });
   }
   private findInteractionCandidate(): MutableEntity | undefined {
     return [...this.entitiesById.values()].flatMap((entity) => {
       const control = entity.definition.controller; const carryable = entity.definition.carryable;
       if (!control && !carryable) return [];
-      const point = control?.interactionPoint ?? entity.position;
+      if (entity.holderId && (!carryable?.stealableWhileHeld || entity.holderId === "goose")) return [];
+      const container = entity.containedBy ? this.entitiesById.get(entity.containedBy) : undefined;
+      if (entity.containedBy && (!container || container.holderId)) return [];
+      const point = control?.interactionPoint ?? container?.position ?? entity.position;
       const range = control?.interactionRange ?? carryable?.interactionRange ?? 0;
       const distance = distance2d(this.position, point);
-      return distance <= range && !entity.holderId ? [{ entity, distance }] : [];
-    }).sort((left, right) => left.distance - right.distance || left.entity.definition.id.localeCompare(right.entity.definition.id))[0]?.entity;
+      return distance <= range ? [{ entity, distance, contained: entity.containedBy ? 0 : 1 }] : [];
+    }).sort((left, right) => left.distance - right.distance || left.contained - right.contained
+      || left.entity.definition.id.localeCompare(right.entity.definition.id))[0]?.entity;
   }
-  private syncHeldEntity(): void {
-    if (!this.heldEntityId) return;
-    const entity = this.entitiesById.get(this.heldEntityId); const carryable = entity?.definition.carryable;
-    if (!entity || !carryable) return;
-    entity.position.x = this.position.x - Math.sin(this.heading) * carryable.carryDistance;
-    entity.position.y = this.position.y + carryable.carryHeight;
-    entity.position.z = this.position.z - Math.cos(this.heading) * carryable.carryDistance;
-    entity.heading = this.heading;
+  private acquireEntity(entity: MutableEntity, actorId: string): boolean {
+    if (entity.holderId || entity.containedBy || !entity.definition.carryable) return false;
+    entity.holderId = actorId;
+    if (actorId === "goose") this.heldEntityId = entity.definition.id;
+    return true;
+  }
+  private releaseEntity(entity: MutableEntity, placeAtHome: boolean): void {
+    if (entity.holderId === "goose" && this.heldEntityId === entity.definition.id) this.heldEntityId = undefined;
+    entity.holderId = undefined;
+    if (placeAtHome) {
+      Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0;
+    }
+  }
+  private syncOwnedEntities(): void {
+    const janitor = this.janitor;
+    for (const entity of this.entitiesById.values()) {
+      const carryable = entity.definition.carryable;
+      if (!carryable) continue;
+      if (entity.holderId === "goose") {
+        entity.position.x = this.position.x - Math.sin(this.heading) * carryable.carryDistance;
+        entity.position.y = this.position.y + carryable.carryHeight;
+        entity.position.z = this.position.z - Math.cos(this.heading) * carryable.carryDistance;
+        entity.heading = this.heading;
+      } else if (janitor && entity.holderId === janitor.definition.id) {
+        entity.position.x = janitor.position.x - Math.sin(janitor.heading) * carryable.carryDistance;
+        entity.position.y = janitor.position.y + carryable.carryHeight;
+        entity.position.z = janitor.position.z - Math.cos(janitor.heading) * carryable.carryDistance;
+        entity.heading = janitor.heading;
+      } else if (entity.containedBy) {
+        const container = this.entitiesById.get(entity.containedBy);
+        if (container) { Object.assign(entity.position, container.position); entity.heading = container.heading; }
+      }
+    }
   }
   private dropHeldEntity(events: GameplayEvent[]): void {
     if (!this.heldEntityId) return;
     const entity = this.entitiesById.get(this.heldEntityId); if (!entity) return;
-    entity.holderId = undefined; entity.position.x = this.position.x - Math.sin(this.heading) * 0.62;
+    this.releaseEntity(entity, false); entity.position.x = this.position.x - Math.sin(this.heading) * 0.62;
     entity.position.y = this.position.y; entity.position.z = this.position.z - Math.cos(this.heading) * 0.62;
     events.push({ type: "entity-dropped", actorId: "goose", entityId: entity.definition.id, position: { ...entity.position } });
-    this.heldEntityId = undefined;
   }
 
-  private updateJanitor(events: GameplayEvent[]): void {
+  private route(role: CleanupRole): readonly string[] { return this.cleanupRoutes.get(role) ?? []; }
+  private janitorTool(role: "trash-bag" | "litter-picker"): MutableEntity { return this.entitiesById.get(this.route(role)[0])!; }
+  private phaseTool(janitor: MutableJanitor): MutableEntity {
+    return this.janitorTool(janitor.cleanupPhase === "trash" ? "trash-bag" : "litter-picker");
+  }
+  private beginPass(phase: CleanupPhase): void {
+    const janitor = this.janitor!;
+    janitor.cleanupPhase = phase; janitor.targetEntityId = undefined; janitor.resume = undefined;
+    janitor.stolenToolId = undefined; janitor.toolSearchSecondsRemaining = 0;
+    if (phase === "trash") {
+      janitor.trashIndex = 0; janitor.completedTrashIdsThisLap = [];
+      janitor.targetEntityId = this.route("trash-can")[0];
+    } else {
+      janitor.litterIndex = 0; this.selectNextLitterTarget();
+    }
+    janitor.activity = "retrieving-tool";
+  }
+  private selectNextLitterTarget(): boolean {
+    const janitor = this.janitor!; const route = this.route("litter");
+    while (janitor.litterIndex < route.length) {
+      const candidate = this.entitiesById.get(route[janitor.litterIndex]);
+      if (candidate && !candidate.holderId && !candidate.containedBy) {
+        janitor.targetEntityId = candidate.definition.id; return true;
+      }
+      janitor.litterIndex += 1;
+    }
+    janitor.targetEntityId = undefined; return false;
+  }
+  private releasePhaseTool(): void {
+    const janitor = this.janitor!; const tool = this.phaseTool(janitor);
+    if (tool.holderId === janitor.definition.id) this.releaseEntity(tool, true);
+  }
+  private startCurrentCleanupTarget(): void {
+    const janitor = this.janitor!;
+    if (janitor.cleanupPhase === "trash") {
+      janitor.targetEntityId = this.route("trash-can")[janitor.trashIndex];
+      janitor.activity = "walking-to-trash";
+      return;
+    }
+    if (this.selectNextLitterTarget()) janitor.activity = "walking-to-litter";
+    else { this.releasePhaseTool(); this.beginPass("trash"); }
+  }
+  private rememberCleanupTask(): void {
+    const janitor = this.janitor!;
+    if (!janitor.resume) janitor.resume = { activity: janitor.activity, targetEntityId: janitor.targetEntityId };
+  }
+  private beginReturnToTask(): void {
+    const janitor = this.janitor!;
+    janitor.activity = "returning"; janitor.activitySecondsRemaining = 0;
+  }
+  private resumeCleanupTask(): void {
+    const janitor = this.janitor!; const resume = janitor.resume;
+    janitor.resume = undefined; janitor.reactionReason = undefined;
+    if (resume?.targetEntityId) janitor.targetEntityId = resume.targetEntityId;
+    const target = janitor.targetEntityId ? this.entitiesById.get(janitor.targetEntityId) : undefined;
+    if (janitor.cleanupPhase === "trash") {
+      if (!target || target.definition.cleanup?.role !== "trash-can") this.startCurrentCleanupTarget();
+      else janitor.activity = "walking-to-trash";
+    } else if (!target || target.holderId || target.containedBy) {
+      if (target) janitor.litterIndex = Math.max(janitor.litterIndex, this.route("litter").indexOf(target.definition.id) + 1);
+      this.startCurrentCleanupTarget();
+    } else janitor.activity = "walking-to-litter";
+  }
+  private onJanitorToolStolen(entity: MutableEntity): void {
+    const janitor = this.janitor; const cleanup = janitor?.definition.cleanup;
+    if (!janitor || !cleanup || (entity.definition.cleanup?.role !== "trash-bag" && entity.definition.cleanup?.role !== "litter-picker")) return;
+    this.rememberCleanupTask(); janitor.stolenToolId = entity.definition.id;
+    janitor.toolSearchSecondsRemaining = cleanup.toolSearchSeconds;
+    janitor.activity = "reacting"; janitor.reactionReason = "theft";
+    janitor.activitySecondsRemaining = cleanup.reactionSeconds;
+  }
+  private recoverStolenTool(events: GameplayEvent[]): void {
+    const janitor = this.janitor!; const tool = janitor.stolenToolId ? this.entitiesById.get(janitor.stolenToolId) : undefined;
+    if (!tool) return;
+    if (tool.holderId === "goose") this.releaseEntity(tool, false);
+    tool.containedBy = undefined; this.releaseEntity(tool, true);
+    janitor.stolenToolId = undefined;
+    events.push({ type: "entity-recovered", actorId: janitor.definition.id, entityId: tool.definition.id, position: { ...tool.position } });
+    janitor.activity = "retrieving-tool";
+  }
+  private updateToolRecovery(events: GameplayEvent[]): boolean {
+    const janitor = this.janitor!; const cleanup = janitor.definition.cleanup!;
+    const tool = janitor.stolenToolId ? this.entitiesById.get(janitor.stolenToolId) : this.phaseTool(janitor);
+    if (!tool) return false;
+    if (tool.holderId === janitor.definition.id) {
+      janitor.stolenToolId = undefined; janitor.toolSearchSecondsRemaining = 0; this.resumeCleanupTask(); return true;
+    }
+    if (janitor.stolenToolId) {
+      janitor.toolSearchSecondsRemaining = Math.max(0, janitor.toolSearchSecondsRemaining - FIXED_STEP);
+      if (janitor.toolSearchSecondsRemaining <= 0) { this.recoverStolenTool(events); return true; }
+    }
+    if (tool.holderId === "goose") {
+      janitor.activity = "pursuing-tool";
+      if (this.moveJanitorToward(this.position, cleanup.jogSpeed) || distance2d(janitor.position, this.position) <= cleanup.shooReach) this.shooGoose(events, true);
+      return true;
+    }
+    janitor.activity = "retrieving-tool";
+    if (this.moveJanitorToward(tool.position, janitor.stolenToolId ? cleanup.jogSpeed : janitor.definition.walkSpeed)) {
+      this.acquireEntity(tool, janitor.definition.id); janitor.stolenToolId = undefined; janitor.toolSearchSecondsRemaining = 0;
+      if (janitor.resume) this.resumeCleanupTask(); else this.startCurrentCleanupTarget();
+    }
+    return true;
+  }
+
+  private updateJanitor(events: GameplayEvent[], honked: boolean): void {
     const janitor = this.janitor; if (!janitor) return;
-    const definition = janitor.definition; const target = this.entitiesById.get(definition.observedTargetId);
-    if (!target || target.active === undefined) return;
+    const definition = janitor.definition; const observedTarget = this.entitiesById.get(definition.observedTargetId);
+    if (!observedTarget || observedTarget.active === undefined) return;
+    janitor.shooCooldownRemaining = Math.max(0, janitor.shooCooldownRemaining - FIXED_STEP);
+    if (!definition.cleanup) { this.updateLegacyJanitor(events, observedTarget); return; }
+    const cleanup = definition.cleanup;
+
+    if (janitor.activity === "reacting") {
+      janitor.activitySecondsRemaining = Math.max(0, janitor.activitySecondsRemaining - FIXED_STEP);
+      if (janitor.activitySecondsRemaining <= 0) {
+        if (janitor.reactionReason === "theft") janitor.activity = "pursuing-tool";
+        else this.beginReturnToTask();
+      }
+      return;
+    }
+    if (janitor.activity === "shooing") {
+      janitor.activitySecondsRemaining = Math.max(0, janitor.activitySecondsRemaining - FIXED_STEP);
+      if (janitor.activitySecondsRemaining <= 0) {
+        if (janitor.stolenToolId) janitor.activity = "retrieving-tool";
+        else this.beginReturnToTask();
+      }
+      return;
+    }
+    if (janitor.activity === "pursuing-tool" || janitor.activity === "retrieving-tool" || this.phaseTool(janitor).holderId !== definition.id) {
+      if (this.updateToolRecovery(events)) return;
+    }
+    if (janitor.activity === "chasing-goose") {
+      if (this.moveJanitorToward(this.position, cleanup.jogSpeed) || distance2d(janitor.position, this.position) <= cleanup.shooReach) this.shooGoose(events, false);
+      return;
+    }
+    if (janitor.activity === "picking-litter" && (honked || this.wingsSpread || this.aggressive)
+      && distance2d(janitor.position, this.position) <= cleanup.fumbleRadius) {
+      const entityId = janitor.targetEntityId; if (!entityId) return;
+      this.rememberCleanupTask(); janitor.activity = "reacting"; janitor.reactionReason = "fumble";
+      janitor.activitySecondsRemaining = cleanup.reactionSeconds;
+      events.push({ type: "janitor-fumbled", actorId: definition.id, entityId }); return;
+    }
+    const working = janitor.activity === "walking-to-trash" || janitor.activity === "emptying-trash"
+      || janitor.activity === "walking-to-litter" || janitor.activity === "picking-litter" || janitor.activity === "returning";
+    if (working && janitor.shooCooldownRemaining <= 0 && distance2d(janitor.position, this.position) <= cleanup.shooRadius) {
+      this.rememberCleanupTask(); janitor.activity = "chasing-goose"; return;
+    }
+    if (!observedTarget.active && working && !janitor.resume
+      && distance2d(janitor.position, definition.investigationPosition) <= definition.noticeRadius) {
+      this.rememberCleanupTask(); janitor.activity = "walking-to-pad"; janitor.activitySecondsRemaining = 0;
+    } else if (observedTarget.active && (janitor.activity === "walking-to-pad" || janitor.activity === "inspecting")) {
+      janitor.activity = "scratching"; janitor.activitySecondsRemaining = definition.scratchSeconds;
+    }
+    switch (janitor.activity) {
+      case "walking-to-pad":
+        if (this.moveJanitorToward(definition.investigationPosition)) { janitor.activity = "inspecting"; janitor.activitySecondsRemaining = definition.inspectSeconds; }
+        break;
+      case "inspecting":
+        janitor.activitySecondsRemaining = Math.max(0, janitor.activitySecondsRemaining - FIXED_STEP);
+        if (janitor.activitySecondsRemaining <= 0) {
+          observedTarget.active = true;
+          events.push({ type: "device-state-changed", actorId: definition.id, targetId: observedTarget.definition.id, active: true });
+          this.beginReturnToTask();
+        }
+        break;
+      case "scratching":
+        janitor.activitySecondsRemaining = Math.max(0, janitor.activitySecondsRemaining - FIXED_STEP);
+        if (janitor.activitySecondsRemaining <= 0) this.beginReturnToTask();
+        break;
+      case "returning": {
+        const target = janitor.resume?.targetEntityId ? this.entitiesById.get(janitor.resume.targetEntityId) : undefined;
+        const destination = target?.position ?? definition.guardPosition;
+        if (this.moveJanitorToward(destination)) this.resumeCleanupTask();
+        break;
+      }
+      case "walking-to-trash": {
+        const target = janitor.targetEntityId ? this.entitiesById.get(janitor.targetEntityId) : undefined;
+        if (!target) { this.startCurrentCleanupTarget(); break; }
+        if (this.moveJanitorToward(target.position)) { janitor.activity = "emptying-trash"; janitor.activitySecondsRemaining = cleanup.emptySeconds; }
+        break;
+      }
+      case "emptying-trash": {
+        janitor.activitySecondsRemaining = Math.max(0, janitor.activitySecondsRemaining - FIXED_STEP);
+        if (janitor.activitySecondsRemaining > 0) break;
+        const target = janitor.targetEntityId ? this.entitiesById.get(janitor.targetEntityId) : undefined;
+        if (target) {
+          target.serviceCount += 1; janitor.completedTrashIdsThisLap.push(target.definition.id);
+          events.push({ type: "trash-can-emptied", actorId: definition.id, entityId: target.definition.id });
+        }
+        janitor.trashIndex += 1;
+        if (janitor.trashIndex >= this.route("trash-can").length) { this.releasePhaseTool(); this.beginPass("litter"); }
+        else this.startCurrentCleanupTarget();
+        break;
+      }
+      case "walking-to-litter": {
+        const target = janitor.targetEntityId ? this.entitiesById.get(janitor.targetEntityId) : undefined;
+        if (!target || target.holderId || target.containedBy) {
+          janitor.litterIndex += 1; this.startCurrentCleanupTarget(); break;
+        }
+        if (this.moveJanitorToward(target.position)) { janitor.activity = "picking-litter"; janitor.activitySecondsRemaining = cleanup.pickupSeconds; }
+        break;
+      }
+      case "picking-litter": {
+        const target = janitor.targetEntityId ? this.entitiesById.get(janitor.targetEntityId) : undefined;
+        if (!target || target.holderId || target.containedBy) { janitor.litterIndex += 1; this.startCurrentCleanupTarget(); break; }
+        janitor.activitySecondsRemaining = Math.max(0, janitor.activitySecondsRemaining - FIXED_STEP);
+        if (janitor.activitySecondsRemaining > 0) break;
+        const bag = this.janitorTool("trash-bag"); target.containedBy = bag.definition.id; target.serviceCount += 1;
+        Object.assign(target.position, bag.position);
+        events.push({ type: "litter-picked-up", actorId: definition.id, entityId: target.definition.id, containerId: bag.definition.id });
+        janitor.litterIndex += 1; this.startCurrentCleanupTarget();
+        break;
+      }
+      case "guarding": this.beginPass("trash"); break;
+      default: break;
+    }
+  }
+  private updateLegacyJanitor(events: GameplayEvent[], target: MutableEntity): void {
+    const janitor = this.janitor!; const definition = janitor.definition;
     if (!target.active && (janitor.activity === "guarding" || janitor.activity === "returning")
       && distance2d(janitor.position, definition.investigationPosition) <= definition.noticeRadius) {
       janitor.activity = "walking-to-pad"; janitor.activitySecondsRemaining = 0;
@@ -326,7 +627,8 @@ export class Simulation {
         janitor.activitySecondsRemaining = Math.max(0, janitor.activitySecondsRemaining - FIXED_STEP);
         if (janitor.activitySecondsRemaining <= 0) janitor.activity = "guarding";
         break;
-      case "guarding": if (distance2d(this.position, definition.guardPosition) <= definition.guardRadius) this.shooGoose(events); break;
+      case "guarding": if (distance2d(this.position, definition.guardPosition) <= definition.guardRadius) this.shooGoose(events, false); break;
+      default: break;
     }
   }
   private updateSplashKids(events: GameplayEvent[]): void {
@@ -390,19 +692,21 @@ export class Simulation {
     child.heading = Math.atan2(-dx, -dz); child.position.x += dx / distance * step; child.position.z += dz / distance * step;
     return false;
   }
-  private moveJanitorToward(destination: Readonly<Position>): boolean {
+  private moveJanitorToward(destination: Readonly<Position>, speed = this.janitor!.definition.walkSpeed): boolean {
     const janitor = this.janitor!; const dx = destination.x - janitor.position.x; const dz = destination.z - janitor.position.z;
-    const distance = Math.hypot(dx, dz); const step = janitor.definition.walkSpeed * FIXED_STEP;
+    const distance = Math.hypot(dx, dz); const step = speed * FIXED_STEP;
     if (distance <= step) { Object.assign(janitor.position, destination); return true; }
     janitor.heading = Math.atan2(-dx, -dz); janitor.position.x += dx / distance * step; janitor.position.z += dz / distance * step;
     return false;
   }
-  private shooGoose(events: GameplayEvent[]): void {
+  private shooGoose(events: GameplayEvent[], retrievingTool: boolean): void {
     const janitor = this.janitor!; const dx = this.position.x - janitor.position.x; const dz = this.position.z - janitor.position.z;
     const length = Math.max(0.0001, Math.hypot(dx, dz)); this.pushDirection.x = dx / length; this.pushDirection.z = dz / length;
     this.spookedSeconds = SHOO_PUSH_SECONDS; this.velocity.x = 0; this.velocity.z = 0; janitor.heading = Math.atan2(-dx, -dz);
-    janitor.activity = "shooing"; janitor.activitySecondsRemaining = janitor.definition.shooSeconds;
-    this.dropHeldEntity(events); events.push({ type: "goose-shooed", actorId: janitor.definition.id, position: { ...this.position } });
+    if (!retrievingTool && janitor.definition.cleanup) this.rememberCleanupTask();
+    janitor.activity = "shooing"; janitor.activitySecondsRemaining = janitor.definition.shooSeconds; janitor.shooCooldownRemaining = SHOO_COOLDOWN_SECONDS;
+    this.dropHeldEntity(events);
+    events.push({ type: "goose-shooed", actorId: janitor.definition.id, position: { ...this.position } });
   }
   private leavePoop(events: GameplayEvent[]): void {
     this.idleSeconds = 0; const id = `goose-poop-${this.poopSequence++}`;
