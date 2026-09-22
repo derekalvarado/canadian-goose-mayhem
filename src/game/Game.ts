@@ -13,7 +13,7 @@ import { WorldEditor } from "./WorldEditor";
 import { getWorldArea, loadWorldLayout } from "./worldLayout";
 import { createCentralPlazaRules } from "./worldLevel";
 import { GooseOcclusionFader } from "./GooseOcclusionFader";
-import { toonMaterial } from "./toonMaterial";
+import { toonMaterial, STORYBOOK_LIGHTING } from "./toonMaterial";
 
 const CAMERA_FOCUS_HEIGHT = 0.55;
 // A closer follow camera keeps the smaller goose readable and makes the plaza
@@ -67,6 +67,10 @@ export class Game {
   private readonly rules = createCentralPlazaRules(this.worldArea);
   private readonly world = new WorldView(this.worldArea, !this.editorMode && !this.overviewMode);
   private readonly goose = new Goose();
+  private readonly gazeRay = new THREE.Raycaster();
+  private readonly gazeOrigin = new THREE.Vector3();
+  private readonly gazeDirection = new THREE.Vector3();
+  private gazeRefresh = 0;
   private readonly poopViews = new Map<string, THREE.Group>();
   private readonly gooseOcclusionFader = new GooseOcclusionFader(this.world.occlusionFadeGroups);
   private readonly input: InputController;
@@ -172,9 +176,8 @@ export class Game {
   }
 
   private setupLighting(): void {
-    // Uniform ambient + one sun preserve the material's three discrete tones.
-    // Hemisphere lights and colored fills introduce gradients between the bands.
-    this.scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.55));
+    // Broad flat colors, with faint grounding shadows from a low-contrast sun.
+    this.scene.add(new THREE.AmbientLight(0xffffff, STORYBOOK_LIGHTING.ambient));
 
     this.scene.add(this.sunShadow.light, this.sunShadow.light.target);
   }
@@ -232,11 +235,13 @@ export class Game {
           this.lastInputTime = performance.now();
         }
         if (event.type === "goose-shooed") this.goose.spook();
+        if ((event.type === "entity-grabbed" || event.type === "entity-dropped") && event.actorId === "goose") this.goose.grab();
         if (event.type === "objective-completed") this.renderObjectives();
       }
     }
 
     const player = this.simulation.player;
+    this.updateGooseAttention(delta);
     this.goose.update(
       delta,
       this.simulation.elapsed,
@@ -281,9 +286,49 @@ export class Game {
 
   private syncPlayerView(): void {
     const player = this.simulation.player;
-    this.goose.position.copy(player.position);
-    this.goose.rotation.y = player.heading;
+    const previous = this.simulation.previousPlayerTransform;
+    const alpha = this.simulation.interpolationAlpha;
+    this.goose.position.copy(previous.position).lerp(player.position, alpha);
+    const angle = Math.atan2(Math.sin(player.heading - previous.heading), Math.cos(player.heading - previous.heading));
+    this.goose.rotation.y = previous.heading + angle * alpha;
     this.velocity.copy(player.velocity);
+  }
+
+  private updateGooseAttention(delta: number): void {
+    this.gazeRefresh -= delta;
+    if (delta <= 0 || this.gazeRefresh > 0) return;
+    this.gazeRefresh = 0.18;
+    const snapshot = this.simulation.world;
+    const player = snapshot.player;
+    // Cosmetic attention only. Visibility is checked against rendered obstacles;
+    // this does not supply perception or interaction decisions to simulation.
+    const candidates = [
+      ...snapshot.entities.filter((entity) => !entity.holderId && !entity.containedBy)
+        .map((entity) => ({ id: entity.id, position: { ...entity.position, y: entity.position.y + 0.28 } })),
+      ...(snapshot.janitor ? [{ id: snapshot.janitor.id,
+        position: { ...snapshot.janitor.position, y: snapshot.janitor.position.y + 1.25 } }] : []),
+      ...snapshot.splashKids.map((child) => ({ id: child.id, position: { ...child.position, y: child.position.y + 0.8 } })),
+    ].map((candidate) => ({ ...candidate,
+      distance: Math.hypot(candidate.position.x - player.position.x, candidate.position.z - player.position.z),
+      angle: Math.atan2(-(candidate.position.x - player.position.x), -(candidate.position.z - player.position.z)) - player.heading,
+    })).filter((candidate) => candidate.distance > 0.4 && candidate.distance < 3.2
+      && Math.cos(candidate.angle) > 0.45).sort((a, b) => a.distance - b.distance);
+    this.gazeOrigin.copy(player.position).y += 0.78;
+    this.world.updateMatrixWorld(true);
+    for (const candidate of candidates.slice(0, 3)) {
+      this.gazeDirection.copy(candidate.position).sub(this.gazeOrigin);
+      const distance = this.gazeDirection.length();
+      this.gazeRay.set(this.gazeOrigin, this.gazeDirection.normalize());
+      this.gazeRay.far = Math.max(0, distance - 0.25);
+      const hit = this.gazeRay.intersectObjects(this.world.children, true)[0];
+      let object: THREE.Object3D | null | undefined = hit?.object;
+      while (object && !object.userData.worldInstanceId) object = object.parent;
+      if (!hit || object?.userData.worldInstanceId === candidate.id) {
+        this.goose.setLookTarget(candidate.position);
+        return;
+      }
+    }
+    this.goose.setLookTarget();
   }
 
   private syncPoopViews(): void {

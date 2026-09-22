@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { STORYBOOK_LIGHTING } from "./toonMaterial.ts";
 
 const SUN_DIRECTION = new THREE.Vector3(-9, 18, 8).normalize();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -8,7 +9,7 @@ const MAX_CASTER_HEIGHT = 24;
 
 /** Fit shadow coverage to the visible ground and buildings, independent of plaza bounds. */
 export class ViewSunShadow {
-  readonly light = new THREE.DirectionalLight(0xffffff, Math.PI * 0.45);
+  readonly light = new THREE.DirectionalLight(0xffffff, STORYBOOK_LIGHTING.sun);
   private readonly ray = new THREE.Raycaster();
   private readonly plane = new THREE.Plane(UP, 0);
   private readonly point = new THREE.Vector3();

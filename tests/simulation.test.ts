@@ -26,6 +26,27 @@ test("movement produces the same result at 30, 60, and 144 rendered frames per s
   assert.deepEqual(states[1], states[2]);
 });
 
+test("presentation interpolation exposes adjacent ticks without advancing or mutating gameplay", () => {
+  const simulation = new Simulation(openWorld);
+  simulation.advance(FIXED_STEP, { ...idle, moveX: 1 });
+  const current = simulation.player;
+  assert.deepEqual(simulation.previousPlayerTransform.position, openWorld.spawn);
+  assert.equal(simulation.interpolationAlpha, 0);
+  simulation.advance(FIXED_STEP / 2, { ...idle, moveX: 1 });
+  assert.deepEqual(simulation.player, current, "partial render frame changed gameplay");
+  assert.ok(Math.abs(simulation.interpolationAlpha - 0.5) < 1e-9);
+  const sample = simulation.previousPlayerTransform;
+  (sample.position as { x: number }).x = 999;
+  assert.equal(simulation.previousPlayerTransform.position.x, 0, "presentation received mutable simulation state");
+  simulation.advance(FIXED_STEP / 2, { ...idle, moveX: 1 });
+  assert.deepEqual(simulation.previousPlayerTransform.position, current.position);
+  simulation.suspend();
+  assert.deepEqual(simulation.previousPlayerTransform.position, simulation.player.position);
+  simulation.reset();
+  assert.deepEqual(simulation.previousPlayerTransform.position, openWorld.spawn);
+  assert.equal(simulation.previousPlayerTransform.heading, openWorld.spawnHeading);
+});
+
 test("honk survives a frame without a tick and is emitted once during catch-up", () => {
   const simulation = new Simulation(openWorld);
   assert.deepEqual(simulation.advance(FIXED_STEP / 2, { ...idle, honkPressed: true }), []);

@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { createGooseModel } from "../src/game/GooseModel.ts";
 
@@ -16,7 +15,9 @@ globalThis.FileReader ??= class FileReader {
 };
 
 const model = createGooseModel();
-const outputPath = fileURLToPath(new URL("../assets/characters/goose/models/canada-goose.glb", import.meta.url));
+// Bootstrap geometry only; runtime animation is exported from Blender.
+const outputPath = process.argv[2];
+if (!outputPath) throw new Error("Pass an explicit output path. Use npm run assets:goose to export the Blender source.");
 const result = await new GLTFExporter().parseAsync(model, {
   binary: true,
   onlyVisible: false,

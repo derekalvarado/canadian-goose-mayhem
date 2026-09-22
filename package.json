@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:lan": "vite --host 0.0.0.0",
-    "assets:goose": "node scripts/generate-goose-glb.mjs",
+    "assets:goose": "node scripts/export-goose.mjs",
+    "assets:goose:author": "node scripts/export-goose.mjs --author",
     "assets:janitor": "node scripts/generate-janitor-glb.mjs",
     "assets:kids": "node scripts/generate-splash-kids-glb.mjs",
     "build": "tsc && vite build",

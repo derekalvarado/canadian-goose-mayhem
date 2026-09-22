@@ -128,6 +128,8 @@ export class Simulation {
   private readonly rules: WorldRules;
   private readonly objectives: Objectives<WorldSnapshot>;
   private readonly position: Position = { x: 0, y: 0, z: 0 };
+  private readonly previousPosition: Position = { x: 0, y: 0, z: 0 };
+  private previousHeading = 0;
   private readonly velocity: Position = { x: 0, y: 0, z: 0 };
   private readonly pushDirection: Position = { x: 0, y: 0, z: 0 };
   private readonly entitiesById = new Map<string, MutableEntity>();
@@ -183,6 +185,11 @@ export class Simulation {
   }
 
   get elapsed(): number { return this.tickCount * FIXED_STEP; }
+  /** Read-only samples for presentation interpolation, never collision inputs. */
+  get previousPlayerTransform(): { position: Readonly<Position>; heading: number } {
+    return { position: { ...this.previousPosition }, heading: this.previousHeading };
+  }
+  get interpolationAlpha(): number { return clamp(this.accumulator / FIXED_STEP, 0, 1); }
   get player(): PlayerState {
     return { id: "goose", position: { ...this.position }, velocity: { ...this.velocity }, heading: this.heading,
       speed: Math.hypot(this.velocity.x, this.velocity.z), turnAmount: this.turnAmount,
@@ -237,11 +244,13 @@ export class Simulation {
   }
   suspend(): void {
     this.accumulator = 0; this.honkQueued = false; this.interactionQueued = false;
+    Object.assign(this.previousPosition, this.position); this.previousHeading = this.heading;
     this.wingsSpread = false; this.aggressive = false;
   }
   reset(): void {
     Object.assign(this.position, this.rules.spawn); Object.assign(this.velocity, { x: 0, y: 0, z: 0 });
     Object.assign(this.pushDirection, { x: 0, y: 0, z: 0 }); this.heading = this.rules.spawnHeading;
+    Object.assign(this.previousPosition, this.position); this.previousHeading = this.heading;
     this.turnAmount = 0; this.wingsSpread = false; this.aggressive = false; this.tickCount = 0;
     this.idleSeconds = 0; this.poopSequence = 0; this.heldEntityId = undefined; this.spookedSeconds = 0;
     this.poopRecords.length = 0; this.durableFacts.clear();
@@ -268,6 +277,7 @@ export class Simulation {
   }
 
   private step(command: PlayerCommand, events: GameplayEvent[]): void {
+    Object.assign(this.previousPosition, this.position); this.previousHeading = this.heading;
     this.wingsSpread = command.wingsSpread === true; this.aggressive = command.aggressive === true;
     const interacted = this.interactionQueued;
     if (interacted) { this.resolveInteraction(events); this.interactionQueued = false; }

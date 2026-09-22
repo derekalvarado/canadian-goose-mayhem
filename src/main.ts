@@ -12,9 +12,18 @@ if (!canvas || !loadingScreen || !errorPanel || !errorDetail || !retryButton) {
 }
 
 try {
-  const game = new Game(canvas);
-  game.start();
-  requestAnimationFrame(() => loadingScreen.classList.add("loading-screen--hidden"));
+  if (new URLSearchParams(location.search).has("animation")) {
+    void import("./game/GoosePreview").then(({ startGoosePreview }) => startGoosePreview(canvas)).catch((error: unknown) => {
+      console.error(error);
+      loadingScreen.hidden = true;
+      errorDetail.textContent = error instanceof Error ? error.message : "Animation preview failed.";
+      errorPanel.hidden = false;
+    });
+  } else {
+    const game = new Game(canvas);
+    game.start();
+    requestAnimationFrame(() => loadingScreen.classList.add("loading-screen--hidden"));
+  }
 } catch (error) {
   console.error(error);
   loadingScreen.hidden = true;

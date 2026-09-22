@@ -75,10 +75,11 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 - `src/game/simulation/Objectives.ts` — independent outcome-based task completion
 - `src/game/simulation/plaza.ts` — active plaza movement rules
 - `src/game/GameAudio.ts` — browser audio output, separate from gameplay decisions
-- `src/game/Goose.ts` — runtime loader and animation blending for the rigged Canada goose
-- `src/game/GooseModel.ts` — reproducible goose geometry, skeleton, and animation recipe
+- `src/game/Goose.ts` — runtime loader, layered clips, and head tracking for the rigged Canada goose
+- `src/game/GooseAnimation.ts` — presentation-only gait phase and blend state
+- `src/game/GooseModel.ts` — bootstrap goose geometry and original prototype animation recipe
 - `src/game/SplashKidModel.ts` — reproducible low-detail child rigs with flat arms and play/reaction clips
-- `assets/characters/goose/goose.blend` — editable Blender character source
+- `assets/characters/goose/goose-animated.blend` — current editable Blender character and animation source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
 - `src/game/worldAssets.ts` — source-owned catalog of render, collision, and occlusion metadata
@@ -100,6 +101,11 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 Run `npm test` for headless gameplay checks and `npm run build` for TypeScript and
 the production bundle. The headless tests use Node's TypeScript stripping; use
 Node 22.18+ or a newer version supported by the installed Vite release.
+
+Open `?animation` for the close-up goose movement studio: walk/hurry, threat/sneak,
+wingbeats, honk/grab/startle, moving head target, slow motion, and frame stepping.
+See the [goose authoring workflow](assets/characters/goose/README.md) for Blender
+editing/export and the remaining limits of foot contact at the current game speed.
 
 ## Color palette
 
@@ -130,12 +136,14 @@ forms that make the object recognizable at play distance. Avoid primitive-only
 models and photorealism; detail should support the established storybook style
 without becoming surface micro-detail.
 
-The nearest-filtered three-step ramp is paired with a neutral ambient light
-(55%) and a single directional sun (45%). The brightest band retains the palette
-color, with two darker tones defining volume. Keep `NoToneMapping` and crisp cast
-shadows. Avoid hemisphere/fill lights, bloom, fog, glossy materials, and additive
-glows: these reintroduce gradients or wash out the color blocks. Animated character
-parts cast shadows onto the world but do not receive tiny self-shadow seams.
+The shared lighting uses neutral ambient light (92%) and one directional sun
+(8%), leaving only faint directional contrast and grounding shadows. The goose
+uses a constant toon ramp for flat palette colors without body-shading bands.
+Its torso, tail, neck, and head form one continuous Blender-authored surface;
+folded wings are thin tapered blades, not attached ovoids. The white chinstrap
+is a marking cut into that skin. Keep `NoToneMapping`. Avoid hemisphere/fill
+lights, bloom, fog, glossy materials, and additive glows. Animated character
+parts cast faint shadows onto the world but do not receive self-shadow seams.
 
 ## Photo-informed Old Town Square
 

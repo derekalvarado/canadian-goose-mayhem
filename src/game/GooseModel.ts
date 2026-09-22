@@ -14,7 +14,7 @@ export const GOOSE_COLORS = {
 
 type ColorSlot = keyof typeof GOOSE_COLORS;
 type Point = [number, number, number];
-type Weight = (position: THREE.Vector3) => [number, number, number];
+type Weight = (position: THREE.Vector3, vertexIndex?: number) => [number, number, number];
 
 export const GOOSE_HEIGHT_METERS = 0.95;
 const AUTHORED_GOOSE_MIN_Y = 0.025;
@@ -76,7 +76,7 @@ export function createGooseModel(): THREE.Group {
     const weights: number[] = [];
     for (let index = 0; index < positions.count; index += 1) {
       position.fromBufferAttribute(positions, index);
-      const [a, b, amount] = weight(position);
+      const [a, b, amount] = weight(position, index);
       indices.push(a, b, 0, 0);
       weights.push(1 - amount, amount, 0, 0);
     }
@@ -101,13 +101,17 @@ export function createGooseModel(): THREE.Group {
   const neckPoints = neckBones.map((bone) => bindPositions.get(bone.name)!.clone());
   const neckCurve = new THREE.CatmullRomCurve3(neckPoints, false, "centripetal");
   const neckGeometry = new THREE.TubeGeometry(neckCurve, 72, 0.078, 20, false);
-  const neckWeight: Weight = (position) => {
+  const neckRings = Array.from({ length: 73 }, (_, index) => neckCurve.getPointAt(index / 72));
+  const neckWeight: Weight = (position, vertexIndex) => {
+    // Every vertex of a tube ring must share weights. Weighting by each surface
+    // vertex's height distorted the cross-section into lumps when bending low.
+    const center = vertexIndex === undefined ? position : neckRings[Math.floor(vertexIndex / 21)];
     for (let index = 0; index < neckPoints.length - 1; index += 1) {
       const low = neckPoints[index];
       const high = neckPoints[index + 1];
-      if (position.y <= high.y || index === neckPoints.length - 2) {
+      if (center.y <= high.y || index === neckPoints.length - 2) {
         return blend(neckBones[index], neckBones[index + 1],
-          THREE.MathUtils.smoothstep(position.y, low.y, high.y));
+          (center.y - low.y) / (high.y - low.y));
       }
     }
     return rigid(neck6)(position);

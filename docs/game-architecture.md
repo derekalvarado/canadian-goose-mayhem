@@ -80,8 +80,11 @@ is a one-time event. Keep queues bounded and presentation disposable.
 The fixed-step loop retains a honk on a render frame without a simulation tick
 and consumes it once during catch-up. Pausing clears pending inputs and time,
 preserving progress. Cap stalls instead of simulating minutes of chases on tab
-return. Input replays, if added, must record commands per simulation tick. Render
-interpolation may later smooth fast displays without changing physical results.
+return. Input replays, if added, must record commands per simulation tick. The
+player view interpolates previous/current fixed-step transforms using the
+remaining tick fraction; these read-only samples never feed back into physics.
+Player animation uses Blender clips with presentation-only phase/blend state and
+head tracking. Resolved events trigger one-shots; animation never resolves actions.
 
 ### One world and stable object identity
 
