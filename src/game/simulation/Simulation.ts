@@ -33,10 +33,21 @@ export interface JanitorState {
   readonly id: string; readonly position: Readonly<Position>; readonly heading: number;
   readonly activity: JanitorActivity; readonly activitySecondsRemaining: number;
 }
+export type SplashKidActivity = "playing" | "disappointed" | "walking-away" | "away" | "frightened" | "crying" | "returning";
+export interface SplashKidDefinition {
+  readonly id: string; readonly position: Readonly<Position>; readonly heading: number;
+  readonly observedTargetId: string; readonly playRoute: readonly Readonly<Position>[];
+  readonly retreatPositions: readonly Readonly<Position>[]; readonly playSpeed: number; readonly fleeSpeed: number;
+  readonly threatRadius: number; readonly disappointedSeconds: number; readonly crySeconds: number;
+}
+export interface SplashKidState {
+  readonly id: string; readonly position: Readonly<Position>; readonly heading: number;
+  readonly activity: SplashKidActivity; readonly activitySecondsRemaining: number;
+}
 export interface ObjectiveZoneDefinition { readonly id: string; readonly position: Readonly<Position>; readonly radius: number; readonly factId: string; readonly guardedBy?: string }
 export interface WorldSnapshot {
   readonly player: PlayerState; readonly entities: readonly WorldEntityState[];
-  readonly janitor?: JanitorState; readonly durableFacts: readonly string[];
+  readonly janitor?: JanitorState; readonly splashKids: readonly SplashKidState[]; readonly durableFacts: readonly string[];
 }
 export type GameplayEvent =
   | { readonly type: "goose-honked"; readonly actorId: "goose"; readonly position: Readonly<Position> }
@@ -45,11 +56,13 @@ export type GameplayEvent =
   | { readonly type: "entity-dropped"; readonly actorId: "goose"; readonly entityId: string; readonly position: Readonly<Position> }
   | { readonly type: "device-state-changed"; readonly actorId: "goose" | string; readonly controllerId?: string; readonly targetId: string; readonly active: boolean }
   | { readonly type: "goose-shooed"; readonly actorId: string; readonly position: Readonly<Position> }
+  | { readonly type: "splash-kid-frightened"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "objective-completed"; readonly objectiveId: string };
 export interface WorldRules {
   readonly spawn: Readonly<Position>; readonly spawnHeading: number;
   readonly objectives: readonly ObjectiveDefinition<WorldSnapshot>[];
   readonly entities?: readonly WorldEntityDefinition[]; readonly janitor?: JanitorDefinition;
+  readonly splashKids?: readonly SplashKidDefinition[];
   readonly objectiveZones?: readonly ObjectiveZoneDefinition[];
   resolveMovement(current: Readonly<Position>, proposed: Readonly<Position>, output: Position): void;
 }
@@ -61,6 +74,10 @@ interface MutableEntity {
 interface MutableJanitor {
   readonly definition: JanitorDefinition; readonly position: Position; heading: number;
   activity: JanitorActivity; activitySecondsRemaining: number;
+}
+interface MutableSplashKid {
+  readonly definition: SplashKidDefinition; readonly position: Position; heading: number;
+  activity: SplashKidActivity; activitySecondsRemaining: number; routeIndex: number; destination?: Position;
 }
 
 export const FIXED_STEP = 1 / 60;
@@ -84,6 +101,7 @@ export class Simulation {
   private readonly entitiesById = new Map<string, MutableEntity>();
   private readonly durableFacts = new Set<string>();
   private readonly poopRecords: GoosePoop[] = [];
+  private readonly splashKids: MutableSplashKid[] = [];
   private janitor?: MutableJanitor;
   private heading = 0; private turnAmount = 0; private wingsSpread = false; private aggressive = false;
   private accumulator = 0; private honkQueued = false; private interactionQueued = false;
@@ -107,6 +125,14 @@ export class Simulation {
       if (!this.entitiesById.has(rules.janitor.observedTargetId)) throw new Error(`Janitor has invalid observed target: ${rules.janitor.observedTargetId}`);
       this.janitor = { definition: rules.janitor, position: { ...rules.janitor.position }, heading: rules.janitor.heading, activity: "guarding", activitySecondsRemaining: 0 };
     }
+    for (const definition of rules.splashKids ?? []) {
+      if (this.entitiesById.has(definition.id) || this.splashKids.some((child) => child.definition.id === definition.id)) throw new Error(`Duplicate splash kid ID: ${definition.id}`);
+      const target = this.entitiesById.get(definition.observedTargetId);
+      if (!target || target.active === undefined) throw new Error(`Splash kid ${definition.id} has invalid observed target: ${definition.observedTargetId}`);
+      if (definition.playRoute.length === 0 || definition.retreatPositions.length === 0) throw new Error(`Splash kid ${definition.id} needs play and retreat positions`);
+      this.splashKids.push({ definition, position: { ...definition.position }, heading: definition.heading,
+        activity: "playing", activitySecondsRemaining: 0, routeIndex: Math.min(1, definition.playRoute.length - 1) });
+    }
     this.reset();
   }
 
@@ -124,6 +150,8 @@ export class Simulation {
     })), janitor: this.janitor ? { id: this.janitor.definition.id, position: { ...this.janitor.position },
       heading: this.janitor.heading, activity: this.janitor.activity,
       activitySecondsRemaining: this.janitor.activitySecondsRemaining } : undefined,
+      splashKids: this.splashKids.map((child) => ({ id: child.definition.id, position: { ...child.position }, heading: child.heading,
+        activity: child.activity, activitySecondsRemaining: child.activitySecondsRemaining })),
       durableFacts: [...this.durableFacts] };
   }
   get objectiveList(): readonly Readonly<{ id: string; description: string; completed: boolean }>[] {
@@ -173,6 +201,11 @@ export class Simulation {
       Object.assign(this.janitor.position, this.janitor.definition.position); this.janitor.heading = this.janitor.definition.heading;
       this.janitor.activity = "guarding"; this.janitor.activitySecondsRemaining = 0;
     }
+    for (const child of this.splashKids) {
+      Object.assign(child.position, child.definition.position); child.heading = child.definition.heading;
+      child.activity = "playing"; child.activitySecondsRemaining = 0;
+      child.routeIndex = Math.min(1, child.definition.playRoute.length - 1); child.destination = undefined;
+    }
     this.suspend(); this.objectives.reset();
   }
 
@@ -207,6 +240,7 @@ export class Simulation {
     this.syncHeldEntity();
     const honked = this.honkQueued;
     if (honked) { events.push({ type: "goose-honked", actorId: "goose", position: { ...this.position } }); this.honkQueued = false; }
+    this.updateSplashKids(events);
     this.updateJanitor(events);
     for (const zone of this.rules.objectiveZones ?? []) {
       const guarded = zone.guardedBy === this.janitor?.definition.id
@@ -294,6 +328,67 @@ export class Simulation {
         break;
       case "guarding": if (distance2d(this.position, definition.guardPosition) <= definition.guardRadius) this.shooGoose(events); break;
     }
+  }
+  private updateSplashKids(events: GameplayEvent[]): void {
+    for (const child of this.splashKids) {
+      const definition = child.definition; const target = this.entitiesById.get(definition.observedTargetId);
+      if (!target || target.active === undefined) continue;
+      const threatened = (this.aggressive || this.wingsSpread) && distance2d(child.position, this.position) <= definition.threatRadius;
+      if (threatened && child.activity !== "frightened" && child.activity !== "crying") {
+        child.activity = "frightened"; child.activitySecondsRemaining = 0;
+        child.destination = { ...definition.retreatPositions.reduce((best, candidate) =>
+          distance2d(candidate, this.position) > distance2d(best, this.position) ? candidate : best) };
+        events.push({ type: "splash-kid-frightened", actorId: definition.id, position: { ...child.position } });
+      }
+      if (child.activity === "frightened") {
+        if (child.destination && this.moveSplashKidToward(child, child.destination, definition.fleeSpeed)) {
+          child.activity = "crying"; child.activitySecondsRemaining = definition.crySeconds;
+        }
+        continue;
+      }
+      if (child.activity === "crying") {
+        child.activitySecondsRemaining = threatened ? definition.crySeconds : Math.max(0, child.activitySecondsRemaining - FIXED_STEP);
+        if (child.activitySecondsRemaining <= 0) {
+          if (target.active) { child.activity = "returning"; child.destination = { ...definition.playRoute[0] }; }
+          else child.activity = "away";
+        }
+        continue;
+      }
+      if (!target.active) {
+        if (child.activity === "playing" || child.activity === "returning") {
+          child.activity = "disappointed"; child.activitySecondsRemaining = definition.disappointedSeconds; child.destination = undefined;
+        } else if (child.activity === "disappointed") {
+          child.activitySecondsRemaining = Math.max(0, child.activitySecondsRemaining - FIXED_STEP);
+          if (child.activitySecondsRemaining <= 0) {
+            child.activity = "walking-away";
+            child.destination = { ...definition.retreatPositions.reduce((best, candidate) =>
+              distance2d(candidate, child.position) < distance2d(best, child.position) ? candidate : best) };
+          }
+        } else if (child.activity === "walking-away" && child.destination
+          && this.moveSplashKidToward(child, child.destination, definition.playSpeed)) child.activity = "away";
+        continue;
+      }
+      if (child.activity === "disappointed" || child.activity === "walking-away" || child.activity === "away") {
+        child.activity = "returning"; child.activitySecondsRemaining = 0; child.destination = { ...definition.playRoute[0] };
+      }
+      if (child.activity === "returning") {
+        if (child.destination && this.moveSplashKidToward(child, child.destination, definition.playSpeed)) {
+          child.activity = "playing"; child.routeIndex = Math.min(1, definition.playRoute.length - 1); child.destination = undefined;
+        }
+        continue;
+      }
+      if (child.activity === "playing") {
+        const destination = definition.playRoute[child.routeIndex];
+        if (this.moveSplashKidToward(child, destination, definition.playSpeed)) child.routeIndex = (child.routeIndex + 1) % definition.playRoute.length;
+      }
+    }
+  }
+  private moveSplashKidToward(child: MutableSplashKid, destination: Readonly<Position>, speed: number): boolean {
+    const dx = destination.x - child.position.x; const dz = destination.z - child.position.z;
+    const distance = Math.hypot(dx, dz); const step = speed * FIXED_STEP;
+    if (distance <= step) { Object.assign(child.position, destination); return true; }
+    child.heading = Math.atan2(-dx, -dz); child.position.x += dx / distance * step; child.position.z += dz / distance * step;
+    return false;
   }
   private moveJanitorToward(destination: Readonly<Position>): boolean {
     const janitor = this.janitor!; const dx = destination.x - janitor.position.x; const dz = destination.z - janitor.position.z;

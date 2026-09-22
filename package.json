@@ -8,6 +8,7 @@
     "dev:lan": "vite --host 0.0.0.0",
     "assets:goose": "node scripts/generate-goose-glb.mjs",
     "assets:janitor": "node scripts/generate-janitor-glb.mjs",
+    "assets:kids": "node scripts/generate-splash-kids-glb.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "node --test --experimental-strip-types tests/*.test.ts"

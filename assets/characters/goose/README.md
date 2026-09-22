@@ -2,7 +2,7 @@
 
 `goose.blend` is the editable Blender source for the player character.
 `models/canada-goose.glb` is the compact runtime export loaded by the browser game.
-The model is meter-scale, Y-up, faces -Z, and has a ground-level origin.
+The model is 0.95 meters tall, Y-up, faces -Z, and has a ground-level origin.
 
 The armature has six neck joints plus head, bill, wing, wing-tip, leg, body, and
 chest controls. The GLB contains `idle`, `walk`, `hurry`, `honk`, `wings_spread`,

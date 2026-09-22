@@ -16,7 +16,11 @@ type ColorSlot = keyof typeof GOOSE_COLORS;
 type Point = [number, number, number];
 type Weight = (position: THREE.Vector3) => [number, number, number];
 
-/** Smooth, meter-scale Canada goose, grounded at Y=0 and facing -Z. */
+export const GOOSE_HEIGHT_METERS = 0.95;
+const AUTHORED_GOOSE_MIN_Y = 0.025;
+const AUTHORED_GOOSE_MAX_Y = 1.245;
+
+/** Smooth, 0.95-meter-tall Canada goose, grounded at Y=0 and facing -Z. */
 export function createGooseModel(): THREE.Group {
   const model = new THREE.Group();
   model.name = "canada-goose";
@@ -159,8 +163,17 @@ export function createGooseModel(): THREE.Group {
     shape.quadraticCurveTo(0.135, -0.12, 0.128, -0.09);
     shape.lineTo(0.04, 0.04);
     shape.closePath();
-    const web = new THREE.ShapeGeometry(shape, 5);
-    web.rotateX(Math.PI / 2).translate(x, 0.025, -0.015);
+    // Give the webbing enough upward thickness to remain visible over the plaza's
+    // raised paver geometry while keeping the sole on the authored ground plane.
+    const webThickness = 0.02;
+    const web = new THREE.ExtrudeGeometry(shape, {
+      depth: webThickness,
+      bevelEnabled: false,
+      curveSegments: 5,
+      steps: 1,
+    });
+    if (!web.index) web.setIndex(Array.from({ length: web.getAttribute("position").count }, (_, index) => index));
+    web.rotateX(Math.PI / 2).translate(x, 0.025 + webThickness, -0.015);
     add(web, "goose-black", rigid(bone));
   }
   foot(-1, leftLeg);
@@ -184,6 +197,10 @@ export function createGooseModel(): THREE.Group {
     geometries.forEach((part) => part.dispose());
   }
   model.animations = createGooseClips(bindPositions);
+  const meterScale = GOOSE_HEIGHT_METERS / (AUTHORED_GOOSE_MAX_Y - AUTHORED_GOOSE_MIN_Y);
+  model.scale.setScalar(meterScale);
+  model.position.y = -AUTHORED_GOOSE_MIN_Y * meterScale;
+  model.userData.heightMeters = GOOSE_HEIGHT_METERS;
   return model;
 }
 

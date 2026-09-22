@@ -118,3 +118,45 @@ test("guarding shoos and releases the goose, while a distraction permits durable
   for (let tick = 0; tick < 500; tick += 1) distracted.advance(FIXED_STEP, idle);
   assert.equal(distracted.isObjectiveComplete("enter-shop"), true);
 });
+
+function splashKidRules(): WorldRules {
+  return {
+    spawn: position(0), spawnHeading: 0, resolveMovement: openMovement, objectives: [],
+    entities: [
+      { id: "pad", label: "Splash pad", position: position(2), active: true },
+      { id: "faucet", label: "Faucet", position: position(0), controller: { targetId: "pad", interactionPoint: position(0), interactionRange: 1 } },
+    ],
+    splashKids: [{
+      id: "kid", position: position(2), heading: 0, observedTargetId: "pad",
+      playRoute: [position(2), position(3)], retreatPositions: [position(7), position(-7)],
+      playSpeed: 1, fleeSpeed: 3, threatRadius: 5, disappointedSeconds: 1, crySeconds: 1,
+    }],
+  };
+}
+
+test("turning off the splash pad makes kids protest, walk away, and return when it resumes", () => {
+  const simulation = new Simulation(splashKidRules());
+  simulation.advance(FIXED_STEP, { ...idle, interactPressed: true });
+  assert.equal(simulation.world.splashKids[0].activity, "disappointed");
+  for (let tick = 0; tick < 70; tick += 1) simulation.advance(FIXED_STEP, idle);
+  assert.equal(simulation.world.splashKids[0].activity, "walking-away");
+  for (let tick = 0; tick < 400 && simulation.world.splashKids[0].activity !== "away"; tick += 1) simulation.advance(FIXED_STEP, idle);
+  assert.equal(simulation.world.splashKids[0].activity, "away");
+  simulation.advance(FIXED_STEP, { ...idle, interactPressed: true });
+  assert.equal(simulation.world.splashKids[0].activity, "returning");
+  for (let tick = 0; tick < 500 && simulation.world.splashKids[0].activity !== "playing"; tick += 1) simulation.advance(FIXED_STEP, idle);
+  assert.equal(simulation.world.splashKids[0].activity, "playing");
+});
+
+test("a nearby threatening goose makes kids run away and cry before returning", () => {
+  for (const pose of [{ aggressive: true }, { wingsSpread: true }]) {
+    const simulation = new Simulation(splashKidRules());
+    const events = simulation.advance(FIXED_STEP, { ...idle, ...pose });
+    assert.ok(events.some((event) => event.type === "splash-kid-frightened" && event.actorId === "kid"));
+    assert.equal(simulation.world.splashKids[0].activity, "frightened");
+    for (let tick = 0; tick < 240 && simulation.world.splashKids[0].activity !== "crying"; tick += 1) simulation.advance(FIXED_STEP, idle);
+    assert.equal(simulation.world.splashKids[0].activity, "crying");
+    for (let tick = 0; tick < 600 && simulation.world.splashKids[0].activity !== "playing"; tick += 1) simulation.advance(FIXED_STEP, idle);
+    assert.equal(simulation.world.splashKids[0].activity, "playing");
+  }
+});

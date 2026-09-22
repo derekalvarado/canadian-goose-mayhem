@@ -12,6 +12,10 @@ function local(instance: WorldInstance, x: number, z: number): { x: number; z: n
   const c = Math.cos(instance.transform.rotationY); const s = Math.sin(instance.transform.rotationY);
   return { x: dx * c - dz * s, z: dx * s + dz * c };
 }
+function worldPoint(instance: WorldInstance, x: number, z: number): Position {
+  const c = Math.cos(instance.transform.rotationY); const s = Math.sin(instance.transform.rotationY);
+  return { x: instance.transform.x + x * c + z * s, y: instance.transform.y, z: instance.transform.z - x * s + z * c };
+}
 function overlaps(localPoint: { x: number; z: number }, collider: WorldAssetCollider): boolean {
   if (collider.shape === "circle") { const dx = localPoint.x - collider.x; const dz = localPoint.z - collider.z; const radius = (collider.radius ?? 0) + WORLD_GOOSE_RADIUS; return dx * dx + dz * dz < radius * radius; }
   return Math.abs(localPoint.x - collider.x) < (collider.halfWidth ?? 0) + WORLD_GOOSE_RADIUS && Math.abs(localPoint.z - collider.z) < (collider.halfDepth ?? 0) + WORLD_GOOSE_RADIUS;
@@ -89,13 +93,29 @@ export function createCentralPlazaRules(area: WorldArea): WorldRules {
     observedTargetId: splashPad.id, walkSpeed: 2.2, guardRadius: 1.75, noticeRadius: 24,
     inspectSeconds: 3, scratchSeconds: 3, shooSeconds: 0.82,
   } : undefined;
+  const splashKids = splashPad ? area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "splash-kid")
+    .map((item, index) => {
+      const routes = [
+        [[-1.35,-0.85], [0.8,1.25], [1.55,-0.45], [-0.45,1.55]],
+        [[0.9,1.15], [-1.4,0.55], [0.35,-1.45], [1.5,0.2]],
+        [[1.2,-1.1], [-0.85,-1.45], [-1.55,0.25], [0.4,1.35]],
+      ] as const;
+      const route = routes[index % routes.length].map(([x, z]) => worldPoint(splashPad, x, z));
+      return {
+        id: item.id, position: { x: item.transform.x, y: item.transform.y, z: item.transform.z }, heading: item.transform.rotationY,
+        observedTargetId: splashPad.id, playRoute: route,
+        retreatPositions: [[5.8,4.7], [5.8,-4.7], [-5.8,4.7], [-5.8,-4.7]].map(([x, z]) => worldPoint(splashPad, x, z)),
+        playSpeed: 1.35 + index * 0.08, fleeSpeed: 3.15, threatRadius: 4.4,
+        disappointedSeconds: 2, crySeconds: 3,
+      };
+    }) : [];
   const objectiveZones = entranceInstance ? [{ id: entranceInstance.id,
     position: { x: entranceInstance.transform.x, y: entranceInstance.transform.y, z: entranceInstance.transform.z },
     radius: 0.72, factId: ENTER_SHOP_FACT_ID, guardedBy: janitorInstance?.id }] : [];
   return {
     spawn: { ...entrance, y: getWorldGroundHeight(area, entrance.x, entrance.z)! }, spawnHeading: 0,
     resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); },
-    entities, janitor, objectiveZones,
+    entities, janitor, splashKids, objectiveZones,
     objectives: [{ id: ENTER_SHOP_OBJECTIVE_ID, description: "Sneak into the north shop", isSatisfied: (world) => world.durableFacts.includes(ENTER_SHOP_FACT_ID) }],
   };
 }

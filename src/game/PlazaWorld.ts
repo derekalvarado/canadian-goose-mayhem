@@ -1,6 +1,7 @@
 import { createOldTownPaving, createTownBench, createTownBed, createTownLamp, createTownLights, createTownFireplace, createTownStage, createTownBlock, createTownInlay } from "./OldTownViews.ts";
 import * as THREE from "three";
 import { JanitorView } from "./JanitorView.ts";
+import { SplashKidView } from "./SplashKidView.ts";
 import { DeciduousTreeView, deciduousTreeVariantForId } from "./DeciduousTreeView.ts";
 import { Building1View } from "./Building1View.ts";
 import { TrashCanView } from "./TrashCanView.ts";
@@ -1030,6 +1031,8 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.pavilion-stage": return createPavilion(groups, instanceId);
     case "plaza.cafe-table-set": return createCafeTable();
     case "plaza.street-janitor": return new JanitorView();
+    case "plaza.splash-kid-runner": return new SplashKidView("runner");
+    case "plaza.splash-kid-boots": return new SplashKidView("boots");
     case "oldtown.shade-tree":
     case "nature.deciduous-tree": {
       const tree = new DeciduousTreeView(undefined, deciduousTreeVariantForId(instanceId));

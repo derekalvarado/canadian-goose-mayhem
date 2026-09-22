@@ -36,7 +36,7 @@ export interface WorldAssetDefinition {
   readonly controller?: Readonly<{ interactionOffset: Readonly<{ x: number; y: number; z: number }>; range: number }>;
   /** Common grab/drop capability; the renderer never decides ownership. */
   readonly carryable?: Readonly<{ interactionRange: number; carryHeight: number; carryDistance: number }>;
-  readonly gameplayRole?: "janitor" | "shop-entrance";
+  readonly gameplayRole?: "janitor" | "splash-kid" | "shop-entrance";
 }
 
 export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
@@ -77,6 +77,8 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.cafe-table-set", label: "Café table set", category: "furniture", halfWidth: 1.25, halfDepth: 1.25, colliders: [{ shape: "circle", x: 0, z: 0, radius: 1.18 }] },
   { assetId: "street.trash-can", label: "Trash can", category: "furniture", halfWidth: 0.46, halfDepth: 0.46, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.46 }] },
   { assetId: "plaza.street-janitor", label: "Street janitor", category: "character", halfWidth: 0.72, halfDepth: 0.72, colliders: [], warnForOverlap: false, gameplayRole: "janitor" },
+  { assetId: "plaza.splash-kid-runner", label: "Splash-pad kid — runner", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
+  { assetId: "plaza.splash-kid-boots", label: "Splash-pad kid — yellow boots", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
   { assetId: "plaza.splash-faucet", label: "Splash-pad faucet", category: "gameplay", halfWidth: 0.4, halfDepth: 0.28, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.2 }], warnForOverlap: false, controller: { interactionOffset: { x: 0, y: 0.58, z: -0.19 }, range: 1.05 } },
   { assetId: "prop.beer-can", label: "Little beer can", category: "prop", halfWidth: 0.09, halfDepth: 0.09, colliders: [], warnForOverlap: false, carryable: { interactionRange: 0.95, carryHeight: 0.72, carryDistance: 0.54 } },
   { assetId: "gameplay.shop-entrance", label: "Shop entrance", category: "gameplay", halfWidth: 0.72, halfDepth: 0.42, colliders: [], warnForOverlap: false, gameplayRole: "shop-entrance" },

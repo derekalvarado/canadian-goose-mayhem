@@ -77,6 +77,7 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 - `src/game/GameAudio.ts` — browser audio output, separate from gameplay decisions
 - `src/game/Goose.ts` — runtime loader and animation blending for the rigged Canada goose
 - `src/game/GooseModel.ts` — reproducible goose geometry, skeleton, and animation recipe
+- `src/game/SplashKidModel.ts` — reproducible low-detail child rigs with flat arms and play/reaction clips
 - `assets/characters/goose/goose.blend` — editable Blender character source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow

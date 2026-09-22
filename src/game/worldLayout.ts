@@ -10,6 +10,7 @@ export const WORLD_CHUNK_SIZE = 64;
 const JANITOR_CONTENT_REVISION = 3;
 const OLD_TOWN_CONTENT_REVISION = 4;
 const GAMEPLAY_CONTENT_REVISION = 5;
+const SPLASH_KIDS_CONTENT_REVISION = 6;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -190,6 +191,23 @@ function addGameplayContent(layout: WorldLayout, store?: WorldLayoutStorage): Wo
   }
   return validated;
 }
+function addSplashKidsContent(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision < GAMEPLAY_CONTENT_REVISION || layout.canonicalRevision >= SPLASH_KIDS_CONTENT_REVISION) return layout;
+  const updated = cloneWorldLayout(layout); const plaza = getWorldArea(updated);
+  const add = (id: string, assetId: string, label: string, x: number, z: number, rotationY: number) => {
+    if (!plaza.instances.some((item) => item.id === id)) plaza.instances.push(instance(id, assetId, label, x, z, rotationY));
+  };
+  add("plaza.splash-kid-milo", "plaza.splash-kid-runner", "Milo at the splash pad", -4.35, -0.85, -0.7);
+  add("plaza.splash-kid-june", "plaza.splash-kid-boots", "June at the splash pad", -2.1, 1.15, 2.35);
+  add("plaza.splash-kid-ari", "plaza.splash-kid-runner", "Ari at the splash pad", -1.8, -1.2, 1.7);
+  updated.canonicalRevision = SPLASH_KIDS_CONTENT_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its character update could not be saved", error); return layout; }
+  }
+  return validated;
+}
 export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
   try {
     const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -203,9 +221,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store);
+    if (saved) return addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
