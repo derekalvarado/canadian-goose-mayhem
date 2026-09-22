@@ -7,6 +7,7 @@ import { Building1View } from "../src/game/Building1View.ts";
 import { CANONICAL_WORLD_LAYOUT, cloneWorldLayout, getWorldArea, loadWorldLayout, loadPreviousWorldLayout, PRE_REBUILD_LAYOUT_STORAGE_KEY, WORLD_LAYOUT_STORAGE_KEY, saveWorldLayout } from "../src/game/worldLayout.ts";
 import { createCentralPlazaRules, isWorldAreaPlayable } from "../src/game/worldLevel.ts";
 import { getWorldAsset } from "../src/game/worldAssets.ts";
+import { FIXED_STEP, Simulation, type PlayerCommand } from "../src/game/simulation/Simulation.ts";
 
 function memoryStore() {
   const values = new Map<string, string>();
@@ -20,7 +21,7 @@ test("square upgrade archives the previous draft, preserves other areas, and can
   old.areas.push({ id: "custom-garden", label: "My garden", chunks: [], instances: [] });
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 7);
+  assert.equal(updated.canonicalRevision, 9);
   assert.equal(getWorldArea(updated).instances.find(i => i.id === "plaza.goose-fountain")!.transform.x, -16);
   assert.deepEqual(updated.areas[1], { ...old.areas[1], controlLinks: [] });
   const backup = store.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -50,11 +51,11 @@ test("the gameplay content update preserves authored edits and is saved once", (
   saveWorldLayout(authored, store);
 
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 7);
+  assert.equal(updated.canonicalRevision, 9);
   assert.equal(getWorldArea(updated).instances.find((item) => item.id === "plaza.goose-fountain")?.transform.x, -14.25);
   assert.ok(getWorldArea(updated).instances.some((item) => item.id === "plaza.splash-faucet"));
   assert.deepEqual(getWorldArea(updated).controlLinks, [{ controllerId: "plaza.splash-faucet", targetId: "plaza.splash-pad" }]);
-  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 7);
+  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 9);
   assert.equal(getWorldArea(updated).instances.filter((item) => item.assetId.startsWith("plaza.splash-kid-")).length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => getWorldAsset(item.assetId)?.cleanupRole === "litter").length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => ["trash-bag", "litter-picker"].includes(getWorldAsset(item.assetId)?.cleanupRole ?? "")).length, 2);
@@ -105,6 +106,22 @@ test("canonical plaza authors one cleanup tool set and three persistent litter i
   assert.equal(byRole("litter-picker").length, 1);
   assert.ok(rules.janitor?.cleanup);
   for (const entity of byRole("litter")) assert.equal(isWorldAreaPlayable(area, entity.position.x, entity.position.z), true);
+});
+
+test("canonical janitor cleanup corridors remain on authored playable ground", () => {
+  const area = getWorldArea(CANONICAL_WORLD_LAYOUT);
+  const rules = createCentralPlazaRules(area);
+  const simulation = new Simulation(rules);
+  const idle: PlayerCommand = { moveX: 0, moveZ: 0, hurry: false, honkPressed: false };
+  for (let tick = 0; tick < 8_000; tick += 1) {
+    simulation.advance(FIXED_STEP, idle);
+    const janitor = simulation.world.janitor!;
+    assert.equal(isWorldAreaPlayable(area, janitor.position.x, janitor.position.z), true,
+      `${janitor.activity} left playable ground at ${janitor.position.x},${janitor.position.z}`);
+  }
+  for (const definition of rules.entities?.filter((entity) => entity.cleanup?.role === "trash-can" || entity.cleanup?.role === "litter") ?? []) {
+    assert.ok((simulation.world.entities.find((entity) => entity.id === definition.id)?.serviceCount ?? 0) >= 1);
+  }
 });
 
 test("all four storefront variants load with toon materials, correct footprint, and independent geometry", async () => {

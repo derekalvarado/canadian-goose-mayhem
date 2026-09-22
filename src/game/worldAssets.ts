@@ -38,6 +38,8 @@ export interface WorldAssetDefinition {
   readonly carryable?: Readonly<{ interactionRange: number; carryHeight: number; carryDistance: number; stealableWhileHeld?: boolean }>;
   /** Shared simulation affordance used to build deterministic janitor routes. */
   readonly cleanupRole?: "trash-can" | "litter" | "trash-bag" | "litter-picker";
+  /** How close a worker gets before using this cleanup affordance. */
+  readonly cleanupRange?: number;
   readonly gameplayRole?: "janitor" | "splash-kid" | "shop-entrance";
 }
 
@@ -77,7 +79,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   ] },
   { assetId: "plaza.pavilion-stage", label: "Stage and pavilion", category: "landmark", halfWidth: 7.4, halfDepth: 2.75, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 6.8, halfDepth: 2.25 }], occludesCamera: true },
   { assetId: "plaza.cafe-table-set", label: "Café table set", category: "furniture", halfWidth: 1.25, halfDepth: 1.25, colliders: [{ shape: "circle", x: 0, z: 0, radius: 1.18 }] },
-  { assetId: "street.trash-can", label: "Trash can", category: "furniture", halfWidth: 0.46, halfDepth: 0.46, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.46 }], cleanupRole: "trash-can" },
+  { assetId: "street.trash-can", label: "Trash can", category: "furniture", halfWidth: 0.46, halfDepth: 0.46, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.46 }], cleanupRole: "trash-can", cleanupRange: 1.2 },
   { assetId: "plaza.street-janitor", label: "Street janitor", category: "character", halfWidth: 0.72, halfDepth: 0.72, colliders: [], warnForOverlap: false, gameplayRole: "janitor" },
   { assetId: "plaza.splash-kid-runner", label: "Splash-pad kid — runner", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
   { assetId: "plaza.splash-kid-boots", label: "Splash-pad kid — yellow boots", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
@@ -85,9 +87,9 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "prop.beer-can", label: "Little beer can", category: "prop", halfWidth: 0.09, halfDepth: 0.09, colliders: [], warnForOverlap: false, carryable: { interactionRange: 0.95, carryHeight: 0.72, carryDistance: 0.54 } },
   { assetId: "prop.trash-bag", label: "Janitor's trash bag", category: "prop", halfWidth: 0.24, halfDepth: 0.18, colliders: [], warnForOverlap: false, cleanupRole: "trash-bag", carryable: { interactionRange: 1, carryHeight: 0.68, carryDistance: 0.48, stealableWhileHeld: true } },
   { assetId: "prop.litter-picker", label: "Janitor's litter picker", category: "prop", halfWidth: 0.12, halfDepth: 0.78, colliders: [], warnForOverlap: false, cleanupRole: "litter-picker", carryable: { interactionRange: 1.05, carryHeight: 0.16, carryDistance: 0.45, stealableWhileHeld: true } },
-  { assetId: "litter.chip-bag", label: "Chip bag", category: "prop", halfWidth: 0.16, halfDepth: 0.11, colliders: [], warnForOverlap: false, cleanupRole: "litter", carryable: { interactionRange: 0.9, carryHeight: 0.7, carryDistance: 0.5 } },
-  { assetId: "litter.crumpled-paper", label: "Crumpled paper", category: "prop", halfWidth: 0.12, halfDepth: 0.12, colliders: [], warnForOverlap: false, cleanupRole: "litter", carryable: { interactionRange: 0.9, carryHeight: 0.7, carryDistance: 0.5 } },
-  { assetId: "litter.food-tray", label: "Paper food tray", category: "prop", halfWidth: 0.22, halfDepth: 0.16, colliders: [], warnForOverlap: false, cleanupRole: "litter", carryable: { interactionRange: 0.9, carryHeight: 0.68, carryDistance: 0.5 } },
+  { assetId: "litter.chip-bag", label: "Chip bag", category: "prop", halfWidth: 0.16, halfDepth: 0.11, colliders: [], warnForOverlap: false, cleanupRole: "litter", cleanupRange: 0.72, carryable: { interactionRange: 0.9, carryHeight: 0.7, carryDistance: 0.5 } },
+  { assetId: "litter.crumpled-paper", label: "Crumpled paper", category: "prop", halfWidth: 0.12, halfDepth: 0.12, colliders: [], warnForOverlap: false, cleanupRole: "litter", cleanupRange: 0.72, carryable: { interactionRange: 0.9, carryHeight: 0.7, carryDistance: 0.5 } },
+  { assetId: "litter.food-tray", label: "Paper food tray", category: "prop", halfWidth: 0.22, halfDepth: 0.16, colliders: [], warnForOverlap: false, cleanupRole: "litter", cleanupRange: 0.72, carryable: { interactionRange: 0.9, carryHeight: 0.68, carryDistance: 0.5 } },
   { assetId: "gameplay.shop-entrance", label: "Shop entrance", category: "gameplay", halfWidth: 0.72, halfDepth: 0.42, colliders: [], warnForOverlap: false, gameplayRole: "shop-entrance" },
   { assetId: "plaza.planter-cluster", label: "Planter cluster", category: "planting", halfWidth: 22, halfDepth: 18, colliders: [
     { shape: "box", x: 19.35, z: -7.2, halfWidth: 1.45, halfDepth: 3.3 },

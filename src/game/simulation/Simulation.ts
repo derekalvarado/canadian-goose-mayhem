@@ -18,7 +18,11 @@ export interface CarryableDefinition {
 }
 export interface ControllerDefinition { readonly targetId: string; readonly interactionPoint: Readonly<Position>; readonly interactionRange: number }
 export type CleanupRole = "trash-can" | "litter" | "trash-bag" | "litter-picker";
-export interface CleanupDefinition { readonly role: CleanupRole; readonly routeOrder?: number }
+export interface CleanupDefinition {
+  readonly role: CleanupRole; readonly routeOrder?: number; readonly interactionRange?: number;
+  /** Authored plaza waypoints for this routine stop; this is not a general navigation mesh. */
+  readonly routeWaypoints?: readonly Readonly<Position>[];
+}
 export interface WorldEntityDefinition {
   readonly id: string; readonly label: string; readonly position: Readonly<Position>; readonly heading?: number;
   readonly active?: boolean; readonly controller?: ControllerDefinition; readonly carryable?: CarryableDefinition;
@@ -98,6 +102,7 @@ interface MutableJanitor {
   readonly definition: JanitorDefinition; readonly position: Position; heading: number;
   activity: JanitorActivity; activitySecondsRemaining: number; cleanupPhase?: CleanupPhase;
   trashIndex: number; litterIndex: number; targetEntityId?: string; resume?: JanitorResume;
+  routeEntityId?: string; routeWaypointIndex: number;
   stolenToolId?: string; toolSearchSecondsRemaining: number; reactionReason?: "fumble" | "theft";
   shooCooldownRemaining: number; completedTrashIdsThisLap: string[];
 }
@@ -164,7 +169,7 @@ export class Simulation {
       }
       this.janitor = { definition: rules.janitor, position: { ...rules.janitor.position }, heading: rules.janitor.heading,
         activity: "guarding", activitySecondsRemaining: 0, trashIndex: 0, litterIndex: 0,
-        toolSearchSecondsRemaining: 0, shooCooldownRemaining: 0, completedTrashIdsThisLap: [] };
+        toolSearchSecondsRemaining: 0, shooCooldownRemaining: 0, completedTrashIdsThisLap: [], routeWaypointIndex: 0 };
     }
     for (const definition of rules.splashKids ?? []) {
       if (this.entitiesById.has(definition.id) || this.splashKids.some((child) => child.definition.id === definition.id)) throw new Error(`Duplicate splash kid ID: ${definition.id}`);
@@ -249,6 +254,7 @@ export class Simulation {
       Object.assign(janitor.position, janitor.definition.position); janitor.heading = janitor.definition.heading;
       janitor.activity = "guarding"; janitor.activitySecondsRemaining = 0; janitor.cleanupPhase = undefined;
       janitor.trashIndex = 0; janitor.litterIndex = 0; janitor.targetEntityId = undefined; janitor.resume = undefined;
+      janitor.routeEntityId = undefined; janitor.routeWaypointIndex = 0;
       janitor.stolenToolId = undefined; janitor.toolSearchSecondsRemaining = 0; janitor.reactionReason = undefined;
       janitor.shooCooldownRemaining = 0; janitor.completedTrashIdsThisLap = [];
       if (janitor.definition.cleanup) this.beginPass("trash");
@@ -478,7 +484,10 @@ export class Simulation {
       return true;
     }
     janitor.activity = "retrieving-tool";
-    if (this.moveJanitorToward(tool.position, janitor.stolenToolId ? cleanup.jogSpeed : janitor.definition.walkSpeed)) {
+    const reached = janitor.stolenToolId
+      ? this.moveJanitorToward(tool.position, cleanup.jogSpeed)
+      : this.moveJanitorAlongCleanupRoute(tool, 0);
+    if (reached) {
       this.acquireEntity(tool, janitor.definition.id); janitor.stolenToolId = undefined; janitor.toolSearchSecondsRemaining = 0;
       if (janitor.resume) this.resumeCleanupTask(); else this.startCurrentCleanupTarget();
     }
@@ -559,7 +568,9 @@ export class Simulation {
       case "walking-to-trash": {
         const target = janitor.targetEntityId ? this.entitiesById.get(janitor.targetEntityId) : undefined;
         if (!target) { this.startCurrentCleanupTarget(); break; }
-        if (this.moveJanitorToward(target.position)) { janitor.activity = "emptying-trash"; janitor.activitySecondsRemaining = cleanup.emptySeconds; }
+        if (this.moveJanitorAlongCleanupRoute(target, target.definition.cleanup?.interactionRange ?? 0)) {
+          janitor.activity = "emptying-trash"; janitor.activitySecondsRemaining = cleanup.emptySeconds;
+        }
         break;
       }
       case "emptying-trash": {
@@ -580,7 +591,9 @@ export class Simulation {
         if (!target || target.holderId || target.containedBy) {
           janitor.litterIndex += 1; this.startCurrentCleanupTarget(); break;
         }
-        if (this.moveJanitorToward(target.position)) { janitor.activity = "picking-litter"; janitor.activitySecondsRemaining = cleanup.pickupSeconds; }
+        if (this.moveJanitorAlongCleanupRoute(target, target.definition.cleanup?.interactionRange ?? 0)) {
+          janitor.activity = "picking-litter"; janitor.activitySecondsRemaining = cleanup.pickupSeconds;
+        }
         break;
       }
       case "picking-litter": {
@@ -696,8 +709,34 @@ export class Simulation {
     const janitor = this.janitor!; const dx = destination.x - janitor.position.x; const dz = destination.z - janitor.position.z;
     const distance = Math.hypot(dx, dz); const step = speed * FIXED_STEP;
     if (distance <= step) { Object.assign(janitor.position, destination); return true; }
-    janitor.heading = Math.atan2(-dx, -dz); janitor.position.x += dx / distance * step; janitor.position.z += dz / distance * step;
+    janitor.heading = Math.atan2(-dx, -dz);
+    janitor.position.x += dx / distance * step; janitor.position.z += dz / distance * step;
     return false;
+  }
+  private moveJanitorIntoCleanupRange(target: MutableEntity): boolean {
+    const range = target.definition.cleanup?.interactionRange ?? 0;
+    const distance = distance2d(this.janitor!.position, target.position);
+    if (distance <= range) return true;
+    const janitor = this.janitor!;
+    this.moveJanitorToward(target.position);
+    return distance2d(janitor.position, target.position) <= range;
+  }
+  private moveJanitorAlongCleanupRoute(target: MutableEntity, range: number): boolean {
+    const janitor = this.janitor!; const waypoints = target.definition.cleanup?.routeWaypoints ?? [];
+    if (janitor.routeEntityId !== target.definition.id) {
+      janitor.routeEntityId = target.definition.id;
+      janitor.routeWaypointIndex = waypoints.reduce((closest, waypoint, index) =>
+        distance2d(janitor.position, waypoint) < distance2d(janitor.position, waypoints[closest]) ? index : closest, 0);
+    }
+    while (janitor.routeWaypointIndex < waypoints.length
+      && distance2d(janitor.position, waypoints[janitor.routeWaypointIndex]) <= 0.001) janitor.routeWaypointIndex += 1;
+    const waypoint = waypoints[janitor.routeWaypointIndex];
+    if (waypoint) {
+      if (this.moveJanitorToward(waypoint)) janitor.routeWaypointIndex += 1;
+      return false;
+    }
+    if (range > 0) return this.moveJanitorIntoCleanupRange(target);
+    return this.moveJanitorToward(target.position);
   }
   private shooGoose(events: GameplayEvent[], retrievingTool: boolean): void {
     const janitor = this.janitor!; const dx = this.position.x - janitor.position.x; const dz = this.position.z - janitor.position.z;

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 7,
+  "canonicalRevision": 9,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -927,9 +927,9 @@
           "assetId": "prop.trash-bag",
           "label": "Janitor's trash bag",
           "transform": {
-            "x": -10.35,
+            "x": 20.45,
             "y": 0,
-            "z": -11.7,
+            "z": 11.8,
             "rotationY": 0
           }
         },
@@ -938,9 +938,9 @@
           "assetId": "prop.litter-picker",
           "label": "Janitor's litter picker",
           "transform": {
-            "x": -11.15,
+            "x": -20.5,
             "y": 0,
-            "z": -11.45,
+            "z": -4.7,
             "rotationY": 0
           }
         },

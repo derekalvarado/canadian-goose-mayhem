@@ -12,6 +12,7 @@ const OLD_TOWN_CONTENT_REVISION = 4;
 const GAMEPLAY_CONTENT_REVISION = 5;
 const SPLASH_KIDS_CONTENT_REVISION = 6;
 const JANITOR_CLEANUP_CONTENT_REVISION = 7;
+const JANITOR_CLEANUP_POLISH_REVISION = 9;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -215,8 +216,8 @@ function addJanitorCleanupContent(layout: WorldLayout, store?: WorldLayoutStorag
   const add = (id: string, assetId: string, label: string, x: number, z: number, rotationY = 0) => {
     if (!plaza.instances.some((item) => item.id === id)) plaza.instances.push(instance(id, assetId, label, x, z, rotationY));
   };
-  add("plaza.janitor-trash-bag", "prop.trash-bag", "Janitor's trash bag", -10.35, -11.7);
-  add("plaza.janitor-litter-picker", "prop.litter-picker", "Janitor's litter picker", -11.15, -11.45);
+  add("plaza.janitor-trash-bag", "prop.trash-bag", "Janitor's trash bag", 20.45, 11.8);
+  add("plaza.janitor-litter-picker", "prop.litter-picker", "Janitor's litter picker", -20.5, -4.7);
   add("plaza.litter-chip-bag", "litter.chip-bag", "Discarded chip bag", -17.25, -5.2, 0.25);
   add("plaza.litter-crumpled-paper", "litter.crumpled-paper", "Crumpled paper", 2, 6, -0.4);
   add("plaza.litter-food-tray", "litter.food-tray", "Paper food tray", 14, -4, 0.3);
@@ -225,6 +226,24 @@ function addJanitorCleanupContent(layout: WorldLayout, store?: WorldLayoutStorag
   if (store) {
     try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
     catch (error) { console.warn("Keeping the previous world because its janitor cleanup update could not be saved", error); return layout; }
+  }
+  return validated;
+}
+function polishJanitorCleanupContent(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision < JANITOR_CLEANUP_CONTENT_REVISION || layout.canonicalRevision >= JANITOR_CLEANUP_POLISH_REVISION) return layout;
+  const updated = cloneWorldLayout(layout); const plaza = getWorldArea(updated);
+  const moveDefault = (id: string, previousX: number, previousZ: number, x: number, z: number) => {
+    const item = plaza.instances.find((candidate) => candidate.id === id);
+    if (item && item.transform.x === previousX && item.transform.z === previousZ) Object.assign(item.transform, { x, z });
+  };
+  moveDefault("plaza.janitor-trash-bag", -10.35, -11.7, 20.45, 11.8);
+  moveDefault("plaza.janitor-litter-picker", -11.15, -11.45, -20.5, -4.7);
+  moveDefault("plaza.janitor-litter-picker", 20.05, 11.75, -20.5, -4.7);
+  updated.canonicalRevision = JANITOR_CLEANUP_POLISH_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its janitor cleanup polish could not be saved", error); return layout; }
   }
   return validated;
 }
@@ -241,9 +260,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store);
+    if (saved) return polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);

@@ -63,15 +63,26 @@ export class WorldView extends THREE.Group {
   }
 
   syncGameplay(snapshot: WorldSnapshot): void {
+    const janitor = snapshot.janitor;
+    const janitorView = janitor ? this.gameplayViews.get(janitor.id) : undefined;
     for (const entity of snapshot.entities) {
       const wrapper = this.instances.get(entity.id); if (!wrapper) continue;
       wrapper.visible = entity.containedBy === undefined;
-      wrapper.position.set(entity.position.x, entity.position.y, entity.position.z);
-      wrapper.rotation.y = entity.heading;
+      const assetId = this.activeArea?.instances.find((instance) => instance.id === entity.id)?.assetId;
+      const socket = entity.holderId === janitor?.id && janitorView instanceof JanitorView
+        ? janitorView.getHandSocket("right") : undefined;
+      if (socket && (assetId === "prop.trash-bag" || assetId === "prop.litter-picker")) {
+        if (wrapper.parent !== socket) socket.add(wrapper);
+        wrapper.position.set(0, assetId === "prop.litter-picker" ? -1.48 : -0.58, 0);
+        wrapper.rotation.set(0, 0, 0);
+      } else {
+        if (wrapper.parent !== this) this.add(wrapper);
+        wrapper.position.set(entity.position.x, entity.position.y, entity.position.z);
+        wrapper.rotation.set(0, entity.heading, 0);
+      }
       const view = this.gameplayViews.get(entity.id);
       if (view instanceof SplashPadView && entity.active !== undefined) view.setActive(entity.active);
     }
-    const janitor = snapshot.janitor;
     if (janitor) {
       const wrapper = this.instances.get(janitor.id); const view = this.gameplayViews.get(janitor.id);
       if (wrapper) { wrapper.position.set(janitor.position.x, janitor.position.y, janitor.position.z); wrapper.rotation.y = janitor.heading; }

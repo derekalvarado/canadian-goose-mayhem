@@ -7,6 +7,29 @@ export const MAX_WALKABLE_STEP = 0.22;
 export const ENTER_SHOP_OBJECTIVE_ID = "plaza.enter-north-shop";
 export const ENTER_SHOP_FACT_ID = "plaza.entered-north-shop";
 
+/** Hand-authored service corridors keep this contained routine out of plaza props without adding general navigation. */
+const PLAZA_CLEANUP_ROUTES: Readonly<Record<string, readonly Readonly<Position>[]>> = {
+  "plaza.janitor-trash-bag": [position(-20.5, -4.5), position(-17.5, -5), position(-13.5, -4.5), position(2, 6), position(14, -4), position(19, 10), position(20.5, 12)],
+  "oldtown.bin-3": [position(20.5, 12), position(21.5, 8.5)],
+  "oldtown.bin-2": [position(18, 7.5), position(7.5, -6), position(7.5, -7.5), position(8.5, -9.5), position(11.5, -10), position(13, -10)],
+  "oldtown.bin-1": [position(10, -10), position(7, -8.5), position(6.5, -6.5), position(-12, 7), position(-11.5, 9.5)],
+  "oldtown.bin-0": [position(-20, 0.5), position(-21, -5.5)],
+  "plaza.janitor-litter-picker": [position(-20.5, -4.5)],
+  "plaza.litter-chip-bag": [position(-17.5, -5)],
+  "plaza.litter-crumpled-paper": [position(-13.5, -4.5), position(2, 6)],
+  "plaza.litter-food-tray": [position(14, -4)],
+};
+
+/** Route order starts beside the worker and ends beside the first litter stop. */
+const PLAZA_CLEANUP_ORDER: Readonly<Record<string, number>> = {
+  "oldtown.bin-3": 0,
+  "oldtown.bin-2": 1,
+  "oldtown.bin-1": 2,
+  "oldtown.bin-0": 3,
+};
+
+function position(x: number, z: number): Position { return { x, y: 0, z }; }
+
 function local(instance: WorldInstance, x: number, z: number): { x: number; z: number } {
   const dx = x - instance.transform.x; const dz = z - instance.transform.z;
   const c = Math.cos(instance.transform.rotationY); const s = Math.sin(instance.transform.rotationY);
@@ -79,7 +102,8 @@ export function createCentralPlazaRules(area: WorldArea): WorldRules {
       heading: item.transform.rotationY, active: asset.activeTarget?.initialActive,
       controller: asset.controller && link && interactionPoint ? { targetId: link.targetId, interactionPoint, interactionRange: asset.controller.range } : undefined,
       carryable: asset.carryable,
-      cleanup: asset.cleanupRole ? { role: asset.cleanupRole } : undefined,
+      cleanup: asset.cleanupRole ? { role: asset.cleanupRole, routeOrder: PLAZA_CLEANUP_ORDER[item.id], interactionRange: asset.cleanupRange,
+        routeWaypoints: PLAZA_CLEANUP_ROUTES[item.id] } : undefined,
     }];
   });
   const janitorInstance = area.instances.find((item) => getWorldAsset(item.assetId)?.gameplayRole === "janitor");
