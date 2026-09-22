@@ -436,8 +436,10 @@ export class Game {
   };
 
   private updateTouchControlsVisibility(): void {
-    this.touchControlsRoot.hidden = !shouldShowTouchControls(this.touchPreference, this.coarseTouchDevice)
-      || this.pauseReasons.paused;
+    const showTouchControls = shouldShowTouchControls(this.touchPreference, this.coarseTouchDevice)
+      && !this.pauseReasons.paused;
+    this.touchControlsRoot.hidden = !showTouchControls;
+    this.controlsCard.classList.toggle("controls-card--touch-visible", showTouchControls);
   }
 
   private readonly openSettings = (): void => {
