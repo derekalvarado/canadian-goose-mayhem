@@ -25,6 +25,12 @@ Open the local URL Vite prints in a browser.
 To test from another device on the same network, run `npm run dev:lan` and open
 the Network URL Vite prints on that device.
 
+The production build installs a service worker and precaches the game shell,
+bundles, models, audio, and public assets. After opening the deployed game once
+while online, the installed app can launch and keep running without a network
+connection. A new build is picked up automatically the next time the app is
+opened online.
+
 ## Arrange the plaza
 
 Open the same local URL with `?edit` at the end (for example,

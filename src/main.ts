@@ -1,6 +1,15 @@
 import "./style.css";
 import { Game } from "./game/Game";
 
+function registerOfflineServiceWorker(): void {
+  if (!import.meta.env.PROD || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  void navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch((error: unknown) => {
+    console.warn("Offline support could not be enabled.", error);
+  });
+}
+
+registerOfflineServiceWorker();
+
 const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas");
 const loadingScreen = document.querySelector<HTMLElement>("#loading-screen");
 const errorPanel = document.querySelector<HTMLElement>("#webgl-error");

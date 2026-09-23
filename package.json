@@ -10,7 +10,7 @@
     "assets:goose:author": "node scripts/export-goose.mjs --author",
     "assets:janitor": "node scripts/generate-janitor-glb.mjs",
     "assets:kids": "node scripts/generate-splash-kids-glb.mjs",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/inject-offline-precache.mjs",
     "preview": "vite preview",
     "test": "node --test --experimental-strip-types tests/*.test.ts"
   },
