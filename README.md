@@ -1,10 +1,10 @@
 # Goose Game 2 — Old Town Square
 
-The first playable slice is a browser-based 3D interpretation of the central plaza
-in Fort Collins' Old Town Square. You control an original, cel-shaded Canada goose
-among the goose fountain, splash pad, children's play area, pavilion, storefronts,
-patios, planters, and string lights. The square is currently an open movement and
-environment slice; gameplay objectives will arrive with later mechanics.
+The first playable slice is a browser-based 3D interpretation of Fort Collins' Old
+Town Square. You control an original, cel-shaded Canada goose among the coffee-shop
+graybox and the central plaza. The coffee shop is the temporary default start
+location while the interior is being developed; gameplay objectives will arrive with
+later mechanics.
 
 The intended game is an interconnected social-stealth sandbox. Read the
 [game architecture and development sequence](docs/game-architecture.md) before
@@ -106,6 +106,17 @@ Open `?animation` for the close-up goose movement studio: walk/hurry, threat/sne
 wingbeats, honk/grab/startle, moving head target, slow motion, and frame stepping.
 See the [goose authoring workflow](assets/characters/goose/README.md) for Blender
 editing/export and the remaining limits of foot contact at the current game speed.
+
+## Coffee shop graybox
+
+The active browser game includes an early coffee-shop interior graybox based on the
+reference floor plan: the front door is on the south wall, the counter runs along
+the left wall, and five people are visual placeholders only. The coffee shop is now
+the default start location and is connected to the leftmost storefront on the
+south side of the plaza. Use `?dev&start=coffee-shop` or simply open the normal
+URL to start there. Use `?dev&start=old-town-square.central-plaza` to test walking
+through the plaza doorway. Use `?edit&dev&start=coffee-shop`
+to inspect and reposition the authored shop instances in the world editor.
 
 ## Color palette
 

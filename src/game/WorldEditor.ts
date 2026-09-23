@@ -24,8 +24,9 @@ export class WorldEditor {
   private readonly history = new WorldEditorHistory(); private undoButton?: HTMLButtonElement; private redoButton?: HTMLButtonElement;
   private world: WorldLayout; private view: WorldView; private areaId = CENTRAL_PLAZA_AREA_ID; private selectedId?: string; private placing = false;
 
-  constructor(scene: THREE.Scene, private readonly camera: THREE.Camera, private readonly canvas: HTMLCanvasElement, world = loadWorldLayout(), view?: WorldView) {
-    this.world = world; this.view = view ?? new WorldView(this.area); if (!view) scene.add(this.view); scene.add(this.preview, this.outline);
+  constructor(scene: THREE.Scene, private readonly camera: THREE.Camera, private readonly canvas: HTMLCanvasElement, world = loadWorldLayout(), view?: WorldView, initialAreaId = CENTRAL_PLAZA_AREA_ID) {
+    this.world = world; this.areaId = world.areas.some((area) => area.id === initialAreaId) ? initialAreaId : CENTRAL_PLAZA_AREA_ID;
+    this.view = view ?? new WorldView(this.area); if (!view) scene.add(this.view); scene.add(this.preview, this.outline);
     this.preview.visible = false; this.preview.userData.editorIgnore = true; this.outline.userData.editorIgnore = true; this.outline.renderOrder = 20;
     this.orbit = new OrbitControls(camera, canvas); this.orbit.mouseButtons.LEFT = null; this.orbit.mouseButtons.MIDDLE = THREE.MOUSE.ROTATE; this.orbit.target.set(0, 0, 0); this.orbit.update(); this.orbit.saveState(); this.view.setEditorChunkFocus(0, 0); this.orbit.addEventListener("change", () => this.view.setEditorChunkFocus(this.orbit.target.x, this.orbit.target.z));
     const authoringGrid = new THREE.GridHelper(4096, 64, 0xf1d38b, 0x766d60); authoringGrid.position.y = -0.02; authoringGrid.userData.editorIgnore = true; scene.add(authoringGrid);

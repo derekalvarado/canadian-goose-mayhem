@@ -78,9 +78,14 @@ export class WorldView extends THREE.Group {
     const janitor = snapshot.janitor;
     const janitorView = janitor ? this.gameplayViews.get(janitor.id) : undefined;
     for (const entity of snapshot.entities) {
-      const wrapper = this.instances.get(entity.id); if (!wrapper) continue;
+      let wrapper = this.instances.get(entity.id);
+      const assetId = this.activeArea?.instances.find((instance) => instance.id === entity.id)?.assetId ?? entity.assetId;
+      if (!wrapper && entity.holderId === "goose" && assetId) {
+        wrapper = this.addInstance({ id: entity.id, assetId, label: entity.label,
+          transform: { x: entity.position.x, y: entity.position.y, z: entity.position.z, rotationY: entity.heading } }, false);
+      }
+      if (!wrapper) continue;
       wrapper.visible = entity.containedBy === undefined;
-      const assetId = this.activeArea?.instances.find((instance) => instance.id === entity.id)?.assetId;
       const socket = entity.holderId === janitor?.id && janitorView instanceof JanitorView
         ? janitorView.getHandSocket("right") : undefined;
       if (socket && (assetId === "prop.trash-bag" || assetId === "prop.litter-picker")) {

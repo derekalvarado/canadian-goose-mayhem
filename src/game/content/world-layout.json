@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 9,
+  "canonicalRevision": 12,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -980,12 +980,12 @@
         {
           "id": "plaza.shop-entrance",
           "assetId": "gameplay.shop-entrance",
-          "label": "North shop entrance",
+          "label": "Coffee shop entrance",
           "transform": {
-            "x": -11,
+            "x": -10,
             "y": 0,
-            "z": -13.72,
-            "rotationY": 0
+            "z": 14.22,
+            "rotationY": 3.141592653589793
           }
         }
       ],
@@ -995,6 +995,197 @@
           "targetId": "plaza.splash-pad"
         }
       ]
+    },
+    {
+      "id": "old-town-square.coffee-shop",
+      "label": "Coffee Shop Interior",
+      "chunks": [
+        { "x": -1, "z": -1, "playable": true },
+        { "x": 0, "z": -1, "playable": true },
+        { "x": -1, "z": 0, "playable": true },
+        { "x": 0, "z": 0, "playable": true }
+      ],
+      "instances": [
+        {
+          "id": "coffee.floor",
+          "assetId": "coffee.shop-floor",
+          "label": "Coffee shop floor",
+          "transform": { "x": 0, "y": 0, "z": 0, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.wall-north",
+          "assetId": "coffee.wall-long",
+          "label": "North brick wall",
+          "transform": { "x": 0, "y": 0, "z": -7, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.wall-west",
+          "assetId": "coffee.wall-side",
+          "label": "West brick wall",
+          "transform": { "x": -9, "y": 0, "z": 0, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.wall-east",
+          "assetId": "coffee.wall-side",
+          "label": "East brick wall",
+          "transform": { "x": 9, "y": 0, "z": 0, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.wall-south-west",
+          "assetId": "coffee.wall-door-wing",
+          "label": "South wall west wing",
+          "transform": { "x": -5.5, "y": 0, "z": 7, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.wall-south-east",
+          "assetId": "coffee.wall-door-wing",
+          "label": "South wall east wing",
+          "transform": { "x": 5.5, "y": 0, "z": 7, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.front-door",
+          "assetId": "coffee.front-door",
+          "label": "Front door",
+          "transform": { "x": 0, "y": 0, "z": 6.82, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.menu-board",
+          "assetId": "coffee.wall-board",
+          "label": "Coffee menu board",
+          "transform": { "x": 1.25, "y": 0, "z": -6.72, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.counter",
+          "assetId": "coffee.counter",
+          "label": "Order counter on left wall",
+          "transform": { "x": -7.25, "y": 0, "z": -1, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.table-1",
+          "assetId": "coffee.table",
+          "label": "Table 1",
+          "transform": { "x": 1.8, "y": 0, "z": -3.7, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.table-2",
+          "assetId": "coffee.table",
+          "label": "Table 2",
+          "transform": { "x": 5.7, "y": 0, "z": -3.7, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.table-3",
+          "assetId": "coffee.table",
+          "label": "Table 3",
+          "transform": { "x": 1.8, "y": 0, "z": 0.7, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.table-4",
+          "assetId": "coffee.table",
+          "label": "Table 4",
+          "transform": { "x": 5.7, "y": 0, "z": 0.7, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.chair-1a",
+          "assetId": "coffee.chair",
+          "label": "Table 1 chair A",
+          "transform": { "x": 1.8, "y": 0, "z": -2.65, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.chair-1b",
+          "assetId": "coffee.chair",
+          "label": "Table 1 chair B",
+          "transform": { "x": 1.8, "y": 0, "z": -4.75, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.chair-2a",
+          "assetId": "coffee.chair",
+          "label": "Table 2 chair A",
+          "transform": { "x": 5.7, "y": 0, "z": -2.65, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.chair-2b",
+          "assetId": "coffee.chair",
+          "label": "Table 2 chair B",
+          "transform": { "x": 5.7, "y": 0, "z": -4.75, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.chair-3a",
+          "assetId": "coffee.chair",
+          "label": "Table 3 chair A",
+          "transform": { "x": 1.8, "y": 0, "z": 1.75, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.chair-3b",
+          "assetId": "coffee.chair",
+          "label": "Table 3 chair B",
+          "transform": { "x": 1.8, "y": 0, "z": -0.35, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.chair-4a",
+          "assetId": "coffee.chair",
+          "label": "Table 4 chair A",
+          "transform": { "x": 5.7, "y": 0, "z": 1.75, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.chair-4b",
+          "assetId": "coffee.chair",
+          "label": "Table 4 chair B",
+          "transform": { "x": 5.7, "y": 0, "z": -0.35, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.person-barista",
+          "assetId": "coffee.placeholder-person",
+          "label": "Placeholder barista",
+          "transform": { "x": -8.35, "y": 0, "z": -1, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.person-customer-1",
+          "assetId": "coffee.placeholder-person",
+          "label": "Placeholder customer 1",
+          "transform": { "x": 1.8, "y": 0, "z": -3.05, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.person-customer-2",
+          "assetId": "coffee.placeholder-person",
+          "label": "Placeholder customer 2",
+          "transform": { "x": 5.7, "y": 0, "z": -3.05, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.person-customer-3",
+          "assetId": "coffee.placeholder-person",
+          "label": "Placeholder customer 3",
+          "transform": { "x": 1.8, "y": 0, "z": 0.35, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.person-customer-4",
+          "assetId": "coffee.placeholder-person",
+          "label": "Placeholder customer 4",
+          "transform": { "x": 5.7, "y": 0, "z": 0.35, "rotationY": 3.141592653589793 }
+        }
+      ],
+      "controlLinks": []
+    }
+  ],
+  "transitions": [
+    {
+      "id": "transition.coffee-shop.enter",
+      "fromAreaId": "old-town-square.central-plaza",
+      "fromInstanceId": "plaza.shop-entrance",
+      "toAreaId": "old-town-square.coffee-shop",
+      "toInstanceId": "coffee.front-door",
+      "triggerRadius": 0.72,
+      "targetPosition": { "x": 0, "y": 0, "z": 5.6 },
+      "targetHeading": 0
+    },
+    {
+      "id": "transition.coffee-shop.exit",
+      "fromAreaId": "old-town-square.coffee-shop",
+      "fromInstanceId": "coffee.front-door",
+      "toAreaId": "old-town-square.central-plaza",
+      "toInstanceId": "plaza.shop-entrance",
+      "triggerRadius": 0.72,
+      "targetPosition": { "x": -10, "y": 0, "z": 13.05 },
+      "targetHeading": 0
     }
   ]
 }

@@ -7,11 +7,11 @@ import { InputController, type InputDevice } from "./InputController";
 import { TouchControls } from "./TouchControls";
 import { PauseReasons, parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
-import { Simulation, HURRY_SPEED } from "./simulation/Simulation";
+import { Simulation, HURRY_SPEED, type GameplayEvent } from "./simulation/Simulation";
 import { PALETTE } from "./palette";
 import { WorldEditor } from "./WorldEditor";
-import { getWorldArea, loadWorldLayout } from "./worldLayout";
-import { createCentralPlazaRules } from "./worldLevel";
+import { COFFEE_SHOP_AREA_ID, getWorldArea, loadWorldLayout, resolveStartAreaId } from "./worldLayout";
+import { createWorldRules } from "./worldLevel";
 import { GooseOcclusionFader } from "./GooseOcclusionFader";
 import { toonMaterial, STORYBOOK_LIGHTING } from "./toonMaterial";
 
@@ -61,11 +61,14 @@ export class Game {
   private readonly scene = new THREE.Scene();
   private readonly sunShadow = new ViewSunShadow();
   private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.1, 300);
-  private readonly overviewMode = new URLSearchParams(window.location.search).has("overview");
-  private readonly editorMode = new URLSearchParams(window.location.search).has("edit");
+  private readonly query = new URLSearchParams(window.location.search);
+  private readonly overviewMode = this.query.has("overview");
+  private readonly editorMode = this.query.has("edit");
+  private readonly devMode = this.query.has("dev");
   private readonly worldLayout = loadWorldLayout();
-  private readonly worldArea = getWorldArea(this.worldLayout);
-  private readonly rules = createCentralPlazaRules(this.worldArea);
+  private readonly startAreaId = resolveStartAreaId(this.worldLayout, this.devMode, this.query.get("start"));
+  private worldArea = getWorldArea(this.worldLayout, this.startAreaId);
+  private rules = createWorldRules(this.worldArea, this.worldLayout.transitions);
   private readonly world = new WorldView(this.worldArea, !this.editorMode && !this.overviewMode);
   private readonly goose = new Goose();
   private readonly gazeRay = new THREE.Raycaster();
@@ -77,17 +80,13 @@ export class Game {
   private readonly input: InputController;
   private readonly clock = new THREE.Clock();
   private readonly velocity = new THREE.Vector3();
-  private readonly simulation = new Simulation(this.rules);
+  private simulation = new Simulation(this.rules);
   private readonly audio = new GameAudio();
   private readonly moveDirection = new THREE.Vector3();
   private readonly cameraForward = new THREE.Vector3();
   private readonly cameraRight = new THREE.Vector3();
   // Equal ground axes give a 45° diagonal; √2 vertical keeps a 45° downward pitch.
-  private readonly cameraOffset = new THREE.Vector3(
-    -CAMERA_AXIS_OFFSET,
-    CAMERA_AXIS_OFFSET * Math.SQRT2,
-    -CAMERA_AXIS_OFFSET,
-  );
+  private readonly cameraOffset = new THREE.Vector3();
   private readonly cameraFocus = new THREE.Vector3();
   private readonly desiredCameraFocus = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
@@ -113,6 +112,8 @@ export class Game {
   private touchPreference: TouchControlsPreference = "auto";
   private coarseTouchDevice = window.matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints > 0;
   private disposed = false;
+  private transitioning = false;
+  private readonly transitionCurtain: HTMLDivElement;
   private lastInputTime = performance.now();
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private readonly canvasResizeObserver: ResizeObserver;
@@ -130,9 +131,18 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.BasicShadowMap;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.transitionCurtain = document.createElement("div");
+    this.transitionCurtain.className = "area-transition-curtain";
+    document.querySelector("#game-shell")?.append(this.transitionCurtain);
 
     this.scene.background = new THREE.Color(PALETTE.atmosphere.sky);
     this.scene.add(this.world, this.goose);
+    if (this.devMode) {
+      const banner = document.createElement("div");
+      banner.className = "dev-mode-banner";
+      banner.textContent = `DEV START · ${this.worldArea.label}`;
+      document.querySelector("#game-shell")?.append(banner);
+    }
     this.syncPlayerView();
     this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket());
     this.renderObjectives();
@@ -145,7 +155,7 @@ export class Game {
       this.camera.position.set(-37, 58, -65);
       this.camera.lookAt(0, 0, 0);
       this.goose.visible = false;
-      new WorldEditor(this.scene, this.camera, canvas, this.worldLayout, this.world);
+      new WorldEditor(this.scene, this.camera, canvas, this.worldLayout, this.world, this.startAreaId);
     }
 
     if (this.overviewMode && !this.editorMode) {
@@ -191,6 +201,13 @@ export class Game {
   private readonly animate = (): void => {
     let delta = Math.min(this.clock.getDelta(), 8 / 60);
     if (this.paused) delta = 0;
+
+    if (this.transitioning) {
+      this.world.updatePresentation(delta);
+      this.sunShadow.update(this.camera);
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
 
     if (this.editorMode || this.overviewMode) {
       this.world.updatePresentation(delta);
@@ -238,6 +255,10 @@ export class Game {
         if (event.type === "goose-shooed") this.goose.spook();
         if ((event.type === "entity-grabbed" || event.type === "entity-dropped") && event.actorId === "goose") this.goose.grab();
         if (event.type === "objective-completed") this.renderObjectives();
+        if (event.type === "area-transition-requested") {
+          this.beginAreaTransition(event);
+          return;
+        }
       }
     }
 
@@ -264,6 +285,39 @@ export class Game {
     this.renderer.render(this.scene, this.camera);
   };
 
+  private beginAreaTransition(event: Extract<GameplayEvent, { type: "area-transition-requested" }>): void {
+    if (this.transitioning) return;
+    const nextArea = this.worldLayout.areas.find((area) => area.id === event.toAreaId);
+    if (!nextArea) return;
+    this.transitioning = true;
+    this.input.clear();
+    this.simulation.suspend();
+    this.transitionCurtain.classList.remove("area-transition-curtain--revealing");
+    this.transitionCurtain.classList.add("area-transition-curtain--covered");
+    window.setTimeout(() => {
+      if (this.disposed) return;
+      const sessionState = this.simulation.sessionState;
+      this.worldArea = nextArea;
+      this.rules = createWorldRules(this.worldArea, this.worldLayout.transitions);
+      this.simulation = new Simulation(this.rules, sessionState);
+      this.simulation.setPlayerTransform(event.targetPosition, event.targetHeading);
+      this.world.applyArea(this.worldArea);
+      this.velocity.set(0, 0, 0);
+      this.syncPlayerView();
+      this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket());
+      this.syncPoopViews();
+      this.renderObjectives();
+      this.snapCameraToGoose();
+      this.transitionCurtain.classList.remove("area-transition-curtain--covered");
+      this.transitionCurtain.classList.add("area-transition-curtain--revealing");
+      window.setTimeout(() => {
+        this.transitionCurtain.classList.remove("area-transition-curtain--revealing");
+        this.transitioning = false;
+        this.clock.getDelta();
+      }, 220);
+    }, 180);
+  }
+
   private updateCamera(delta: number): void {
     const leadSeconds = this.reducedMotion ? 0 : CAMERA_LEAD_SECONDS;
     this.desiredCameraFocus
@@ -273,7 +327,7 @@ export class Game {
 
     const cameraDamping = 1 - Math.exp(-(this.reducedMotion ? 12 : 6.3) * delta);
     this.cameraFocus.lerp(this.desiredCameraFocus, cameraDamping);
-    this.camera.position.copy(this.cameraFocus).add(this.cameraOffset);
+    this.camera.position.copy(this.cameraFocus).add(this.getCameraOffset());
     this.camera.lookAt(this.cameraFocus);
   }
 
@@ -281,8 +335,18 @@ export class Game {
     this.cameraFocus.copy(this.goose.position);
     this.cameraFocus.y = this.goose.position.y + CAMERA_FOCUS_HEIGHT;
     this.desiredCameraFocus.copy(this.cameraFocus);
-    this.camera.position.copy(this.cameraFocus).add(this.cameraOffset);
+    this.camera.position.copy(this.cameraFocus).add(this.getCameraOffset());
     this.camera.lookAt(this.cameraFocus);
+  }
+
+  private getCameraOffset(): THREE.Vector3 {
+    const reversed = this.worldArea.id === COFFEE_SHOP_AREA_ID;
+    this.cameraOffset.set(
+      reversed ? CAMERA_AXIS_OFFSET : -CAMERA_AXIS_OFFSET,
+      CAMERA_AXIS_OFFSET * Math.SQRT2,
+      reversed ? CAMERA_AXIS_OFFSET : -CAMERA_AXIS_OFFSET,
+    );
+    return this.cameraOffset;
   }
 
   private syncPlayerView(): void {

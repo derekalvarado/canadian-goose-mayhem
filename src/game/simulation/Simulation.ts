@@ -25,11 +25,14 @@ export interface CleanupDefinition {
 }
 export interface WorldEntityDefinition {
   readonly id: string; readonly label: string; readonly position: Readonly<Position>; readonly heading?: number;
+  /** Optional catalog ID used by presentation when a carryable crosses an area boundary. */
+  readonly assetId?: string;
   readonly active?: boolean; readonly controller?: ControllerDefinition; readonly carryable?: CarryableDefinition;
   readonly cleanup?: CleanupDefinition;
 }
 export interface WorldEntityState {
   readonly id: string; readonly label: string; readonly position: Readonly<Position>; readonly heading: number;
+  readonly assetId?: string;
   readonly active?: boolean; readonly holderId?: string; readonly containedBy?: string; readonly serviceCount: number;
 }
 export type CleanupPhase = "trash" | "litter";
@@ -67,6 +70,14 @@ export interface SplashKidState {
   readonly activity: SplashKidActivity; readonly activitySecondsRemaining: number;
 }
 export interface ObjectiveZoneDefinition { readonly id: string; readonly position: Readonly<Position>; readonly radius: number; readonly factId: string; readonly guardedBy?: string }
+export interface AreaTransitionDefinition {
+  readonly id: string;
+  readonly toAreaId: string;
+  readonly triggerPosition: Readonly<Position>;
+  readonly triggerRadius: number;
+  readonly targetPosition: Readonly<Position>;
+  readonly targetHeading: number;
+}
 export interface WorldSnapshot {
   readonly player: PlayerState; readonly entities: readonly WorldEntityState[];
   readonly janitor?: JanitorState; readonly splashKids: readonly SplashKidState[]; readonly durableFacts: readonly string[];
@@ -83,14 +94,37 @@ export type GameplayEvent =
   | { readonly type: "janitor-fumbled"; readonly actorId: string; readonly entityId: string }
   | { readonly type: "goose-shooed"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "splash-kid-frightened"; readonly actorId: string; readonly position: Readonly<Position> }
+  | { readonly type: "area-transition-requested"; readonly transitionId: string; readonly toAreaId: string; readonly targetPosition: Readonly<Position>; readonly targetHeading: number }
   | { readonly type: "objective-completed"; readonly objectiveId: string };
 export interface WorldRules {
+  readonly areaId?: string;
   readonly spawn: Readonly<Position>; readonly spawnHeading: number;
   readonly objectives: readonly ObjectiveDefinition<WorldSnapshot>[];
   readonly entities?: readonly WorldEntityDefinition[]; readonly janitor?: JanitorDefinition;
   readonly splashKids?: readonly SplashKidDefinition[];
   readonly objectiveZones?: readonly ObjectiveZoneDefinition[];
+  readonly transitions?: readonly AreaTransitionDefinition[];
   resolveMovement(current: Readonly<Position>, proposed: Readonly<Position>, output: Position): void;
+}
+
+export interface SimulationAreaState {
+  readonly areaId: string;
+  readonly entities: readonly SimulationEntityState[];
+}
+export interface SimulationEntityState {
+  readonly id: string;
+  readonly definition: WorldEntityDefinition;
+  readonly position: Readonly<Position>;
+  readonly heading: number;
+  readonly active?: boolean;
+  readonly holderId?: string;
+  readonly containedBy?: string;
+  readonly serviceCount: number;
+}
+export interface SimulationSessionState {
+  readonly durableFacts: readonly string[];
+  /** Per-area entity snapshots let carried and dropped objects survive scene swaps. */
+  readonly areaStates?: readonly SimulationAreaState[];
 }
 
 interface MutableEntity {
@@ -133,6 +167,7 @@ export class Simulation {
   private readonly velocity: Position = { x: 0, y: 0, z: 0 };
   private readonly pushDirection: Position = { x: 0, y: 0, z: 0 };
   private readonly entitiesById = new Map<string, MutableEntity>();
+  private readonly persistedAreaStates = new Map<string, Map<string, SimulationEntityState>>();
   private readonly cleanupRoutes = new Map<CleanupRole, string[]>();
   private readonly durableFacts = new Set<string>();
   private readonly poopRecords: GoosePoop[] = [];
@@ -143,7 +178,7 @@ export class Simulation {
   private tickCount = 0; private idleSeconds = 0; private poopSequence = 0;
   private heldEntityId?: string; private spookedSeconds = 0;
 
-  constructor(rules: WorldRules) {
+  constructor(rules: WorldRules, sessionState?: SimulationSessionState) {
     this.rules = rules;
     this.objectives = new Objectives(rules.objectives);
     for (const definition of rules.entities ?? []) {
@@ -182,6 +217,7 @@ export class Simulation {
         activity: "playing", activitySecondsRemaining: 0, routeIndex: Math.min(1, definition.playRoute.length - 1) });
     }
     this.reset();
+    if (sessionState) this.restoreSessionState(sessionState);
   }
 
   get elapsed(): number { return this.tickCount * FIXED_STEP; }
@@ -201,6 +237,7 @@ export class Simulation {
       && (entity.definition.cleanup?.role === "trash-bag" || entity.definition.cleanup?.role === "litter-picker")) : undefined;
     return { player: this.player, entities: [...this.entitiesById.values()].map((entity) => ({
       id: entity.definition.id, label: entity.definition.label, position: { ...entity.position }, heading: entity.heading,
+      assetId: entity.definition.assetId,
       active: entity.active, holderId: entity.holderId, containedBy: entity.containedBy, serviceCount: entity.serviceCount,
     })), janitor: this.janitor ? { id: this.janitor.definition.id, position: { ...this.janitor.position },
       heading: this.janitor.heading, activity: this.janitor.activity,
@@ -215,6 +252,28 @@ export class Simulation {
     return this.rules.objectives.map((objective) => ({ id: objective.id, description: objective.description, completed: this.objectives.isComplete(objective.id) }));
   }
   get goosePoops(): readonly GoosePoop[] { return this.poopRecords.map((poop) => ({ id: poop.id, position: { ...poop.position } })); }
+  get sessionState(): SimulationSessionState {
+    const currentAreaId = this.rules.areaId ?? "";
+    const currentEntities = new Map<string, SimulationEntityState>();
+    for (const entity of this.entitiesById.values()) {
+      currentEntities.set(entity.definition.id, {
+        id: entity.definition.id,
+        definition: entity.definition,
+        position: { ...entity.position },
+        heading: entity.heading,
+        active: entity.active,
+        holderId: entity.holderId,
+        containedBy: entity.containedBy,
+        serviceCount: entity.serviceCount,
+      });
+    }
+    const areaStates = new Map(this.persistedAreaStates);
+    areaStates.set(currentAreaId, currentEntities);
+    return {
+      durableFacts: [...this.durableFacts],
+      areaStates: [...areaStates.entries()].map(([areaId, entities]) => ({ areaId, entities: [...entities.values()] })),
+    };
+  }
   get interactionHint(): string | undefined {
     if (this.heldEntityId) return `Drop ${this.entitiesById.get(this.heldEntityId)?.definition.label ?? "item"}`;
     const candidate = this.findInteractionCandidate();
@@ -228,6 +287,14 @@ export class Simulation {
     return candidate.definition.carryable ? `Pick up ${candidate.definition.label}` : undefined;
   }
   isObjectiveComplete(id: string): boolean { return this.objectives.isComplete(id); }
+
+  /** Repositions the player after an authored area transition without resetting the session. */
+  setPlayerTransform(position: Readonly<Position>, heading = this.rules.spawnHeading): void {
+    Object.assign(this.position, position); Object.assign(this.velocity, { x: 0, y: 0, z: 0 });
+    Object.assign(this.pushDirection, { x: 0, y: 0, z: 0 }); this.heading = heading;
+    this.turnAmount = 0; this.idleSeconds = 0; this.spookedSeconds = 0;
+    this.suspend(); this.syncOwnedEntities();
+  }
 
   /** Edges survive frames with no tick and fire once across catch-up ticks. */
   advance(delta: number, command: PlayerCommand): GameplayEvent[] {
@@ -320,6 +387,63 @@ export class Simulation {
     else { this.idleSeconds += FIXED_STEP; if (this.idleSeconds + 1e-10 >= GOOSE_POOP_IDLE_SECONDS) this.leavePoop(events); }
     this.tickCount += 1;
     for (const objectiveId of this.objectives.evaluate(this.world)) events.push({ type: "objective-completed", objectiveId });
+    for (const transition of this.rules.transitions ?? []) {
+      const crossedIntoTrigger = distance2d(this.previousPosition, transition.triggerPosition) > transition.triggerRadius
+        && distance2d(this.position, transition.triggerPosition) <= transition.triggerRadius;
+      if (crossedIntoTrigger) {
+        events.push({ type: "area-transition-requested", transitionId: transition.id, toAreaId: transition.toAreaId,
+          targetPosition: { ...transition.targetPosition }, targetHeading: transition.targetHeading });
+        break;
+      }
+    }
+  }
+
+  private restoreSessionState(state: SimulationSessionState): void {
+    for (const areaState of state.areaStates ?? []) {
+      this.persistedAreaStates.set(areaState.areaId, new Map(areaState.entities.map((entity) => [entity.id, entity])));
+    }
+    this.durableFacts.clear();
+    for (const fact of state.durableFacts) this.durableFacts.add(fact);
+    const currentAreaId = this.rules.areaId ?? "";
+    const currentEntities = this.persistedAreaStates.get(currentAreaId) ?? new Map<string, SimulationEntityState>();
+    this.persistedAreaStates.set(currentAreaId, currentEntities);
+
+    // A goose-held item belongs to the area it is entering. Move it out of the
+    // source area's snapshot so dropping it there later does not duplicate it.
+    for (const [areaId, entities] of this.persistedAreaStates) {
+      if (areaId === currentAreaId) continue;
+      for (const [entityId, entity] of entities) {
+        if (entity.holderId !== "goose") continue;
+        entities.delete(entityId);
+        currentEntities.set(entityId, entity);
+      }
+    }
+    for (const entityState of currentEntities.values()) {
+      let entity = this.entitiesById.get(entityState.id);
+      if (!entity) {
+        entity = {
+          definition: entityState.definition,
+          position: { ...entityState.position },
+          heading: entityState.heading,
+          active: entityState.active,
+          holderId: entityState.holderId,
+          containedBy: entityState.containedBy,
+          serviceCount: entityState.serviceCount,
+        };
+        this.entitiesById.set(entityState.id, entity);
+      } else {
+        Object.assign(entity.position, entityState.position);
+        entity.heading = entityState.heading;
+        entity.active = entityState.active;
+        entity.holderId = entityState.holderId;
+        entity.containedBy = entityState.containedBy;
+        entity.serviceCount = entityState.serviceCount;
+      }
+      if (entity.holderId === "goose") this.heldEntityId = entity.definition.id;
+    }
+    this.syncOwnedEntities();
+    // Rehydrate objective completion silently; re-entering an area must not replay a completion cue.
+    this.objectives.evaluate(this.world);
   }
 
   private resolveInteraction(events: GameplayEvent[]): void {

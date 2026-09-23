@@ -1,6 +1,6 @@
 import { getWorldAsset, type WorldAssetCollider } from "./worldAssets.ts";
-import { CENTRAL_PLAZA_AREA_ID, isWorldChunkPlayable, type WorldArea, type WorldInstance } from "./worldLayout.ts";
-import type { Position, WorldEntityDefinition, WorldRules } from "./simulation/Simulation.ts";
+import { CENTRAL_PLAZA_AREA_ID, COFFEE_SHOP_AREA_ID, isWorldChunkPlayable, type WorldArea, type WorldAreaTransition, type WorldInstance } from "./worldLayout.ts";
+import type { AreaTransitionDefinition, Position, WorldEntityDefinition, WorldRules } from "./simulation/Simulation.ts";
 
 export const WORLD_GOOSE_RADIUS = 0.34;
 export const MAX_WALKABLE_STEP = 0.22;
@@ -81,7 +81,22 @@ export function findWorldInstanceOverlaps(area: WorldArea, instanceId: string): 
     return Math.hypot(selected.transform.x - other.transform.x, selected.transform.z - other.transform.z) < (Math.hypot(asset.halfWidth, asset.halfDepth) + Math.hypot(otherAsset.halfWidth, otherAsset.halfDepth)) * 0.82;
   }).map((item) => item.id);
 }
-export function createCentralPlazaRules(area: WorldArea): WorldRules {
+function createAreaTransitions(area: WorldArea, transitions: readonly WorldAreaTransition[]): AreaTransitionDefinition[] {
+  return transitions.filter((transition) => transition.fromAreaId === area.id).map((transition) => {
+    const source = area.instances.find((instance) => instance.id === transition.fromInstanceId);
+    if (!source) throw new Error(`Transition ${transition.id} has no source instance in ${area.id}`);
+    return {
+      id: transition.id,
+      toAreaId: transition.toAreaId,
+      triggerPosition: { x: source.transform.x, y: source.transform.y, z: source.transform.z },
+      triggerRadius: transition.triggerRadius,
+      targetPosition: transition.targetPosition,
+      targetHeading: transition.targetHeading,
+    };
+  });
+}
+
+export function createCentralPlazaRules(area: WorldArea, transitions: readonly WorldAreaTransition[] = []): WorldRules {
   // Preserve usable entry points when an older authored square is restored.
   const entrance = [{ x: -24, z: -3 }, { x: 11.5, z: 10.5 }, { x: -12, z: -3 }]
     .find(point => isWorldAreaPlayable(area, point.x, point.z));
@@ -99,6 +114,7 @@ export function createCentralPlazaRules(area: WorldArea): WorldRules {
     if (!asset.activeTarget && !asset.carryable && !asset.cleanupRole && !(asset.controller && link && interactionPoint)) return [];
     return [{
       id: item.id, label: item.label, position: { x: item.transform.x, y: item.transform.y, z: item.transform.z },
+      assetId: item.assetId,
       heading: item.transform.rotationY, active: asset.activeTarget?.initialActive,
       controller: asset.controller && link && interactionPoint ? { targetId: link.targetId, interactionPoint, interactionRange: asset.controller.range } : undefined,
       carryable: asset.carryable,
@@ -145,11 +161,60 @@ export function createCentralPlazaRules(area: WorldArea): WorldRules {
     position: { x: entranceInstance.transform.x, y: entranceInstance.transform.y, z: entranceInstance.transform.z },
     radius: 0.72, factId: ENTER_SHOP_FACT_ID, guardedBy: janitorInstance?.id }] : [];
   return {
+    areaId: area.id,
     spawn: { ...entrance, y: getWorldGroundHeight(area, entrance.x, entrance.z)! }, spawnHeading: 0,
     resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); },
     entities, janitor, splashKids, objectiveZones,
-    objectives: [{ id: ENTER_SHOP_OBJECTIVE_ID, description: "Sneak into the north shop", isSatisfied: (world) => world.durableFacts.includes(ENTER_SHOP_FACT_ID) }],
+    objectives: [{ id: ENTER_SHOP_OBJECTIVE_ID, description: "Sneak into the coffee shop", isSatisfied: (world) => world.durableFacts.includes(ENTER_SHOP_FACT_ID) }],
+    transitions: createAreaTransitions(area, transitions),
   };
+}
+
+function authoredSpawn(area: WorldArea, candidates: readonly Readonly<{ x: number; z: number }>[]): Position {
+  const point = candidates.find((candidate) => isWorldAreaPlayable(area, candidate.x, candidate.z));
+  if (!point) throw new Error(`${area.label} has no clear playable spawn; add a floor and clear an entrance`);
+  return { x: point.x, y: getWorldGroundHeight(area, point.x, point.z) ?? 0, z: point.z };
+}
+
+export function createCoffeeShopRules(area: WorldArea, transitions: readonly WorldAreaTransition[] = []): WorldRules {
+  const spawn = authoredSpawn(area, [
+    { x: 0, z: 5.6 },
+    { x: 0, z: 4.4 },
+    { x: 3.2, z: 5.6 },
+    { x: -3.2, z: 5.6 },
+  ]);
+  return {
+    areaId: area.id,
+    spawn,
+    spawnHeading: Math.PI,
+    objectives: [],
+    transitions: createAreaTransitions(area, transitions),
+    resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); },
+  };
+}
+
+/** Fallback rules keep newly authored non-plaza areas testable before they gain bespoke gameplay. */
+export function createAuthoredAreaRules(area: WorldArea, transitions: readonly WorldAreaTransition[] = []): WorldRules {
+  const spawn = authoredSpawn(area, [
+    { x: 0, z: 0 },
+    { x: 0, z: 2 },
+    { x: 2, z: 0 },
+    { x: -2, z: 0 },
+  ]);
+  return {
+    areaId: area.id,
+    spawn,
+    spawnHeading: 0,
+    objectives: [],
+    transitions: createAreaTransitions(area, transitions),
+    resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); },
+  };
+}
+
+export function createWorldRules(area: WorldArea, transitions: readonly WorldAreaTransition[] = []): WorldRules {
+  if (area.id === CENTRAL_PLAZA_AREA_ID) return createCentralPlazaRules(area, transitions);
+  if (area.id === COFFEE_SHOP_AREA_ID) return createCoffeeShopRules(area, transitions);
+  return createAuthoredAreaRules(area, transitions);
 }
 
 export { CENTRAL_PLAZA_AREA_ID };

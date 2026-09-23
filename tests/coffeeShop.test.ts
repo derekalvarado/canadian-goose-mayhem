@@ -1,0 +1,142 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import * as THREE from "three";
+import { createWorldAssetView } from "../src/game/PlazaWorld.ts";
+import { OcclusionFadeGroupRegistry } from "../src/game/OcclusionFadeGroups.ts";
+import {
+  CANONICAL_WORLD_LAYOUT,
+  CENTRAL_PLAZA_AREA_ID,
+  COFFEE_SHOP_AREA_ID,
+  getWorldArea,
+  isWorldChunkPlayable,
+  resolveStartAreaId,
+} from "../src/game/worldLayout.ts";
+import { createCoffeeShopRules, createWorldRules, ENTER_SHOP_FACT_ID, ENTER_SHOP_OBJECTIVE_ID, isWorldAreaPlayable, resolveWorldAreaMovement } from "../src/game/worldLevel.ts";
+import { FIXED_STEP, Simulation } from "../src/game/simulation/Simulation.ts";
+import { AuthoredPhysicsAdapter } from "../src/game/simulation/physics.ts";
+
+test("canonical coffee shop graybox has a left-wall counter and five visual people", () => {
+  const area = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
+  const people = area.instances.filter((instance) => instance.assetId === "coffee.placeholder-person");
+  const tables = area.instances.filter((instance) => instance.assetId === "coffee.table");
+  const counter = area.instances.find((instance) => instance.id === "coffee.counter");
+
+  assert.equal(people.length, 5);
+  assert.equal(tables.length, 4);
+  assert.ok(counter);
+  assert.ok(tables.every((table) => table.transform.x > counter.transform.x));
+  assert.equal(isWorldChunkPlayable(area, 0, 0), true);
+  assert.equal(isWorldAreaPlayable(area, 0, 6.6), true, "front door opening should be walkable");
+  assert.equal(isWorldAreaPlayable(area, counter.transform.x, counter.transform.z), false, "counter should block movement");
+});
+
+test("the coffee shop portal is anchored to the southern storefront", () => {
+  const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID);
+  const entrance = plaza.instances.find((instance) => instance.id === "plaza.shop-entrance");
+  assert.ok(entrance);
+  assert.equal(entrance.label, "Coffee shop entrance");
+  assert.deepEqual(entrance.transform, { x: -10, y: 0, z: 14.22, rotationY: Math.PI });
+
+  const transitions = CANONICAL_WORLD_LAYOUT.transitions;
+  assert.deepEqual(transitions.map((transition) => transition.id), ["transition.coffee-shop.enter", "transition.coffee-shop.exit"]);
+  assert.equal(transitions[0]?.fromInstanceId, "plaza.shop-entrance");
+  assert.equal(transitions[0]?.toAreaId, COFFEE_SHOP_AREA_ID);
+  assert.equal(transitions[1]?.fromInstanceId, "coffee.front-door");
+  assert.equal(transitions[1]?.toAreaId, CENTRAL_PLAZA_AREA_ID);
+});
+
+test("coffee shop rules keep the goose inside the graybox and expose no placeholder AI", () => {
+  const area = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
+  const rules = createCoffeeShopRules(area);
+  assert.equal(rules.entities?.length ?? 0, 0);
+  assert.equal(rules.janitor, undefined);
+  assert.equal(isWorldAreaPlayable(area, rules.spawn.x, rules.spawn.z), true);
+
+  const output = { x: 0, y: 0, z: 0 };
+  resolveWorldAreaMovement(area, { x: 0, y: 0, z: -6 }, { x: 0, y: 0, z: -8 }, output);
+  assert.equal(isWorldAreaPlayable(area, output.x, output.z), true);
+  assert.ok(output.z > -7, "north wall should stop the goose before the wall center");
+  assert.equal(createWorldRules(area).objectives.length, 0);
+});
+
+test("crossing the southern storefront transitions both ways without losing the shop fact", () => {
+  const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID);
+  const coffeeShop = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
+  const plazaRules = createWorldRules(plaza, CANONICAL_WORLD_LAYOUT.transitions);
+  const plazaSimulation = new Simulation({ ...plazaRules, spawn: { x: -10, y: 0, z: 13.05 } });
+  const enterEvents = Array.from({ length: 120 }, () => plazaSimulation.advance(FIXED_STEP, { moveX: 0, moveZ: 1, hurry: false, honkPressed: false })).flat();
+  const enter = enterEvents.find((event) => event.type === "area-transition-requested");
+  assert.ok(enter && enter.type === "area-transition-requested");
+  assert.equal(enter.toAreaId, COFFEE_SHOP_AREA_ID);
+  assert.ok(plazaSimulation.sessionState.durableFacts.includes(ENTER_SHOP_FACT_ID));
+
+  const coffeeSimulation = new Simulation(createWorldRules(coffeeShop, CANONICAL_WORLD_LAYOUT.transitions), plazaSimulation.sessionState);
+  coffeeSimulation.setPlayerTransform(enter.targetPosition, enter.targetHeading);
+  const exitEvents = Array.from({ length: 120 }, () => coffeeSimulation.advance(FIXED_STEP, { moveX: 0, moveZ: 1, hurry: false, honkPressed: false })).flat();
+  const exit = exitEvents.find((event) => event.type === "area-transition-requested");
+  assert.ok(exit && exit.type === "area-transition-requested");
+  assert.equal(exit.toAreaId, CENTRAL_PLAZA_AREA_ID);
+
+  const restoredPlaza = new Simulation(plazaRules, coffeeSimulation.sessionState);
+  assert.equal(restoredPlaza.isObjectiveComplete(ENTER_SHOP_OBJECTIVE_ID), true);
+});
+
+test("a goose-held item keeps its identity across the area boundary", () => {
+  const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID);
+  const coffeeShop = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
+  const rules = createWorldRules(plaza, CANONICAL_WORLD_LAYOUT.transitions);
+  const simulation = new Simulation({ ...rules, spawn: { x: -20.5, y: 0, z: -2.25 } });
+  simulation.advance(FIXED_STEP, { moveX: 0, moveZ: 0, hurry: false, honkPressed: false, interactPressed: true });
+  assert.equal(simulation.player.heldEntityId, "plaza.beer-can");
+
+  simulation.setPlayerTransform({ x: -10, y: 0, z: 13.05 });
+  const enterEvents = Array.from({ length: 120 }, () => simulation.advance(FIXED_STEP, { moveX: 0, moveZ: 1, hurry: false, honkPressed: false })).flat();
+  const enter = enterEvents.find((event) => event.type === "area-transition-requested");
+  assert.ok(enter && enter.type === "area-transition-requested");
+
+  const coffeeSimulation = new Simulation(createWorldRules(coffeeShop, CANONICAL_WORLD_LAYOUT.transitions), simulation.sessionState);
+  assert.equal(coffeeSimulation.player.heldEntityId, "plaza.beer-can");
+  assert.equal(coffeeSimulation.world.entities.find((entity) => entity.id === "plaza.beer-can")?.holderId, "goose");
+  assert.equal(coffeeSimulation.world.entities.find((entity) => entity.id === "plaza.beer-can")?.assetId, "prop.beer-can");
+});
+
+test("coffee shop is the default start while developer overrides remain available", () => {
+  const layout = CANONICAL_WORLD_LAYOUT;
+  assert.equal(resolveStartAreaId(layout, false), COFFEE_SHOP_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, false, "missing-area"), COFFEE_SHOP_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, true), COFFEE_SHOP_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, true, COFFEE_SHOP_AREA_ID), COFFEE_SHOP_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, true, "coffee-shop"), COFFEE_SHOP_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, true, "old-town-square.central-plaza"), "old-town-square.central-plaza");
+  assert.equal(resolveStartAreaId(layout, true, "missing-area"), COFFEE_SHOP_AREA_ID);
+});
+
+test("authored physics spike maps stable colliders and supports fixed-step body queries", () => {
+  const area = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
+  const physics = new AuthoredPhysicsAdapter(area);
+  physics.createBody({ id: "coffee.test-mug", type: "dynamic", position: { x: 0, y: 0.8, z: 4 }, radius: 0.1 });
+  physics.applyImpulse("coffee.test-mug", { x: 1, y: 0, z: 0 });
+  physics.step(1 / 60);
+  assert.ok((physics.snapshot()[0]?.position.x ?? 0) > 0);
+  assert.ok(physics.overlapCircle({ x: -7.25, y: 0, z: -1 }, 0.2).includes("coffee.counter"));
+
+  const hit = physics.sweepCircle({ x: 0, y: 0, z: 4 }, { x: 0, y: 0, z: -6.5 }, 0.34, "coffee.test-mug");
+  assert.equal(hit?.bodyId, "coffee.wall-north");
+});
+
+test("coffee graybox assets render with the shared toon material", () => {
+  const ids = [
+    "coffee.shop-floor", "coffee.wall-long", "coffee.wall-side", "coffee.wall-door-wing", "coffee.front-door",
+    "coffee.wall-board", "coffee.counter", "coffee.table", "coffee.chair", "coffee.placeholder-person",
+  ];
+  for (const assetId of ids) {
+    const view = createWorldAssetView(assetId, new OcclusionFadeGroupRegistry(), `test.${assetId}`);
+    let meshCount = 0;
+    view.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      meshCount += 1;
+      assert.ok(object.material instanceof THREE.MeshToonMaterial, `${assetId} should use toon materials`);
+    });
+    assert.ok(meshCount > 0, `${assetId} should render geometry`);
+  }
+});

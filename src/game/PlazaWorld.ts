@@ -477,6 +477,137 @@ function createShopEntranceMarker(): THREE.Group {
   mat.position.y = 0.013; mat.userData.gameplayMarker = "shop-entrance"; group.add(mat); return group;
 }
 
+function registerCoffeeOcclusion(group: THREE.Group, groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
+  groups.register(instanceId, group);
+  return group;
+}
+
+function createCoffeeFloor(): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop graybox floor";
+  group.add(box(18, 0.14, 14, PALETTE.coffee.floor, 0, -0.07, 0));
+  for (const z of [-5.8, -3.2, -0.6, 2, 4.6] as const) {
+    group.add(box(17.6, 0.025, 0.045, PALETTE.coffee.floorLight, 0, 0.012, z));
+  }
+  return group;
+}
+
+function createCoffeeWallLong(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop long wall";
+  group.add(
+    box(17.6, 2.8, 0.36, PALETTE.coffee.brick, 0, 1.4, 0),
+    box(17.8, 0.18, 0.42, PALETTE.coffee.brickDark, 0, 2.78, 0),
+    box(17.8, 0.18, 0.42, PALETTE.coffee.brickDark, 0, 0.18, 0),
+  );
+  return registerCoffeeOcclusion(group, groups, instanceId);
+}
+
+function createCoffeeWallSide(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop side wall";
+  group.add(
+    box(0.36, 2.8, 13.6, PALETTE.coffee.brick, 0, 1.4, 0),
+    box(0.42, 0.18, 13.8, PALETTE.coffee.brickDark, 0, 2.78, 0),
+    box(0.42, 0.18, 13.8, PALETTE.coffee.brickDark, 0, 0.18, 0),
+  );
+  return registerCoffeeOcclusion(group, groups, instanceId);
+}
+
+function createCoffeeDoorWing(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop front wall wing";
+  group.add(
+    box(7, 2.8, 0.36, PALETTE.coffee.brick, 0, 1.4, 0),
+    box(7.2, 0.18, 0.42, PALETTE.coffee.brickDark, 0, 2.78, 0),
+    box(7.2, 0.18, 0.42, PALETTE.coffee.brickDark, 0, 0.18, 0),
+  );
+  return registerCoffeeOcclusion(group, groups, instanceId);
+}
+
+function createCoffeeFrontDoor(): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop front door graybox";
+  group.add(
+    box(0.18, 2.6, 0.18, PALETTE.coffee.metal, -1.7, 1.3, 0),
+    box(0.18, 2.6, 0.18, PALETTE.coffee.metal, 1.7, 1.3, 0),
+    box(3.55, 0.18, 0.18, PALETTE.coffee.metal, 0, 2.58, 0),
+  );
+  const glass = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(3.25, 2.2, 0.035), toonMaterial(PALETTE.plaza.window, { transparent: true, opacity: 0.35 })), false, false);
+  glass.position.set(0, 1.15, -0.01);
+  group.add(glass);
+  const threshold = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.025, 0.78), toonMaterial(PALETTE.earth.pathShade)), false, true);
+  threshold.position.y = 0.014;
+  group.add(threshold);
+  return group;
+}
+
+function createCoffeeWallBoard(): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop menu board";
+  group.add(
+    box(3.2, 1.55, 0.1, PALETTE.coffee.chalkboard, 0, 1.85, 0),
+    box(3.35, 0.08, 0.16, PALETTE.coffee.counterTop, 0, 2.67, 0),
+    box(3.35, 0.08, 0.16, PALETTE.coffee.counterTop, 0, 1.03, 0),
+    box(0.08, 1.7, 0.16, PALETTE.coffee.counterTop, -1.62, 1.85, 0),
+    box(0.08, 1.7, 0.16, PALETTE.coffee.counterTop, 1.62, 1.85, 0),
+  );
+  for (const [width, y] of [[1.45, 2.22], [1.05, 1.88], [1.28, 1.54]] as const) {
+    group.add(box(width, 0.045, 0.018, PALETTE.accent.cream, -0.2, y, -0.065));
+  }
+  return group;
+}
+
+function createCoffeeCounter(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop counter graybox";
+  group.add(
+    box(6.2, 1.05, 1.35, PALETTE.coffee.counter, 0, 0.525, 0),
+    box(6.45, 0.18, 1.55, PALETTE.coffee.counterTop, 0, 1.14, 0),
+    box(5.9, 0.08, 0.08, PALETTE.accent.cream, 0, 1.26, -0.7),
+  );
+  const register = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.34, 0.32), toonMaterial(PALETTE.coffee.metal)));
+  register.position.set(1.85, 1.38, -0.1);
+  group.add(register);
+  return registerCoffeeOcclusion(group, groups, instanceId);
+}
+
+function createCoffeeTable(): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop table graybox";
+  group.add(
+    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.1, 16), toonMaterial(PALETTE.coffee.counterTop))),
+    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 0.72, 10), toonMaterial(PALETTE.coffee.metal))),
+    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.06, 12), toonMaterial(PALETTE.coffee.metal))),
+  );
+  (group.children[0] as THREE.Mesh).position.y = 0.78;
+  (group.children[1] as THREE.Mesh).position.y = 0.39;
+  (group.children[2] as THREE.Mesh).position.y = 0.04;
+  return group;
+}
+
+function createCoffeeChair(): THREE.Group {
+  const group = new THREE.Group(); group.name = "coffee shop chair graybox";
+  group.add(
+    box(0.56, 0.1, 0.56, PALETTE.coffee.chair, 0, 0.48, 0),
+    box(0.56, 0.66, 0.1, PALETTE.coffee.chair, 0, 0.8, 0.22),
+  );
+  for (const x of [-0.2, 0.2] as const) group.add(box(0.08, 0.44, 0.08, PALETTE.coffee.metal, x, 0.26, -0.16));
+  return group;
+}
+
+function createCoffeePlaceholderPerson(instanceId: string): THREE.Group {
+  const group = new THREE.Group();
+  const isBarista = instanceId.includes("barista");
+  const colors = [PALETTE.coffee.personBlue, PALETTE.coffee.personCoral, PALETTE.coffee.personGold, PALETTE.coffee.personSage];
+  const hash = [...instanceId].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  const shirtColor = isBarista ? PALETTE.coffee.apron : colors[hash % colors.length];
+  const body = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.72, 8), toonMaterial(shirtColor)));
+  body.position.y = 0.58;
+  const head = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), toonMaterial(PALETTE.coffee.skin)));
+  head.position.y = 1.14;
+  const hair = finishMesh(new THREE.Mesh(new THREE.SphereGeometry(0.225, 12, 6), toonMaterial(PALETTE.coffee.hair)));
+  hair.scale.set(1, 0.55, 1);
+  hair.position.set(0, 1.29, 0.01);
+  group.add(body, head, hair);
+  if (isBarista) group.add(box(0.34, 0.5, 0.035, PALETTE.coffee.counterTop, 0, 0.64, -0.27));
+  group.userData.placeholderCharacter = true;
+  group.name = isBarista ? "placeholder barista" : "placeholder coffee shop customer";
+  return group;
+}
+
 function createPlaySculptures(): THREE.Group {
   const group = new THREE.Group();
   const sculptureMaterial = toonMaterial(PALETTE.plaza.concreteShade);
@@ -1083,6 +1214,16 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.paving-base": return createOldTownPaving();
     case "plaza.paving-patch": return createOldTownPaving(4, 4);
     case "plaza.paving-patch-large": return createOldTownPaving(8, 8);
+    case "coffee.shop-floor": return createCoffeeFloor();
+    case "coffee.wall-long": return createCoffeeWallLong(groups, instanceId);
+    case "coffee.wall-side": return createCoffeeWallSide(groups, instanceId);
+    case "coffee.wall-door-wing": return createCoffeeDoorWing(groups, instanceId);
+    case "coffee.front-door": return createCoffeeFrontDoor();
+    case "coffee.wall-board": return createCoffeeWallBoard();
+    case "coffee.counter": return createCoffeeCounter(groups, instanceId);
+    case "coffee.table": return createCoffeeTable();
+    case "coffee.chair": return createCoffeeChair();
+    case "coffee.placeholder-person": return createCoffeePlaceholderPerson(instanceId);
     case "street.sidewalk-tile": return createStreetTile(PALETTE.plaza.concrete, 0);
     case "street.road-tile": return createStreetTile(PALETTE.stone.dark, -0.15);
     case "street.curb-straight": return createStraightCurb();
