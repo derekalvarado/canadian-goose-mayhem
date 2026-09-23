@@ -250,12 +250,15 @@ function createJanitorClips(bind: ReadonlyMap<string, THREE.Vector3>): THREE.Ani
     rotation("left_shoulder", inspectTimes, [[0, 0, 0], [-0.18, 0, -0.08], [-0.24, 0, -0.12], [-0.16, 0, -0.07], [0, 0, 0]]),
     rotation("right_shoulder", inspectTimes, [[0, 0, 0], [-0.18, 0, 0.08], [-0.24, 0, 0.12], [-0.16, 0, 0.07], [0, 0, 0]]),
   ]);
-  const scratchTimes = [0, 0.22, 0.5, 0.78, 1.06, 1.3];
+  // Hand on the side of the cap, elbow up and out; poses solved against the rig.
+  const scratchTimes = [0, 0.24, 0.38, 0.52, 0.66, 0.8, 0.94, 1.3];
+  const reach: Point = [2.13, 0.8, 0.32];
   const scratch = new THREE.AnimationClip("scratch", 1.3, [
-    rotation("head", scratchTimes, [[0, 0, 0], [0, -0.18, 0.08], [-0.05, -0.25, 0.1], [0, 0.2, -0.06], [-0.04, -0.18, 0.08], [0, 0, 0]]),
-    rotation("right_shoulder", scratchTimes, [[0, 0, 0], [1.28, 0.15, 0.48], [1.38, 0.2, 0.55], [1.3, 0.12, 0.48], [1.38, 0.2, 0.55], [0, 0, 0]]),
-    rotation("right_elbow", scratchTimes, [[0, 0, 0], [1.18, 0, 0], [1.34, 0, 0], [1.16, 0, 0], [1.34, 0, 0], [0, 0, 0]]),
-    rotation("right_wrist", scratchTimes, [[0, 0, 0], [0.2, 0, 0.1], [0.3, 0, -0.1], [0.16, 0, 0.12], [0.3, 0, -0.1], [0, 0, 0]]),
+    rotation("head", scratchTimes, [[0, 0, 0], [0.04, -0.14, -0.1], [0.06, -0.18, -0.12], [0.04, -0.14, -0.1], [0.06, -0.18, -0.12], [0.04, -0.14, -0.1], [0.05, -0.16, -0.11], [0, 0, 0]]),
+    rotation("chest", scratchTimes, [[0, 0, 0], [0, -0.06, 0.05], [0, -0.06, 0.05], [0, -0.06, 0.05], [0, -0.06, 0.05], [0, -0.06, 0.05], [0, -0.06, 0.05], [0, 0, 0]]),
+    rotation("right_shoulder", scratchTimes, [[0, 0, 0], reach, reach, reach, reach, reach, reach, [0, 0, 0]]),
+    rotation("right_elbow", scratchTimes, [[0, 0, 0], [1.24, 0, 0], [1.34, 0, 0], [1.18, 0, 0], [1.34, 0, 0], [1.18, 0, 0], [1.28, 0, 0], [0, 0, 0]]),
+    rotation("right_wrist", scratchTimes, [[0, 0, 0], [0.09, 0, -0.54], [0.4, 0, -0.5], [-0.2, 0, -0.58], [0.4, 0, -0.5], [-0.2, 0, -0.58], [0.1, 0, -0.54], [0, 0, 0]]),
   ]);
   return [idle, look, walkClip("walk", JANITOR_WALK, bind), walkClip("chase", JANITOR_CHASE, bind), shoo, inspect, scratch];
 }

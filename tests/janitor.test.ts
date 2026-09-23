@@ -115,12 +115,16 @@ test("exported clips bend knees and elbows the anatomical way", async () => {
   }
 });
 
-test("janitor chases with the chase clip and works with the walk clip", async () => {
+test("janitor stomps when chasing or recovering a stolen tool, and walks otherwise", async () => {
   const source = await loadJanitor();
   const view = new JanitorView(async () => source);
   await view.ready;
   view.setActivity("chasing-goose");
   assert.equal(view.activeClip, "chase");
   view.setActivity("walking-to-trash");
+  assert.equal(view.activeClip, "walk");
+  view.setActivity("retrieving-tool", true);
+  assert.equal(view.activeClip, "chase");
+  view.setActivity("retrieving-tool");
   assert.equal(view.activeClip, "walk");
 });

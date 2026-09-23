@@ -204,3 +204,4 @@ export const JANITOR_FURIOUS_STOMP: WalkStyle = {
 /** Chasing the goose: the furious stomp with quicker legs, same stride. */
 export const JANITOR_CHASE: WalkStyle = paced(JANITOR_FURIOUS_STOMP, 3 / JANITOR_FURIOUS_STOMP.speed);
 
+

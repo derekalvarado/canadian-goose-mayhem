@@ -33,7 +33,7 @@ export const VARIANTS: Variant[] = [
   },
   {
     name: "In game: chase", group: "chase", travelSpeed: JANITOR_CHASE.speed, clip: inGame("chase"),
-    notes: "Furious stomp with quicker legs at 3 m/s, used while chasing the goose or a stolen tool.",
+    notes: "Furious stomp with quicker legs at 3 m/s, used while chasing the goose or dashing back to a stolen tool.",
   },
   ...(["shoo", "inspect", "scratch", "look", "idle"] as const).map((name): Variant => ({
     name: `In game: ${name}`, group: "react", clip: inGame(name),
