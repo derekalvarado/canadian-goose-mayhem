@@ -93,7 +93,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
     { shape: "circle", x: 1.3, z: 0, radius: 0.92 },
   ] },
   { assetId: "plaza.pavilion-stage", label: "Stage and pavilion", category: "landmark", halfWidth: 7.4, halfDepth: 2.75, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 6.8, halfDepth: 2.25 }], occludesCamera: true },
-  { assetId: "plaza.cafe-table-set", label: "Café table set", category: "furniture", halfWidth: 1.25, halfDepth: 1.25, colliders: [{ shape: "circle", x: 0, z: 0, radius: 1.18 }] },
+  { assetId: "plaza.cafe-table-set", label: "Café table set", category: "furniture", halfWidth: 1.0, halfDepth: 0.44, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.96, halfDepth: 0.4 }] },
   { assetId: "street.trash-can", label: "Trash can", category: "furniture", halfWidth: 0.46, halfDepth: 0.46, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.46 }], cleanupRole: "trash-can", cleanupRange: 1.2 },
   { assetId: "plaza.street-janitor", label: "Street janitor", category: "character", halfWidth: 0.72, halfDepth: 0.72, colliders: [], warnForOverlap: false, gameplayRole: "janitor" },
   { assetId: "plaza.splash-kid-runner", label: "Splash-pad kid — runner", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },

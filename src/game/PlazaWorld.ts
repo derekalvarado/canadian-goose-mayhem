@@ -1,5 +1,6 @@
 import { createGasMeterBank } from "./GasMeterBankView.ts";
 import { createCoffeeChair, createCoffeeTable } from "./CoffeeFurnitureView.ts";
+import { createBistroSet } from "./PlazaBistroView.ts";
 import { createOldTownPaving, createTownBench, createTownBed, createTownLamp, createTownLights, createTownFireplace, createTownStage, createTownBlock, createTownInlay } from "./OldTownViews.ts";
 import * as THREE from "three";
 import { JanitorView } from "./JanitorView.ts";
@@ -1050,41 +1051,6 @@ function createTree(id: string, x: number, z: number, height: number, groups: Oc
   return group;
 }
 
-function createCafeTable(): THREE.Group {
-  const group = new THREE.Group();
-  const metal = toonMaterial(PALETTE.plaza.awningBlue);
-  group.add(
-    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.72, 10), metal)),
-    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.08, 12), metal)),
-  );
-  const stem = group.children[0] as THREE.Mesh;
-  stem.position.set(0, 0.36, 0);
-  const foot = group.children[1] as THREE.Mesh;
-  foot.position.set(0, 0.06, 0);
-  const top = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.1, 18), metal));
-  top.position.set(0, 0.76, 0);
-  group.add(top);
-  const topInset = finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.025, 18), toonMaterial(PALETTE.plaza.awningGreen)), false);
-  topInset.position.set(0, 0.82, 0);
-  group.add(topInset);
-  for (let index = 0; index < 3; index += 1) {
-    const angle = index / 3 * Math.PI * 2;
-    const chair = new THREE.Group();
-    chair.name = "cafe chair";
-    chair.position.set(Math.cos(angle) * 0.88, 0, Math.sin(angle) * 0.88);
-    chair.rotation.y = -angle;
-    chair.add(
-      box(0.52, 0.11, 0.52, PALETTE.plaza.awningBlue, 0, 0.48, 0),
-      box(0.52, 0.62, 0.1, PALETTE.plaza.awningBlue, 0, 0.78, 0.22),
-    );
-    for (const legX of [-0.18, 0.18] as const) {
-      chair.add(box(0.08, 0.42, 0.08, PALETTE.plaza.iron, legX, 0.26, -0.16));
-    }
-    group.add(chair);
-  }
-  return group;
-}
-
 function createPlanterCluster(): THREE.Group {
   const group = new THREE.Group();
   for (const planter of PLAZA_STATIC_COLLIDERS) {
@@ -1160,9 +1126,9 @@ export class PlazaWorld extends THREE.Group {
       "plaza.splash-pad": createSplashPad(),
       "plaza.play-area": createPlayArea(),
       "plaza.pavilion-stage": createPavilion(this.occlusionFadeGroups),
-      "plaza.cafe-table-1": createCafeTable(),
-      "plaza.cafe-table-2": createCafeTable(),
-      "plaza.cafe-table-3": createCafeTable(),
+      "plaza.cafe-table-1": createBistroSet(),
+      "plaza.cafe-table-2": createBistroSet(),
+      "plaza.cafe-table-3": createBistroSet(),
     };
     for (const id of PLAZA_GROUP_IDS) {
       const group = createEditableGroup(id, layout, contents[id]);
@@ -1221,7 +1187,7 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "gameplay.shop-entrance": return createShopEntranceMarker();
     case "plaza.play-area": return createPlayArea();
     case "plaza.pavilion-stage": return createPavilion(groups, instanceId);
-    case "plaza.cafe-table-set": return createCafeTable();
+    case "plaza.cafe-table-set": return createBistroSet();
     case "plaza.street-janitor": return new JanitorView();
     case "plaza.splash-kid-runner": return new SplashKidView("runner");
     case "plaza.splash-kid-boots": return new SplashKidView("boots");

@@ -83,6 +83,13 @@ export const PALETTE = {
     tableTop: 0x4b3428,
     tableEdge: 0x33241c,
   },
+  plazaBistro: {
+    frame: 0x2b6379,
+    frameShade: 0x21505f,
+    top: 0x327189,
+    slat: 0x2f6a80,
+    foot: 0x1b2f36,
+  },
   oldTown: {
     paving: 0xc3af98,
     pavingLight: 0xcbb9a3,
