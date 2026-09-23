@@ -18,6 +18,7 @@ const JANITOR_CLEANUP_POLISH_REVISION = 9;
 const COFFEE_SHOP_CONTENT_REVISION = 11;
 const COFFEE_SHOP_TRANSITION_CONTENT_REVISION = 12;
 const GAS_METER_CONTENT_REVISION = 13;
+const BREWERY_TANK_CONTENT_REVISION = 14;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -368,6 +369,22 @@ function addGasMeterContent(layout: WorldLayout, store?: WorldLayoutStorage): Wo
   return validated;
 }
 
+function addBreweryTankContent(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= BREWERY_TANK_CONTENT_REVISION) return layout;
+  const updated = cloneWorldLayout(layout);
+  const plaza = getWorldArea(updated);
+  if (!plaza.instances.some((item) => item.id === "oldtown.brewery-tank")) {
+    plaza.instances.push(instance("oldtown.brewery-tank", "oldtown.brewery-tank", "Brewery fermentation tank", -17.5, -14.5));
+  }
+  updated.canonicalRevision = BREWERY_TANK_CONTENT_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its brewery tank update could not be saved", error); return layout; }
+  }
+  return validated;
+}
+
 export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
   try {
     const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -381,9 +398,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store);
+    if (saved) return addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);

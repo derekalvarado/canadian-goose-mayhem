@@ -7,6 +7,31 @@ Each prop should retain an editable source or reproducible recipe alongside its
 runtime GLB, and its collision and interaction data belong in the game content —
 not in the model file.
 
+## Brewery fermentation tank
+
+`brewery_tank.glb` reproduces the mural-painted fermenter standing outside the Old
+Town brewery in the project's reference photos: a conical-bottom vessel on four
+braced legs, a shallow dome with a brass manway cap, a brass discharge valve at the
+cone tip, a short racking arm, and an iron railing ringing the base. It is **4.97 m
+wide × 4.97 m deep × 8.40 m tall** (3.6 m vessel diameter) with a ground-level
+origin on the tank axis, glTF Y-up.
+
+The mural is geometry, not a texture: irregular quilted panels are lifted ~2 cm off
+the vessel skin so the pale shell reads as the painted seams between them. Ten mural
+colors plus seven structural materials keep the runtime conversion to the shared
+toon palette (`PALETTE.breweryTank`) one mesh per material. Authored colors in the
+recipe match that palette so the Blender preview matches the game.
+
+Choose **Brewery fermentation tank** under **landmark** in the world editor (stable
+ID `oldtown.brewery-tank`). The railing ring blocks movement, and the whole tank
+fades together when it occludes the camera.
+
+Rebuild the GLB and `/private/tmp/brewery_tank_preview.png` from the repository root:
+
+```sh
+/Applications/Blender.app/Contents/MacOS/Blender --background --python assets/props/build_brewery_tank.py
+```
+
 ## Deciduous tree
 
 `deciduous_tree.glb`, `deciduous_tree_2.glb`, and `deciduous_tree_3.glb` form a

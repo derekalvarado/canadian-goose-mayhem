@@ -6,6 +6,7 @@ import { SplashKidView } from "./SplashKidView.ts";
 import { DeciduousTreeView, deciduousTreeVariantForId } from "./DeciduousTreeView.ts";
 import { Building1View } from "./Building1View.ts";
 import { TrashCanView } from "./TrashCanView.ts";
+import { BreweryTankView } from "./BreweryTankView.ts";
 import {
   FOUNTAIN_RADIUS,
   PAVILION_SIZE,
@@ -1269,6 +1270,11 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     }
     case "oldtown.stage": {
       const stage = createTownStage(); groups.register(instanceId, stage); return stage;
+    }
+    case "oldtown.brewery-tank": {
+      const tank = new BreweryTankView();
+      groups.register(instanceId, tank);
+      return tank;
     }
     case "oldtown.oval-inlay": return createTownInlay();
     case "oldtown.bench": return createTownBench();

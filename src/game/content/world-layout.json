@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 13,
+  "canonicalRevision": 14,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -886,6 +886,17 @@
             "x": 23,
             "y": 0,
             "z": 9,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "oldtown.brewery-tank",
+          "assetId": "oldtown.brewery-tank",
+          "label": "Brewery fermentation tank",
+          "transform": {
+            "x": -17.5,
+            "y": 0,
+            "z": -14.5,
             "rotationY": 0
           }
         },
