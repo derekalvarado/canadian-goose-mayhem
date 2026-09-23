@@ -106,6 +106,9 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 - `src/game/GooseAnimation.ts` — presentation-only gait phase and blend state
 - `src/game/GooseModel.ts` — bootstrap goose geometry and original prototype animation recipe
 - `src/game/SplashKidModel.ts` — reproducible low-detail child rigs with flat arms and play/reaction clips
+- `src/game/JanitorModel.ts` — procedural janitor mesh, rig, and exported clips
+- `src/game/janitorGaits.ts` — knob-driven walk/chase gaits with leg IK that keeps stance feet planted
+- `src/dev/janitorLab/` — dev-only janitor animation lab: variants, lab runtime, and rig helpers
 - `assets/characters/goose/goose-animated.blend` — current editable Blender character and animation source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
@@ -134,6 +137,14 @@ Open `?animation` for the close-up goose movement studio: walk/hurry, threat/sne
 wingbeats, honk/grab/startle, moving head target, slow motion, and frame stepping.
 See the [goose authoring workflow](assets/characters/goose/README.md) for Blender
 editing/export and the remaining limits of foot contact at the current game speed.
+
+Open `/assets/characters/janitor/anim-lab.html` (with `npm run dev`) for the janitor
+animation lab: clip variants side by side with the shipped clips, game-camera, side,
+and front views, frame stepping, and a treadmill floor that shows foot sliding. It
+builds the rig from source, so edits to `src/dev/janitorLab/variants.ts` or
+`JanitorModel.ts` reload in about a second. Use `?group=chase&zoom` to open a tab
+close up. New character animation is prototyped in a lab like this before it ships;
+see [AGENTS.md](AGENTS.md#prototyping-character-animation).
 
 ## Coffee shop graybox
 
