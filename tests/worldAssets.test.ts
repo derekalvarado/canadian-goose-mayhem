@@ -157,3 +157,18 @@ test("coffee shop chairs stand on four legs and the square tables fit their foot
     assert.ok(bounds.min.y > -0.01 && bounds.max.y < 1.1, `${assetId} height`);
   }
 });
+
+test("plaza bistro sets pair a square folding table with two facing chairs inside their footprint", () => {
+  const asset = getWorldAsset("plaza.cafe-table-set");
+  assert.ok(asset);
+  const view = createWorldAssetView("plaza.cafe-table-set", new OcclusionFadeGroupRegistry(), "test.bistro");
+  const chairs: THREE.Object3D[] = [];
+  view.traverse((object) => { if (object.name === "plaza folding bistro chair") chairs.push(object); });
+  assert.equal(chairs.length, 2);
+  assert.ok(chairs[0].position.x * chairs[1].position.x < 0, "chairs sit on opposite sides of the table");
+
+  const bounds = new THREE.Box3().setFromObject(view);
+  assert.ok(bounds.max.x <= asset.halfWidth + 0.01 && bounds.min.x >= -asset.halfWidth - 0.01, "width");
+  assert.ok(bounds.max.z <= asset.halfDepth + 0.01 && bounds.min.z >= -asset.halfDepth - 0.01, "depth");
+  assert.ok(bounds.min.y > -0.03 && bounds.max.y < 1.1, "height");
+});
