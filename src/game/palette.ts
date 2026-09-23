@@ -67,7 +67,6 @@ export const PALETTE = {
     counterTop: 0x8b5b3d,
     metal: 0x455055,
     chalkboard: 0x29343a,
-    chair: 0x37434b,
     apron: 0x356b59,
     personBlue: 0x47758b,
     personCoral: 0xc56b57,
@@ -75,6 +74,14 @@ export const PALETTE = {
     personSage: 0x6d8d6a,
     skin: 0xe0aa7b,
     hair: 0x3a302b,
+  },
+  coffeeFurniture: {
+    frame: 0x24282b,
+    foot: 0x161a1c,
+    seat: 0x6a4a32,
+    seatLight: 0x80603f,
+    tableTop: 0x4b3428,
+    tableEdge: 0x33241c,
   },
   oldTown: {
     paving: 0xc3af98,
