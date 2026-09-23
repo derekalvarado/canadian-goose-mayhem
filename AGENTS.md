@@ -88,3 +88,36 @@ worked example).
    temporary close-up page that imports the builder for detail (delete it before
    committing). If the dev server redirects every page to the game, unregister the
    offline service worker in that browser first.
+
+## Prototyping character animation
+
+Iterate on character clips and character meshes in a lab page before changing what
+the game plays. The janitor lab (`/assets/characters/janitor/anim-lab.html`, source in
+`src/dev/janitorLab/`) is the reference implementation; the goose has its own
+`?animation` studio. Give other characters a lab in the same shape when they need
+animation work.
+
+1. **Build from source, not the export.** A lab builds the rig from the character's
+   `*Model.ts` so edits hot-reload in about a second with no `npm run assets:*` step.
+   Keep lab code under `src/dev/` so `tsc` checks it; it is not a production entry.
+2. **Compare side by side.** Show 2–3 variants next to the clip the game ships
+   today, each with a game-camera view plus orthographic side and front views, frame
+   stepping, slow motion, and a treadmill floor at the clip's travel speed so foot
+   sliding is visible. Label each variant with what it is trying so the user can
+   give feedback by name ("A's bounce with C's arms").
+3. **The user picks.** Present options and let the user choose and refine them;
+   do not ship a clip they have not seen in the lab.
+4. **Port, then keep the lab honest.** Move the chosen clip into the model's clip
+   list, regenerate the GLB, and point the lab's "In game" cards at the exported
+   clips so later variants are compared against what actually ships.
+5. **Match locomotion to gameplay speed.** Walk-type clips must be generated for the
+   speed the simulation moves the character at (e.g. `walkSpeed`/`jogSpeed` in
+   `src/game/worldLevel.ts`); change the style and the speed together, never one
+   alone. Gait styles with leg IK live in `src/game/janitorGaits.ts`.
+6. **Respect the rig's joint directions.** For the humanoid rigs, forward is `-Z`:
+   `+x` swings a hanging limb forward and leans the spine/neck/head back, knees bend
+   with `-x`, elbows bend with `+x`, `+y` turns toward the character's left. Probe
+   an unfamiliar rig with a one-joint test pose in the lab before authoring clips,
+   and keep a regression test like the janitor's hyperextension check.
+7. **Close-up checks.** Lab pages accept `?group=<tab>&zoom&paused` so a specific
+   view can be opened in a separate tab without disturbing the user's saved settings.
