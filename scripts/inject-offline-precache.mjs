@@ -26,12 +26,12 @@ for (const path of precacheFiles) {
 const buildId = buildHash.digest("hex").slice(0, 12);
 const source = readFileSync(serviceWorkerPath, "utf8");
 
-if (!source.includes('const BUILD_ID = "__BUILD_ID__";') || !source.includes('const PRECACHE_URLS = "__PRECACHE_URLS__";')) {
+if (!source.includes('const BUILD_ID = "dev";') || !source.includes("const PRECACHE_URLS = [];")) {
   throw new Error("The service worker is missing its build-time precache placeholders.");
 }
 
 const builtServiceWorker = source
-  .replace('const BUILD_ID = "__BUILD_ID__";', `const BUILD_ID = ${JSON.stringify(buildId)};`)
-  .replace('const PRECACHE_URLS = "__PRECACHE_URLS__";', `const PRECACHE_URLS = ${JSON.stringify(precacheUrls)};`);
+  .replace('const BUILD_ID = "dev";', `const BUILD_ID = ${JSON.stringify(buildId)};`)
+  .replace("const PRECACHE_URLS = [];", `const PRECACHE_URLS = ${JSON.stringify(precacheUrls)};`);
 
 writeFileSync(serviceWorkerPath, builtServiceWorker);

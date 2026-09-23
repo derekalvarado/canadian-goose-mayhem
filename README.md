@@ -25,11 +25,12 @@ Open the local URL Vite prints in a browser.
 To test from another device on the same network, run `npm run dev:lan` and open
 the Network URL Vite prints on that device.
 
-The production build installs a service worker and precaches the game shell,
-bundles, models, audio, and public assets. After opening the deployed game once
-while online, the installed app can launch and keep running without a network
-connection. A new build is picked up automatically the next time the app is
-opened online.
+The app installs a service worker and caches the game shell, bundles, models,
+audio, and public assets. After opening the game once while online, it can launch
+and keep running without a network connection; the development origin also
+caches files as they load so it can fall back when Vite becomes unreachable. A
+phone must use HTTPS (or localhost) for service workers; plain HTTP LAN IPs
+cannot provide this browser guarantee.
 
 ## Arrange the plaza
 

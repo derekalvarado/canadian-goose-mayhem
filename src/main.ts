@@ -2,8 +2,22 @@ import "./style.css";
 import { Game } from "./game/Game";
 
 function registerOfflineServiceWorker(): void {
-  if (!import.meta.env.PROD || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
-  void navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch((error: unknown) => {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  void navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).then((registration) => {
+    const warmOfflineCache = (): void => {
+      const worker = navigator.serviceWorker.controller ?? registration.active;
+      if (!worker) return;
+      const urls = new Set<string>(["/", "/index.html", location.href]);
+      for (const entry of performance.getEntriesByType("resource")) {
+        if (entry.name.startsWith(location.origin)) urls.add(entry.name);
+      }
+      worker.postMessage({ type: "warm-cache", urls: [...urls] });
+    };
+
+    void navigator.serviceWorker.ready.then(warmOfflineCache);
+    window.addEventListener("load", warmOfflineCache, { once: true });
+    window.setTimeout(warmOfflineCache, 2000);
+  }).catch((error: unknown) => {
     console.warn("Offline support could not be enabled.", error);
   });
 }
