@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 14,
+  "canonicalRevision": 16,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -28,6 +28,16 @@
           "x": 0,
           "z": 0,
           "playable": true
+        },
+        {
+          "x": -1,
+          "z": 1,
+          "playable": false
+        },
+        {
+          "x": -2,
+          "z": 0,
+          "playable": false
         }
       ],
       "instances": [
@@ -43,35 +53,13 @@
           }
         },
         {
-          "id": "oldtown.approach.1",
-          "assetId": "plaza.paving-patch-large",
-          "label": "Entry paving",
-          "transform": {
-            "x": -29,
-            "y": 0,
-            "z": -10,
-            "rotationY": 0
-          }
-        },
-        {
-          "id": "oldtown.approach.2",
-          "assetId": "plaza.paving-patch-large",
-          "label": "Entry paving",
-          "transform": {
-            "x": -29,
-            "y": 0,
-            "z": 6,
-            "rotationY": 0
-          }
-        },
-        {
           "id": "oldtown.approach.3",
           "assetId": "plaza.paving-patch-large",
           "label": "Entry paving",
           "transform": {
-            "x": -29,
+            "x": -26.75,
             "y": 0,
-            "z": 18,
+            "z": 26,
             "rotationY": 0
           }
         },
@@ -80,7 +68,7 @@
           "assetId": "plaza.paving-patch-large",
           "label": "Entry paving",
           "transform": {
-            "x": -13,
+            "x": -11.75,
             "y": 0,
             "z": 24,
             "rotationY": 0
@@ -197,17 +185,6 @@
           }
         },
         {
-          "id": "oldtown.inlay",
-          "assetId": "oldtown.oval-inlay",
-          "label": "Oval event-space paving band",
-          "transform": {
-            "x": 1,
-            "y": 0,
-            "z": 0,
-            "rotationY": 0
-          }
-        },
-        {
           "id": "plaza.splash-pad",
           "assetId": "plaza.splash-pad",
           "label": "Vernal pool / splash pad",
@@ -223,10 +200,10 @@
           "assetId": "oldtown.stage",
           "label": "Old Town Square stage",
           "transform": {
-            "x": 20.25,
+            "x": 20,
             "y": 0,
-            "z": -1.75,
-            "rotationY": -1.1344640137963142
+            "z": 0,
+            "rotationY": -1.5707963267948966
           }
         },
         {
@@ -234,10 +211,10 @@
           "assetId": "plaza.play-area",
           "label": "Play sculptures and sitting wall",
           "transform": {
-            "x": -28,
+            "x": -32.5,
             "y": 0,
-            "z": 3,
-            "rotationY": 1.5707963267948966
+            "z": -1.25,
+            "rotationY": 4.440892098500626e-16
           }
         },
         {
@@ -245,54 +222,10 @@
           "assetId": "plaza.street-janitor",
           "label": "Street janitor",
           "transform": {
-            "x": 21.25,
+            "x": -11,
             "y": 0,
-            "z": 12.5,
-            "rotationY": -0.2617993877991497
-          }
-        },
-        {
-          "id": "plaza.splash-kid-milo",
-          "assetId": "plaza.splash-kid-runner",
-          "label": "Milo at the splash pad",
-          "transform": {
-            "x": -4.35,
-            "y": 0,
-            "z": -0.85,
-            "rotationY": -0.7
-          }
-        },
-        {
-          "id": "plaza.splash-kid-june",
-          "assetId": "plaza.splash-kid-boots",
-          "label": "June at the splash pad",
-          "transform": {
-            "x": -2.1,
-            "y": 0,
-            "z": 1.15,
-            "rotationY": 2.35
-          }
-        },
-        {
-          "id": "plaza.splash-kid-ari",
-          "assetId": "plaza.splash-kid-runner",
-          "label": "Ari at the splash pad",
-          "transform": {
-            "x": -1.8,
-            "y": 0,
-            "z": -1.2,
-            "rotationY": 1.7
-          }
-        },
-        {
-          "id": "oldtown.miller",
-          "assetId": "oldtown.miller-block",
-          "label": "Miller Block (photo interpretation)",
-          "transform": {
-            "x": 39,
-            "y": 0,
-            "z": -17.5,
-            "rotationY": -1.508996938995749
+            "z": -12.45,
+            "rotationY": 0
           }
         },
         {
@@ -300,16 +233,16 @@
           "assetId": "oldtown.coopersmith-block",
           "label": "CooperSmith’s block (photo interpretation)",
           "transform": {
-            "x": -26,
+            "x": -32,
             "y": 0,
-            "z": 18,
-            "rotationY": 3.141592653589793
+            "z": 14.75,
+            "rotationY": 2.5307274153917776
           }
         },
         {
-          "id": "oldtown.north.shop-0",
+          "id": "oldtown.southwest.shop-0",
           "assetId": "street.building1",
-          "label": "North storefront 1",
+          "label": "Southwest storefront 1",
           "transform": {
             "x": -11,
             "y": 0,
@@ -318,9 +251,9 @@
           }
         },
         {
-          "id": "oldtown.north.shop-1",
+          "id": "oldtown.southwest.shop-1",
           "assetId": "street.building3",
-          "label": "North storefront 2",
+          "label": "Southwest storefront 2",
           "transform": {
             "x": -4.1,
             "y": 0,
@@ -329,9 +262,9 @@
           }
         },
         {
-          "id": "oldtown.north.shop-2",
+          "id": "oldtown.southwest.shop-2",
           "assetId": "street.building4",
-          "label": "North storefront 3",
+          "label": "Southwest storefront 3",
           "transform": {
             "x": 2.8,
             "y": 0,
@@ -340,9 +273,9 @@
           }
         },
         {
-          "id": "oldtown.north.shop-3",
+          "id": "oldtown.southwest.shop-3",
           "assetId": "street.building2",
-          "label": "North storefront 4",
+          "label": "Southwest storefront 4",
           "transform": {
             "x": 10.1,
             "y": 0,
@@ -351,9 +284,9 @@
           }
         },
         {
-          "id": "oldtown.north.shop-4",
+          "id": "oldtown.southwest.shop-4",
           "assetId": "street.building5",
-          "label": "North storefront 5",
+          "label": "Southwest storefront 5",
           "transform": {
             "x": 17,
             "y": 0,
@@ -362,9 +295,9 @@
           }
         },
         {
-          "id": "oldtown.south.shop-0",
+          "id": "oldtown.northeast.shop-0",
           "assetId": "street.building4",
-          "label": "South storefront 1",
+          "label": "Northeast storefront 1",
           "transform": {
             "x": -10,
             "y": 0,
@@ -373,9 +306,9 @@
           }
         },
         {
-          "id": "oldtown.south.shop-1",
+          "id": "oldtown.northeast.shop-1",
           "assetId": "street.building1",
-          "label": "South storefront 2",
+          "label": "Northeast storefront 2",
           "transform": {
             "x": -2.5,
             "y": 0,
@@ -384,9 +317,9 @@
           }
         },
         {
-          "id": "oldtown.south.shop-2",
+          "id": "oldtown.northeast.shop-2",
           "assetId": "street.building2",
-          "label": "South storefront 3",
+          "label": "Northeast storefront 3",
           "transform": {
             "x": 4.6,
             "y": 0,
@@ -395,9 +328,9 @@
           }
         },
         {
-          "id": "oldtown.south.shop-3",
+          "id": "oldtown.northeast.shop-3",
           "assetId": "street.building3",
-          "label": "South storefront 4",
+          "label": "Northeast storefront 4",
           "transform": {
             "x": 11.5,
             "y": 0,
@@ -406,9 +339,9 @@
           }
         },
         {
-          "id": "oldtown.south.shop-4",
+          "id": "oldtown.northeast.shop-4",
           "assetId": "street.building1",
-          "label": "South storefront 5",
+          "label": "Northeast storefront 5",
           "transform": {
             "x": 18.2,
             "y": 0,
@@ -417,7 +350,18 @@
           }
         },
         {
-          "id": "oldtown.north.bed-0",
+          "id": "oldtown.southwest.tree-0",
+          "assetId": "nature.deciduous-tree",
+          "label": "Shade tree",
+          "transform": {
+            "x": -9,
+            "y": 0,
+            "z": -8.5,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "oldtown.southwest.bed-0",
           "assetId": "oldtown.flower-bed",
           "label": "Flower and shrub bed",
           "transform": {
@@ -428,18 +372,18 @@
           }
         },
         {
-          "id": "oldtown.north.tree-1",
-          "assetId": "oldtown.shade-tree",
-          "label": "Shade tree",
+          "id": "oldtown.southwest.bench-0",
+          "assetId": "oldtown.bench",
+          "label": "Bench facing square",
           "transform": {
-            "x": 0,
+            "x": -9,
             "y": 0,
-            "z": -8.5,
-            "rotationY": 0.7
+            "z": -6.8,
+            "rotationY": 0
           }
         },
         {
-          "id": "oldtown.north.bed-1",
+          "id": "oldtown.southwest.bed-1",
           "assetId": "oldtown.flower-bed",
           "label": "Flower and shrub bed",
           "transform": {
@@ -450,7 +394,7 @@
           }
         },
         {
-          "id": "oldtown.north.bench-1",
+          "id": "oldtown.southwest.bench-1",
           "assetId": "oldtown.bench",
           "label": "Bench facing square",
           "transform": {
@@ -461,8 +405,8 @@
           }
         },
         {
-          "id": "oldtown.north.tree-2",
-          "assetId": "oldtown.shade-tree",
+          "id": "oldtown.southwest.tree-2",
+          "assetId": "nature.deciduous-tree",
           "label": "Shade tree",
           "transform": {
             "x": 9,
@@ -472,7 +416,7 @@
           }
         },
         {
-          "id": "oldtown.north.bed-2",
+          "id": "oldtown.southwest.bed-2",
           "assetId": "oldtown.flower-bed",
           "label": "Flower and shrub bed",
           "transform": {
@@ -483,7 +427,7 @@
           }
         },
         {
-          "id": "oldtown.north.bench-2",
+          "id": "oldtown.southwest.bench-2",
           "assetId": "oldtown.bench",
           "label": "Bench facing square",
           "transform": {
@@ -494,19 +438,19 @@
           }
         },
         {
-          "id": "oldtown.north.tree-3",
-          "assetId": "oldtown.shade-tree",
+          "id": "oldtown.southwest.tree-3",
+          "assetId": "nature.deciduous-tree",
           "label": "Shade tree",
           "transform": {
-            "x": 22.25,
+            "x": 16,
             "y": 0,
-            "z": -8,
+            "z": -8.5,
             "rotationY": 0
           }
         },
         {
-          "id": "oldtown.south.tree-0",
-          "assetId": "oldtown.shade-tree",
+          "id": "oldtown.northeast.tree-0",
+          "assetId": "nature.deciduous-tree",
           "label": "Shade tree",
           "transform": {
             "x": -9,
@@ -516,7 +460,7 @@
           }
         },
         {
-          "id": "oldtown.south.bed-0",
+          "id": "oldtown.northeast.bed-0",
           "assetId": "oldtown.flower-bed",
           "label": "Flower and shrub bed",
           "transform": {
@@ -527,7 +471,7 @@
           }
         },
         {
-          "id": "oldtown.south.bench-0",
+          "id": "oldtown.northeast.bench-0",
           "assetId": "oldtown.bench",
           "label": "Bench facing square",
           "transform": {
@@ -538,8 +482,8 @@
           }
         },
         {
-          "id": "oldtown.south.tree-1",
-          "assetId": "oldtown.shade-tree",
+          "id": "oldtown.northeast.tree-1",
+          "assetId": "nature.deciduous-tree",
           "label": "Shade tree",
           "transform": {
             "x": 0,
@@ -549,7 +493,7 @@
           }
         },
         {
-          "id": "oldtown.south.bed-1",
+          "id": "oldtown.northeast.bed-1",
           "assetId": "oldtown.flower-bed",
           "label": "Flower and shrub bed",
           "transform": {
@@ -560,7 +504,7 @@
           }
         },
         {
-          "id": "oldtown.south.bench-1",
+          "id": "oldtown.northeast.bench-1",
           "assetId": "oldtown.bench",
           "label": "Bench facing square",
           "transform": {
@@ -571,18 +515,7 @@
           }
         },
         {
-          "id": "oldtown.south.tree-2",
-          "assetId": "oldtown.shade-tree",
-          "label": "Shade tree",
-          "transform": {
-            "x": 9,
-            "y": 0,
-            "z": 8.5,
-            "rotationY": 1.4
-          }
-        },
-        {
-          "id": "oldtown.south.bed-2",
+          "id": "oldtown.northeast.bed-2",
           "assetId": "oldtown.flower-bed",
           "label": "Flower and shrub bed",
           "transform": {
@@ -593,7 +526,7 @@
           }
         },
         {
-          "id": "oldtown.south.bench-2",
+          "id": "oldtown.northeast.bench-2",
           "assetId": "oldtown.bench",
           "label": "Bench facing square",
           "transform": {
@@ -601,17 +534,6 @@
             "y": 0,
             "z": 6.8,
             "rotationY": 3.141592653589793
-          }
-        },
-        {
-          "id": "oldtown.south.tree-3",
-          "assetId": "oldtown.shade-tree",
-          "label": "Shade tree",
-          "transform": {
-            "x": 26,
-            "y": 0,
-            "z": 13.75,
-            "rotationY": 0
           }
         },
         {
@@ -753,7 +675,7 @@
           "transform": {
             "x": -29,
             "y": 0,
-            "z": 11,
+            "z": 6.25,
             "rotationY": 0
           }
         },
@@ -762,10 +684,10 @@
           "assetId": "plaza.cafe-table-set",
           "label": "Patio table",
           "transform": {
-            "x": -24,
+            "x": -16.5,
             "y": 0,
-            "z": 11,
-            "rotationY": 0
+            "z": 6.5,
+            "rotationY": 1.221730476396032
           }
         },
         {
@@ -773,9 +695,9 @@
           "assetId": "plaza.cafe-table-set",
           "label": "Patio table",
           "transform": {
-            "x": -19,
+            "x": -12.5,
             "y": 0,
-            "z": 11,
+            "z": 6.25,
             "rotationY": 0
           }
         },
@@ -890,36 +812,14 @@
           }
         },
         {
-          "id": "oldtown.brewery-tank",
-          "assetId": "oldtown.brewery-tank",
-          "label": "Brewery fermentation tank",
-          "transform": {
-            "x": -17.5,
-            "y": 0,
-            "z": -14.5,
-            "rotationY": 0
-          }
-        },
-        {
           "id": "oldtown.fireplace",
           "assetId": "oldtown.fireplace",
           "label": "Communal fireplace",
           "transform": {
-            "x": 20,
+            "x": 14,
             "y": 0,
-            "z": 6.25,
+            "z": 11,
             "rotationY": 3.141592653589793
-          }
-        },
-        {
-          "id": "oldtown.gas-meter-bank",
-          "assetId": "oldtown.gas-meter-bank",
-          "label": "Gas meters on the corner storefront side wall",
-          "transform": {
-            "x": 22.11,
-            "y": 0,
-            "z": 17.5,
-            "rotationY": 1.5707963267948966
           }
         },
         {
@@ -927,9 +827,9 @@
           "assetId": "plaza.splash-faucet",
           "label": "Splash-pad faucet",
           "transform": {
-            "x": 4,
+            "x": -7.75,
             "y": 0,
-            "z": 6.25,
+            "z": 0,
             "rotationY": -1.5707963267948966
           }
         },
@@ -942,6 +842,50 @@
             "y": 0,
             "z": -2.25,
             "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.shop-entrance",
+          "assetId": "gameplay.shop-entrance",
+          "label": "Coffee shop entrance",
+          "transform": {
+            "x": -10,
+            "y": 0,
+            "z": 14.22,
+            "rotationY": 3.141592653589793
+          }
+        },
+        {
+          "id": "plaza.splash-kid-milo",
+          "assetId": "plaza.splash-kid-runner",
+          "label": "Milo at the splash pad",
+          "transform": {
+            "x": -4.35,
+            "y": 0,
+            "z": -0.85,
+            "rotationY": -0.7
+          }
+        },
+        {
+          "id": "plaza.splash-kid-june",
+          "assetId": "plaza.splash-kid-boots",
+          "label": "June at the splash pad",
+          "transform": {
+            "x": -2.1,
+            "y": 0,
+            "z": 1.15,
+            "rotationY": 2.35
+          }
+        },
+        {
+          "id": "plaza.splash-kid-ari",
+          "assetId": "plaza.splash-kid-runner",
+          "label": "Ari at the splash pad",
+          "transform": {
+            "x": -1.8,
+            "y": 0,
+            "z": -1.2,
+            "rotationY": 1.7
           }
         },
         {
@@ -1000,14 +944,80 @@
           }
         },
         {
-          "id": "plaza.shop-entrance",
-          "assetId": "gameplay.shop-entrance",
-          "label": "Coffee shop entrance",
+          "id": "oldtown.brewery-tank",
+          "assetId": "oldtown.brewery-tank",
+          "label": "Brewery fermentation tank",
           "transform": {
-            "x": -10,
+            "x": -21.75,
             "y": 0,
-            "z": 14.22,
-            "rotationY": 3.141592653589793
+            "z": 24.25,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "paving-base-mueg1scb",
+          "assetId": "plaza.paving-base",
+          "label": "Plaza paving base",
+          "transform": {
+            "x": -42.75,
+            "y": 0,
+            "z": 0,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "nature.deciduous-tree-mueg9zb1",
+          "assetId": "nature.deciduous-tree",
+          "label": "Deciduous tree",
+          "transform": {
+            "x": -42.5,
+            "y": 0,
+            "z": 3.5,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "oldtown.shade-tree-muega1gz",
+          "assetId": "oldtown.shade-tree",
+          "label": "Old Town shade tree",
+          "transform": {
+            "x": -51.5,
+            "y": 0,
+            "z": 7.5,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "oldtown.flower-bed-muegabyp",
+          "assetId": "oldtown.flower-bed",
+          "label": "Stone-edged flower bed",
+          "transform": {
+            "x": -42.75,
+            "y": 0,
+            "z": 3,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "oldtown.gas-meter-bank-muegp2ri",
+          "assetId": "oldtown.gas-meter-bank",
+          "label": "Wall-mounted gas meter bank",
+          "transform": {
+            "x": -14.5,
+            "y": 0,
+            "z": 17.5,
+            "rotationY": -1.5707963267948966
+          }
+        },
+        {
+          "id": "oldtown.gas-meter-bank-muegqelt",
+          "assetId": "oldtown.gas-meter-bank",
+          "label": "Wall-mounted gas meter bank",
+          "transform": {
+            "x": -15,
+            "y": 0,
+            "z": -16.5,
+            "rotationY": -1.5707963267948966
           }
         }
       ],

@@ -100,15 +100,15 @@ test("a goose-held item keeps its identity across the area boundary", () => {
   assert.equal(coffeeSimulation.world.entities.find((entity) => entity.id === "plaza.beer-can")?.assetId, "prop.beer-can");
 });
 
-test("coffee shop is the default start while developer overrides remain available", () => {
+test("the central plaza is the default start while developer overrides remain available", () => {
   const layout = CANONICAL_WORLD_LAYOUT;
-  assert.equal(resolveStartAreaId(layout, false), COFFEE_SHOP_AREA_ID);
-  assert.equal(resolveStartAreaId(layout, false, "missing-area"), COFFEE_SHOP_AREA_ID);
-  assert.equal(resolveStartAreaId(layout, true), COFFEE_SHOP_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, false), CENTRAL_PLAZA_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, false, "missing-area"), CENTRAL_PLAZA_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, true), CENTRAL_PLAZA_AREA_ID);
   assert.equal(resolveStartAreaId(layout, true, COFFEE_SHOP_AREA_ID), COFFEE_SHOP_AREA_ID);
   assert.equal(resolveStartAreaId(layout, true, "coffee-shop"), COFFEE_SHOP_AREA_ID);
   assert.equal(resolveStartAreaId(layout, true, "old-town-square.central-plaza"), "old-town-square.central-plaza");
-  assert.equal(resolveStartAreaId(layout, true, "missing-area"), COFFEE_SHOP_AREA_ID);
+  assert.equal(resolveStartAreaId(layout, true, "missing-area"), CENTRAL_PLAZA_AREA_ID);
 });
 
 test("authored physics spike maps stable colliders and supports fixed-step body queries", () => {
