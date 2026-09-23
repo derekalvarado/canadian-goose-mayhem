@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { PALETTE } from "./palette.ts";
+import { JANITOR_CHASE, JANITOR_WALK, walkClip } from "./janitorGaits.ts";
 
 /** Shared palette slots survive export/import. */
 export const JANITOR_COLORS = {
@@ -82,34 +83,66 @@ export function createJanitorModel(): THREE.Group {
   }
   garment("janitor-shirt", [[0.98, 0], [1.01, 0.31], [1.12, 0.41], [1.38, 0.435], [1.65, 0.385], [1.79, 0.33], [1.86, 0.22], [1.89, 0]], 0.73, [0, 0, 0], torsoWeight);
 
-  // Tailored vest shell: lowered armholes and a front V expose the red shirt.
-  const torsoRadius = (y: number) => 0.44 - 0.12 * Math.pow((y - 1.3) / 0.65, 2);
-  function vestSurface(bottom: number, top: number, neckline: boolean, offset = 0): THREE.BufferGeometry {
-    const positions: number[] = [], indices: number[] = [];
-    const segments = 64, rows = 16;
+  // Vest shell: shoulder straps close over the top of the torso, with armholes cut
+  // below them and a front V exposing the red shirt.
+  const SHOULDER_Y = 1.6, SHOULDER_HEIGHT = 0.356, VEST_TOP = 1.905;
+  const bodyRadius = (y: number) => 0.44 - 0.12 * Math.pow((y - 1.3) / 0.65, 2);
+  const torsoRadius = (y: number) => y <= SHOULDER_Y
+    ? bodyRadius(y)
+    : bodyRadius(SHOULDER_Y) * Math.sqrt(Math.max(0, 1 - Math.pow((y - SHOULDER_Y) / SHOULDER_HEIGHT, 2)));
+  // Armholes are ellipses in (height, distance from the side seam).
+  const ARMHOLE_Y = 1.62, ARMHOLE_HALF_HEIGHT = 0.22, ARMHOLE_HALF_WIDTH = 0.26;
+  const armholeField = (theta: number, y: number): [number, number] =>
+    [(y - ARMHOLE_Y) / ARMHOLE_HALF_HEIGHT, (1 - Math.abs(Math.sin(theta))) / ARMHOLE_HALF_WIDTH];
+  function vestSurface(bottom: number, top: number, cutouts: boolean, offset = 0): THREE.BufferGeometry {
+    const segments = 128, rows = cutouts ? 64 : 4;
+    const grid: [number, number][] = [];
     for (let row = 0; row <= rows; row++) {
       for (let col = 0; col <= segments; col++) {
         const theta = col / segments * Math.PI * 2;
         const front = Math.max(0, -Math.cos(theta));
-        const armhole = Math.pow(Math.abs(Math.sin(theta)), 8) * 0.2;
-        const v = Math.pow(front, 12) * 0.25;
-        const edge = neckline ? top - armhole - v : top;
-        const y = THREE.MathUtils.lerp(bottom, edge, row / rows);
-        const radius = torsoRadius(y) + offset;
-        positions.push(Math.sin(theta) * radius, y, Math.cos(theta) * radius * 0.75 - 0.007);
-        if (row < rows && col < segments) {
-          const a = row * (segments + 1) + col, b = a + segments + 1;
-          indices.push(a, a + 1, b, a + 1, b + 1, b);
-        }
+        const edge = cutouts ? top - Math.pow(front, 12) * 0.27 : top;
+        grid.push([theta, THREE.MathUtils.lerp(bottom, edge, row / rows)]);
       }
     }
+    const inside = (theta: number, y: number) => {
+      const [a, b] = armholeField(theta, y);
+      return cutouts && a * a + b * b < 1;
+    };
+    const indices: number[] = [];
+    const rim = new Set<number>();
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < segments; col++) {
+        const a = row * (segments + 1) + col, b = a + segments + 1;
+        const corners = [a, a + 1, b, b + 1].filter((corner) => inside(...grid[corner]));
+        if (corners.length === 4) continue;
+        indices.push(a, a + 1, b, a + 1, b + 1, b);
+        for (const corner of corners) rim.add(corner);
+      }
+    }
+    // Pull kept vertices that fall inside a hole onto its ellipse so the edge is smooth.
+    for (const index of rim) {
+      const [theta, y] = grid[index];
+      const [a, b] = armholeField(theta, y);
+      const scale = 1 / Math.max(Math.hypot(a, b), 1e-3);
+      const sin = Math.min(1, 1 - b * scale * ARMHOLE_HALF_WIDTH);
+      const quadrant = Math.sin(theta) >= 0 ? 1 : -1;
+      const back = Math.cos(theta) >= 0;
+      const asin = Math.asin(sin);
+      const snapped = quadrant > 0 ? (back ? asin : Math.PI - asin) : (back ? 2 * Math.PI - asin : Math.PI + asin);
+      grid[index] = [snapped, ARMHOLE_Y + a * scale * ARMHOLE_HALF_HEIGHT];
+    }
+    const positions = grid.flatMap(([theta, y]) => {
+      const radius = torsoRadius(y) + offset;
+      return [Math.sin(theta) * radius, y, Math.cos(theta) * radius * 0.75 - 0.007];
+    });
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     return geometry;
   }
-  add(vestSurface(1.075, 1.875, true), "janitor-vest", torsoWeight);
+  add(vestSurface(1.075, VEST_TOP, true), "janitor-vest", torsoWeight);
   add(vestSurface(1.27, 1.345, false, 0.004), "janitor-reflective-stripe", torsoWeight);
   for (const side of [-1, 1]) {
     oval("janitor-vest", [side * 0.185, 1.18, -0.31], [0.107, 0.089, 0.033], torsoWeight);
@@ -144,8 +177,14 @@ export function createJanitorModel(): THREE.Group {
     const armWeight: Weight = (p) => p.y > 1.23
       ? blendY(elbow, shoulder, 1.29, 1.51)(p)
       : blendY(wrist, elbow, 1.075, 1.21)(p);
-    oval("janitor-shirt", [sign * 0.433, 1.594, -0.004], [0.152, 0.273, 0.155], armWeight, sign * -0.34);
-    oval("janitor-shirt", [sign * 0.517, 1.411, -0.01], [0.133, 0.085, 0.143], armWeight);
+    // Slim sleeve from a rounded shoulder cap down to a rolled cuff above the elbow.
+    const shoulderCap = new THREE.Vector3(sign * 0.35, 1.72, 0);
+    const cuff = new THREE.Vector3(sign * 0.52, 1.41, -0.01);
+    const sleeve = new THREE.CapsuleGeometry(0.1, shoulderCap.distanceTo(cuff), 8, 20);
+    sleeve.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), shoulderCap.clone().sub(cuff).normalize()));
+    sleeve.translate(...shoulderCap.clone().add(cuff).multiplyScalar(0.5).toArray());
+    add(sleeve, "janitor-shirt", armWeight);
+    oval("janitor-shirt", [sign * 0.52, 1.415, -0.01], [0.112, 0.045, 0.114], armWeight, sign * 0.5);
     oval("janitor-skin", [sign * 0.56, 1.251, -0.047], [0.097, 0.206, 0.098], armWeight, sign * -0.13);
     oval("janitor-skin", [sign * 0.591, 1.045, -0.081], [0.096, 0.13, 0.08], rigid(wrist));
     oval("janitor-skin", [sign * 0.531, 1.065, -0.13], [0.038, 0.064, 0.04], rigid(wrist));
@@ -176,12 +215,15 @@ export function createJanitorModel(): THREE.Group {
     mesh.bind(skeleton);
     geometries.forEach((part) => part.dispose());
   }
-  model.animations = createJanitorClips();
+  model.animations = createJanitorClips(new Map(bones.map((bone) => [bone.name, bone.position.clone()])));
   return model;
 }
 
 /** In-place presentation clips; never move gameplay state. */
-function createJanitorClips(): THREE.AnimationClip[] {
+// Rig directions: +x swings a hanging limb forward and leans the spine, neck, or
+// head back; knees bend with -x and elbows with +x. +y turns toward the janitor's
+// left; +z lifts the right side.
+function createJanitorClips(bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationClip[] {
   const rotation = (bone: string, times: number[], angles: Point[]): THREE.QuaternionKeyframeTrack => {
     const values = angles.flatMap((angle) => new THREE.Quaternion().setFromEuler(new THREE.Euler(...angle)).toArray());
     return new THREE.QuaternionKeyframeTrack(`${bone}.quaternion`, times, values);
@@ -192,37 +234,28 @@ function createJanitorClips(): THREE.AnimationClip[] {
   const look = new THREE.AnimationClip("look", 4, [
     rotation("head", [0, 1, 2, 3, 4], [[0, 0, 0], [0, 0.45, 0], [0, 0, 0], [0, -0.45, 0], [0, 0, 0]]),
   ]);
-  const times = [0, 0.25, 0.5, 0.75, 1];
-  const walkTracks: THREE.KeyframeTrack[] = [];
-  for (const [side, sign] of [["left", 1], ["right", -1]] as const) {
-    walkTracks.push(rotation(`${side}_hip`, times, [0.36, 0, -0.36, 0, 0.36].map((x) => [x * sign, 0, 0])));
-    // Forward is -Z: positive knee rotation folds the lower leg behind.
-    walkTracks.push(rotation(`${side}_knee`, times, (sign === 1 ? [0.04, 0.05, 0.12, 0.65, 0.04] : [0.12, 0.65, 0.04, 0.05, 0.12]).map((x) => [x, 0, 0])));
-    walkTracks.push(rotation(`${side}_shoulder`, times, [-0.24, 0, 0.24, 0, -0.24].map((x) => [x * sign, 0, 0])));
-    walkTracks.push(rotation(`${side}_elbow`, times, [-0.08, -0.14, -0.2, -0.14, -0.08].map((x) => [x, 0, 0])));
-  }
   const shooTimes = [0, 0.14, 0.34, 0.58, 0.82];
   const shoo = new THREE.AnimationClip("shoo", 0.82, [
-    rotation("chest", shooTimes, [[0, 0, 0], [-0.08, 0, 0], [0.14, 0, 0], [0.06, 0, 0], [0, 0, 0]]),
+    rotation("chest", shooTimes, [[0, 0, 0], [0.08, 0, 0], [-0.14, 0, 0], [-0.06, 0, 0], [0, 0, 0]]),
     rotation("head", shooTimes, [[0, 0, 0], [0, 0.12, 0], [0, -0.08, 0], [0, 0.05, 0], [0, 0, 0]]),
-    rotation("left_shoulder", shooTimes, [[0, 0, 0], [-0.65, 0, -0.4], [-1.35, 0, -0.18], [-0.82, 0, -0.32], [0, 0, 0]]),
-    rotation("right_shoulder", shooTimes, [[0, 0, 0], [-0.65, 0, 0.4], [-1.35, 0, 0.18], [-0.82, 0, 0.32], [0, 0, 0]]),
-    rotation("left_elbow", shooTimes, [[0, 0, 0], [-0.32, 0, 0], [-0.08, 0, 0], [-0.28, 0, 0], [0, 0, 0]]),
-    rotation("right_elbow", shooTimes, [[0, 0, 0], [-0.32, 0, 0], [-0.08, 0, 0], [-0.28, 0, 0], [0, 0, 0]]),
+    rotation("left_shoulder", shooTimes, [[0, 0, 0], [0.65, 0, -0.4], [1.35, 0, -0.18], [0.82, 0, -0.32], [0, 0, 0]]),
+    rotation("right_shoulder", shooTimes, [[0, 0, 0], [0.65, 0, 0.4], [1.35, 0, 0.18], [0.82, 0, 0.32], [0, 0, 0]]),
+    rotation("left_elbow", shooTimes, [[0, 0, 0], [0.32, 0, 0], [0.08, 0, 0], [0.28, 0, 0], [0, 0, 0]]),
+    rotation("right_elbow", shooTimes, [[0, 0, 0], [0.32, 0, 0], [0.08, 0, 0], [0.28, 0, 0], [0, 0, 0]]),
   ]);
   const inspectTimes = [0, 0.4, 0.8, 1.2, 1.6];
   const inspect = new THREE.AnimationClip("inspect", 1.6, [
-    rotation("spine", inspectTimes, [[0, 0, 0], [0.22, 0, 0], [0.27, 0, 0], [0.2, 0, 0], [0, 0, 0]]),
-    rotation("head", inspectTimes, [[0, 0, 0], [0.24, 0.3, 0], [0.32, -0.28, 0], [0.22, 0.18, 0], [0, 0, 0]]),
-    rotation("left_shoulder", inspectTimes, [[0, 0, 0], [0.18, 0, -0.08], [0.24, 0, -0.12], [0.16, 0, -0.07], [0, 0, 0]]),
-    rotation("right_shoulder", inspectTimes, [[0, 0, 0], [0.18, 0, 0.08], [0.24, 0, 0.12], [0.16, 0, 0.07], [0, 0, 0]]),
+    rotation("spine", inspectTimes, [[0, 0, 0], [-0.22, 0, 0], [-0.27, 0, 0], [-0.2, 0, 0], [0, 0, 0]]),
+    rotation("head", inspectTimes, [[0, 0, 0], [-0.24, 0.3, 0], [-0.32, -0.28, 0], [-0.22, 0.18, 0], [0, 0, 0]]),
+    rotation("left_shoulder", inspectTimes, [[0, 0, 0], [-0.18, 0, -0.08], [-0.24, 0, -0.12], [-0.16, 0, -0.07], [0, 0, 0]]),
+    rotation("right_shoulder", inspectTimes, [[0, 0, 0], [-0.18, 0, 0.08], [-0.24, 0, 0.12], [-0.16, 0, 0.07], [0, 0, 0]]),
   ]);
   const scratchTimes = [0, 0.22, 0.5, 0.78, 1.06, 1.3];
   const scratch = new THREE.AnimationClip("scratch", 1.3, [
-    rotation("head", scratchTimes, [[0, 0, 0], [0, -0.18, 0.08], [0.05, -0.25, 0.1], [0, 0.2, -0.06], [0.04, -0.18, 0.08], [0, 0, 0]]),
-    rotation("right_shoulder", scratchTimes, [[0, 0, 0], [-1.28, 0.15, 0.48], [-1.38, 0.2, 0.55], [-1.3, 0.12, 0.48], [-1.38, 0.2, 0.55], [0, 0, 0]]),
-    rotation("right_elbow", scratchTimes, [[0, 0, 0], [-1.18, 0, 0], [-1.34, 0, 0], [-1.16, 0, 0], [-1.34, 0, 0], [0, 0, 0]]),
-    rotation("right_wrist", scratchTimes, [[0, 0, 0], [-0.2, 0, 0.1], [-0.3, 0, -0.1], [-0.16, 0, 0.12], [-0.3, 0, -0.1], [0, 0, 0]]),
+    rotation("head", scratchTimes, [[0, 0, 0], [0, -0.18, 0.08], [-0.05, -0.25, 0.1], [0, 0.2, -0.06], [-0.04, -0.18, 0.08], [0, 0, 0]]),
+    rotation("right_shoulder", scratchTimes, [[0, 0, 0], [1.28, 0.15, 0.48], [1.38, 0.2, 0.55], [1.3, 0.12, 0.48], [1.38, 0.2, 0.55], [0, 0, 0]]),
+    rotation("right_elbow", scratchTimes, [[0, 0, 0], [1.18, 0, 0], [1.34, 0, 0], [1.16, 0, 0], [1.34, 0, 0], [0, 0, 0]]),
+    rotation("right_wrist", scratchTimes, [[0, 0, 0], [0.2, 0, 0.1], [0.3, 0, -0.1], [0.16, 0, 0.12], [0.3, 0, -0.1], [0, 0, 0]]),
   ]);
-  return [idle, look, new THREE.AnimationClip("walk", 1, walkTracks), shoo, inspect, scratch];
+  return [idle, look, walkClip("walk", JANITOR_WALK, bind), walkClip("chase", JANITOR_CHASE, bind), shoo, inspect, scratch];
 }
