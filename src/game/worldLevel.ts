@@ -73,12 +73,16 @@ export function resolveWorldAreaMovement<T extends Position>(area: WorldArea, cu
 }
 export function findWorldInstanceOverlaps(area: WorldArea, instanceId: string): string[] {
   const selected = area.instances.find((item) => item.id === instanceId); if (!selected) return [];
-  const asset = getWorldAsset(selected.assetId); if (!asset) return [];
+  return findWorldPlacementOverlaps(area, selected.assetId, selected.transform.x, selected.transform.z, instanceId);
+}
+/** Overlap warnings for a prospective placement, e.g. the editor's drag ghost. */
+export function findWorldPlacementOverlaps(area: WorldArea, assetId: string, x: number, z: number, ignoreId?: string): string[] {
+  const asset = getWorldAsset(assetId); if (!asset) return [];
   if (asset.warnForOverlap === false) return [];
   return area.instances.filter((other) => {
-    if (other.id === selected.id) return false;
+    if (other.id === ignoreId) return false;
     const otherAsset = getWorldAsset(other.assetId); if (!otherAsset || otherAsset.warnForOverlap === false) return false;
-    return Math.hypot(selected.transform.x - other.transform.x, selected.transform.z - other.transform.z) < (Math.hypot(asset.halfWidth, asset.halfDepth) + Math.hypot(otherAsset.halfWidth, otherAsset.halfDepth)) * 0.82;
+    return Math.hypot(x - other.transform.x, z - other.transform.z) < (Math.hypot(asset.halfWidth, asset.halfDepth) + Math.hypot(otherAsset.halfWidth, otherAsset.halfDepth)) * 0.82;
   }).map((item) => item.id);
 }
 function createAreaTransitions(area: WorldArea, transitions: readonly WorldAreaTransition[]): AreaTransitionDefinition[] {

@@ -109,6 +109,7 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 - `assets/characters/goose/goose-animated.blend` — current editable Blender character and animation source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
+- `src/game/editorCatalog.ts` — the editor's drag-and-drop asset catalog drawer with rendered thumbnails
 - `src/game/worldAssets.ts` — source-owned catalog of render, collision, and occlusion metadata
 - `src/game/worldLayout.ts` — sparse 64 m chunk documents, playable regions, browser drafts, import/export, and plaza migration
 - `src/game/worldLevel.ts` — renderer-independent collision, chunk, and stepped-surface queries for placed catalog assets

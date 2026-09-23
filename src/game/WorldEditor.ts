@@ -1,14 +1,16 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { WORLD_ASSETS, getWorldAsset } from "./worldAssets.ts";
+import { getWorldAsset } from "./worldAssets.ts";
 import { CENTRAL_PLAZA_AREA_ID, addWorldArea, clampWorldInstance, createInstance, deleteWorldArea, getWorldArea, loadWorldLayout, loadPreviousWorldLayout, migratePlazaLayout, resetWorldLayout, saveWorldLayout, serializeWorldLayout, toggleWorldChunkPlayable, type WorldArea, type WorldInstance, type WorldLayout, validateWorldLayout, worldChunkCoordinates } from "./worldLayout.ts";
 import { validatePlazaLayout } from "./plazaLayout.ts";
-import { findWorldInstanceOverlaps, getWorldGroundHeight } from "./worldLevel.ts";
+import { findWorldInstanceOverlaps, findWorldPlacementOverlaps, getWorldGroundHeight } from "./worldLevel.ts";
+import { CatalogDrawer, createDragChip, type AssetCatalog, type PaletteHost } from "./editorCatalog.ts";
 import { WorldView } from "./WorldView.ts";
 import { resolveEditorShortcut, WorldEditorHistory, type WorldEditorSnapshot } from "./worldEditorHistory.ts";
 
-const SNAP = 0.25; const ROTATION_SNAP = THREE.MathUtils.degToRad(5);
+const SNAP = 0.25; const ROTATION_SNAP = THREE.MathUtils.degToRad(5); const PLACING_ROTATION_STEP = THREE.MathUtils.degToRad(15);
+const DRAG_THRESHOLD_PX = 6;
 const LITTER_PICKER_ASSET_ID = "prop.litter-picker";
 const LITTER_PICKER_GROUND_ROTATION_X = Math.PI / 2;
 function download(contents: string): void { const blob = new Blob([contents], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "goose-game-world.json"; link.click(); URL.revokeObjectURL(url); }
@@ -17,22 +19,28 @@ function cleanId(value: string): string { return value.toLowerCase().replace(/[^
 
 export class WorldEditor {
   private readonly orbit: OrbitControls; private readonly transform: TransformControls; private readonly raycaster = new THREE.Raycaster(); private readonly pointer = new THREE.Vector2();
-  private readonly panel = document.createElement("aside"); private readonly areaSelect = document.createElement("select"); private readonly assetSelect = document.createElement("select"); private readonly instanceSelect = document.createElement("select");
+  private readonly panel = document.createElement("aside"); private readonly areaSelect = document.createElement("select"); private readonly instanceSelect = document.createElement("select");
   private readonly controlTargetSelect = document.createElement("select"); private readonly controlTargetLabel = document.createElement("label");
   private readonly xInput = document.createElement("input"); private readonly zInput = document.createElement("input"); private readonly rotationInput = document.createElement("input"); private readonly status = document.createElement("p"); private readonly warnings = document.createElement("p");
   private readonly preview = new THREE.Group(); private readonly outline = new THREE.BoxHelper(new THREE.Object3D(), 0xf1d38b);
   private readonly history = new WorldEditorHistory(); private undoButton?: HTMLButtonElement; private redoButton?: HTMLButtonElement;
   private world: WorldLayout; private view: WorldView; private areaId = CENTRAL_PLAZA_AREA_ID; private selectedId?: string; private placing = false;
+  // Placement ghost for assets dragged or picked up from the catalog.
+  private placingAssetId?: string; private placingRotation = 0; private lastPointer = { x: 0, y: 0 };
+  private readonly footprint = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x8fdc97, transparent: true, opacity: 0.38, depthWrite: false }));
+  private drag?: { assetId: string; startX: number; startY: number; moved: boolean; chip: HTMLElement };
+  private readonly catalog: AssetCatalog;
 
   constructor(scene: THREE.Scene, private readonly camera: THREE.Camera, private readonly canvas: HTMLCanvasElement, world = loadWorldLayout(), view?: WorldView, initialAreaId = CENTRAL_PLAZA_AREA_ID) {
     this.world = world; this.areaId = world.areas.some((area) => area.id === initialAreaId) ? initialAreaId : CENTRAL_PLAZA_AREA_ID;
-    this.view = view ?? new WorldView(this.area); if (!view) scene.add(this.view); scene.add(this.preview, this.outline);
+    this.view = view ?? new WorldView(this.area); if (!view) scene.add(this.view); scene.add(this.preview, this.outline, this.footprint); this.footprint.rotation.x = -Math.PI / 2; this.footprint.visible = false; this.footprint.renderOrder = 19; this.footprint.userData.editorIgnore = true;
     this.preview.visible = false; this.preview.userData.editorIgnore = true; this.outline.userData.editorIgnore = true; this.outline.renderOrder = 20;
     this.orbit = new OrbitControls(camera, canvas); this.orbit.mouseButtons.LEFT = null; this.orbit.mouseButtons.MIDDLE = THREE.MOUSE.ROTATE; this.orbit.target.set(0, 0, 0); this.orbit.update(); this.orbit.saveState(); this.view.setEditorChunkFocus(0, 0); this.orbit.addEventListener("change", () => this.view.setEditorChunkFocus(this.orbit.target.x, this.orbit.target.z));
     const authoringGrid = new THREE.GridHelper(4096, 64, 0xf1d38b, 0x766d60); authoringGrid.position.y = -0.02; authoringGrid.userData.editorIgnore = true; scene.add(authoringGrid);
     this.transform = new TransformControls(camera, canvas); this.transform.setSpace("world"); this.transform.showY = false; this.transform.setTranslationSnap(SNAP); this.transform.setRotationSnap(ROTATION_SNAP); this.transform.setSize(0.82); scene.add(this.transform.getHelper());
     this.transform.addEventListener("dragging-changed", (event) => { this.orbit.enabled = event.value !== true; if (event.value === true) this.history.begin(this.snapshot()); else if (this.history.commit(this.snapshot())) this.save("Saved automatically."); }); this.transform.addEventListener("objectChange", this.commitTransform);
-    document.body.classList.add("editor-mode"); this.buildPanel(); this.refreshAreaOptions(); this.refreshAssetOptions(); this.selectInstance(this.area.instances[0]?.id); this.history.reset(this.snapshot()); window.addEventListener("keydown", this.handleKeyDown, { passive: false }); canvas.addEventListener("pointermove", this.movePreview); canvas.addEventListener("pointerup", this.handleCanvasClick);
+    document.body.classList.add("editor-mode"); this.buildPanel(); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); this.history.reset(this.snapshot()); window.addEventListener("keydown", this.handleKeyDown, { passive: false }); canvas.addEventListener("pointermove", this.movePreview); canvas.addEventListener("pointerup", this.handleCanvasClick); window.addEventListener("pointermove", this.trackPointer);
+    this.catalog = new CatalogDrawer(this.paletteHost); document.querySelector("#game-shell")?.append(this.catalog.root);
   }
   private get area(): WorldArea { return getWorldArea(this.world, this.areaId); }
   private buildPanel(): void {
@@ -41,9 +49,8 @@ export class WorldEditor {
     const areaLabel = this.label("Area", this.areaSelect); this.areaSelect.addEventListener("change", () => { this.areaId = this.areaSelect.value; this.view.applyArea(this.area); this.selectInstance(this.area.instances[0]?.id); });
     const areaActions = document.createElement("div"); areaActions.className = "plaza-editor__actions";
     areaActions.append(this.button("New area", () => this.createArea()), this.button("Rename", () => this.renameArea()), this.button("Delete", () => this.deleteArea()));
-    const assetLabel = this.label("Add asset", this.assetSelect);
     const historyActions = document.createElement("div"); historyActions.className = "plaza-editor__actions"; this.undoButton = this.button("Undo", () => this.undo()); this.redoButton = this.button("Redo", () => this.redo()); this.undoButton.title = "Undo (⌘/Ctrl+Z)"; this.redoButton.title = "Redo (⌘/Ctrl+Shift+Z)"; historyActions.append(this.undoButton, this.redoButton);
-    const placement = document.createElement("div"); placement.className = "plaza-editor__actions"; placement.append(this.button("Place in world", () => this.startPlacing()), this.button("Stop placing", () => this.stopPlacing()), this.button("Toggle playable chunk", () => this.togglePlayableChunk()), this.button("Duplicate selected", () => this.duplicate()), this.button("Delete selected", () => this.removeSelected()));
+    const placement = document.createElement("div"); placement.className = "plaza-editor__actions"; placement.append(this.button("Stop placing", () => this.stopPlacing()), this.button("Toggle playable chunk", () => this.togglePlayableChunk()), this.button("Duplicate selected", () => this.duplicate()), this.button("Delete selected", () => this.removeSelected()));
     const instanceLabel = this.label("Selected instance", this.instanceSelect); this.instanceSelect.addEventListener("change", () => this.selectInstance(this.instanceSelect.value));
     this.controlTargetLabel.textContent = "Controls target"; this.controlTargetLabel.append(this.controlTargetSelect); this.controlTargetLabel.hidden = true; this.controlTargetSelect.addEventListener("change", this.commitControlTarget);
     const modes = document.createElement("div"); modes.className = "plaza-editor__modes"; modes.append(this.button("Move", () => this.setTransformMode("translate")), this.button("Rotate", () => this.setTransformMode("rotate")));
@@ -57,14 +64,13 @@ export class WorldEditor {
         this.view.applyArea(this.area); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id);
       });
     }));
-    this.status.className = "plaza-editor__status"; this.status.setAttribute("aria-live", "polite"); this.warnings.className = "plaza-editor__warnings"; this.warnings.setAttribute("aria-live", "polite"); const help = document.createElement("p"); help.className = "plaza-editor__help"; help.textContent = "Middle-drag rotates the world; left-click selects. Choose an asset, place its preview with a click, then select an instance to move or rotate it. Arrow keys move the selected asset by 0.25 m. Position snaps to 0.25 m; rotation snaps to 5°. Changes save automatically.";
-    this.panel.append(heading, areaLabel, areaActions, assetLabel, historyActions, placement, instanceLabel, this.controlTargetLabel, modes, fields, io, this.status, this.warnings, help); document.querySelector("#game-shell")?.append(this.panel); this.updateHistoryButtons();
+    this.status.className = "plaza-editor__status"; this.status.setAttribute("aria-live", "polite"); this.warnings.className = "plaza-editor__warnings"; this.warnings.setAttribute("aria-live", "polite"); const help = document.createElement("p"); help.className = "plaza-editor__help"; help.textContent = "Middle-drag rotates the world; left-click selects. Drag an item from the catalog into the world, or click it and then click the ground. Shift while dropping keeps placing, R rotates the ghost, Esc cancels. Select an instance to move or rotate it. Arrow keys move the selected asset by 0.25 m. Position snaps to 0.25 m; rotation snaps to 5°. Changes save automatically.";
+    this.panel.append(heading, areaLabel, areaActions, historyActions, placement, instanceLabel, this.controlTargetLabel, modes, fields, io, this.status, this.warnings, help); document.querySelector("#game-shell")?.append(this.panel); this.updateHistoryButtons();
   }
   private label(text: string, control: HTMLElement): HTMLLabelElement { const label = document.createElement("label"); label.textContent = text; label.append(control); return label; }
   private number(text: string, input: HTMLInputElement, step: number, suffix = "m"): HTMLLabelElement { input.type = "number"; input.step = String(step); const label = this.label(text, input); const unit = document.createElement("span"); unit.className = "plaza-editor__suffix"; unit.textContent = suffix; label.append(unit); return label; }
   private button(text: string, handler: () => void): HTMLButtonElement { const button = document.createElement("button"); button.type = "button"; button.textContent = text; button.addEventListener("click", handler); return button; }
   private refreshAreaOptions(): void { this.areaSelect.replaceChildren(...this.world.areas.map((area) => { const option = document.createElement("option"); option.value = area.id; option.textContent = area.label; return option; })); this.areaSelect.value = this.areaId; }
-  private refreshAssetOptions(): void { const categories = new Map<string, HTMLOptGroupElement>(); for (const asset of WORLD_ASSETS) { let group = categories.get(asset.category); if (!group) { group = document.createElement("optgroup"); group.label = asset.category; categories.set(asset.category, group); this.assetSelect.append(group); } const option = document.createElement("option"); option.value = asset.assetId; option.textContent = asset.label; group.append(option); } }
   private refreshInstanceOptions(): void { this.instanceSelect.replaceChildren(...this.area.instances.map((item) => { const option = document.createElement("option"); option.value = item.id; option.textContent = item.label; return option; })); if (this.selectedId) this.instanceSelect.value = this.selectedId; }
   private selectInstance(id: string | undefined): void { this.selectedId = id; this.refreshInstanceOptions(); const item = this.area.instances.find((candidate) => candidate.id === id); const group = id ? this.view.instances.get(id) : undefined; if (!item || !group) { this.transform.detach(); this.outline.visible = false; this.controlTargetLabel.hidden = true; return; } this.transform.attach(group); this.outline.visible = true; this.outline.setFromObject(group); this.xInput.value = item.transform.x.toFixed(2); this.zInput.value = item.transform.z.toFixed(2); this.rotationInput.value = THREE.MathUtils.radToDeg(item.transform.rotationY).toFixed(1); this.refreshControlTarget(item); const overlaps = findWorldInstanceOverlaps(this.area, item.id); const missingTarget = Boolean(getWorldAsset(item.assetId)?.controller) && !this.area.controlLinks.some((link) => link.controllerId === item.id); this.warnings.textContent = missingTarget ? "This controller needs a compatible target." : overlaps.length ? `Possible overlap with ${overlaps.map((other) => this.area.instances.find((candidate) => candidate.id === other)?.label).join(", ")}.` : "No instance overlaps detected."; this.warnings.classList.toggle("has-warning", missingTarget || overlaps.length > 0); }
   private refreshControlTarget(item: WorldInstance): void {
@@ -119,10 +125,64 @@ export class WorldEditor {
     try { this.mutate("Area deleted.", () => { deleteWorldArea(this.world, this.areaId); this.areaId = CENTRAL_PLAZA_AREA_ID; this.view.applyArea(this.area); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); }); }
     catch (error) { this.setStatus(error instanceof Error ? error.message : "Area could not be deleted.", true); }
   }
-  private startPlacing(): void { this.placing = true; this.preview.visible = true; this.preview.clear(); const asset = getWorldAsset(this.assetSelect.value); if (!asset) return; const source = this.view.addInstance({ id: "editor-preview", assetId: asset.assetId, label: asset.label, transform: { x: 0, y: 0, z: 0, rotationY: 0 } }, false); this.view.remove(source); this.view.instances.delete("editor-preview"); this.preview.add(...source.children); source.clear(); this.preview.rotation.set(asset.assetId === LITTER_PICKER_ASSET_ID ? LITTER_PICKER_GROUND_ROTATION_X : 0, 0, 0); const pivot = asset.pivotOffset ?? { x: 0, z: 0 }; this.preview.position.set(pivot.x, asset.surfaceHeight === undefined ? (getWorldGroundHeight(this.area, pivot.x, pivot.z) ?? 0) : 0, pivot.z); this.preview.traverse((object) => { object.userData.editorIgnore = true; const mesh = object as THREE.Mesh; if (mesh.material instanceof THREE.Material) { mesh.material = mesh.material.clone(); mesh.material.transparent = true; mesh.material.opacity = 0.45; } }); this.setStatus(`Click the ground to place ${asset.label}.`); }
-  private point(event: PointerEvent): THREE.Vector3 | undefined { const rect = this.canvas.getBoundingClientRect(); this.pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1); this.raycaster.setFromCamera(this.pointer, this.camera); const hit = new THREE.Vector3(); return this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit) ?? undefined; }
-  private readonly movePreview = (event: PointerEvent): void => { if (!this.placing) return; const hit = this.point(event); const asset = getWorldAsset(this.assetSelect.value); if (!hit || !asset) return; const x = Math.round(hit.x / SNAP) * SNAP; const z = Math.round(hit.z / SNAP) * SNAP; const pivot = asset.pivotOffset ?? { x: 0, z: 0 }; this.preview.position.set(x + pivot.x, asset.surfaceHeight === undefined ? (getWorldGroundHeight(this.area, x + pivot.x, z + pivot.z) ?? 0) : 0, z + pivot.z); };
-  private readonly handleCanvasClick = (event: PointerEvent): void => { if (event.button !== 0) return; const hit = this.point(event); if (this.placing && hit) { const asset = getWorldAsset(this.assetSelect.value); if (!asset) return; const x = Math.round(hit.x / SNAP) * SNAP; const z = Math.round(hit.z / SNAP) * SNAP; const id = `${asset.assetId.replace("plaza.", "")}-${Date.now().toString(36)}`; this.mutate("Asset placed. Click again to place another, or stop placing.", () => { const created = createInstance(this.area, asset.assetId, id, x, z); created.transform.y = asset.surfaceHeight === undefined ? (getWorldGroundHeight(this.area, x, z) ?? 0) : 0; this.view.addInstance(created); this.selectInstance(created.id); }); return; } if (!this.placing) { const hitObject = this.raycaster.intersectObjects([...this.view.instances.values()], true).find((entry) => !entry.object.userData.editorIgnore); const id = findInstance(hitObject?.object ?? null); if (id) this.selectInstance(id); } };
+  private startPlacing(assetId: string): void {
+    const asset = getWorldAsset(assetId); if (!asset) return;
+    this.placing = true; this.placingAssetId = asset.assetId; this.preview.visible = true; this.preview.clear();
+    const source = this.view.addInstance({ id: "editor-preview", assetId: asset.assetId, label: asset.label, transform: { x: 0, y: 0, z: 0, rotationY: 0 } }, false); this.view.remove(source); this.view.instances.delete("editor-preview"); this.preview.add(...source.children); source.clear();
+    this.preview.rotation.set(asset.assetId === LITTER_PICKER_ASSET_ID ? LITTER_PICKER_GROUND_ROTATION_X : 0, this.placingRotation, 0);
+    const pivot = asset.pivotOffset ?? { x: 0, z: 0 }; this.preview.position.set(pivot.x, asset.surfaceHeight === undefined ? (getWorldGroundHeight(this.area, pivot.x, pivot.z) ?? 0) : 0, pivot.z);
+    this.preview.traverse((object) => { object.userData.editorIgnore = true; const mesh = object as THREE.Mesh; if (mesh.material instanceof THREE.Material) { mesh.material = mesh.material.clone(); mesh.material.transparent = true; mesh.material.opacity = 0.6; } });
+    this.footprint.scale.set(asset.halfWidth * 2, asset.halfDepth * 2, 1); this.footprint.rotation.z = this.placingRotation; this.footprint.visible = this.preview.visible;
+    this.setStatus(`Carrying ${asset.label}: click the ground to place (Shift keeps placing), R rotates, Esc cancels.`);
+  }
+  private point(event: Pick<PointerEvent, "clientX" | "clientY">): THREE.Vector3 | undefined { const rect = this.canvas.getBoundingClientRect(); this.pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1); this.raycaster.setFromCamera(this.pointer, this.camera); const hit = new THREE.Vector3(); return this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit) ?? undefined; }
+  private readonly movePreview = (event: PointerEvent): void => { if (this.placing && !this.drag) this.updatePreviewAt(event); };
+  private readonly trackPointer = (event: PointerEvent): void => { this.lastPointer = { x: event.clientX, y: event.clientY }; };
+  private updatePreviewAt(event: Pick<PointerEvent, "clientX" | "clientY">): void {
+    const hit = this.point(event); const asset = this.placingAssetId ? getWorldAsset(this.placingAssetId) : undefined; if (!hit || !asset) return;
+    const x = Math.round(hit.x / SNAP) * SNAP; const z = Math.round(hit.z / SNAP) * SNAP; const pivot = asset.pivotOffset ?? { x: 0, z: 0 };
+    const y = asset.surfaceHeight === undefined ? (getWorldGroundHeight(this.area, x + pivot.x, z + pivot.z) ?? 0) : 0;
+    this.preview.position.set(x + pivot.x, y, z + pivot.z); this.preview.visible = true;
+    const blocked = findWorldPlacementOverlaps(this.area, asset.assetId, x, z).length > 0;
+    this.footprint.position.set(x, y + 0.04, z); this.footprint.visible = true; (this.footprint.material as THREE.MeshBasicMaterial).color.setHex(blocked ? 0xf0826a : 0x8fdc97);
+  }
+  private placeAt(event: Pick<PointerEvent, "clientX" | "clientY">): void {
+    const hit = this.point(event); const asset = this.placingAssetId ? getWorldAsset(this.placingAssetId) : undefined; if (!hit || !asset) return;
+    const x = Math.round(hit.x / SNAP) * SNAP; const z = Math.round(hit.z / SNAP) * SNAP; const id = `${asset.assetId.replace("plaza.", "")}-${Date.now().toString(36)}`;
+    this.mutate(`${asset.label} placed.`, () => { const created = createInstance(this.area, asset.assetId, id, x, z); created.transform.y = asset.surfaceHeight === undefined ? (getWorldGroundHeight(this.area, x, z) ?? 0) : 0; created.transform.rotationY = this.placingRotation; this.view.addInstance(created); this.selectInstance(created.id); });
+    this.catalog.notePlaced(asset.assetId);
+  }
+  private readonly paletteHost: PaletteHost = {
+    beginDrag: (assetId, event) => {
+      this.cancelDrag(); this.startPlacing(assetId); this.preview.visible = false; this.footprint.visible = false;
+      const chip = createDragChip(assetId); chip.hidden = true; document.body.append(chip);
+      this.drag = { assetId, startX: event.clientX, startY: event.clientY, moved: false, chip };
+      document.body.classList.add("is-dragging-asset");
+      window.addEventListener("pointermove", this.handleDragMove); window.addEventListener("pointerup", this.handleDragEnd); window.addEventListener("pointercancel", this.cancelDrag);
+    },
+    pickUp: (assetId) => { this.cancelDrag(); this.startPlacing(assetId); if (document.elementFromPoint(this.lastPointer.x, this.lastPointer.y) === this.canvas) this.updatePreviewAt({ clientX: this.lastPointer.x, clientY: this.lastPointer.y }); else { this.preview.visible = false; this.footprint.visible = false; } },
+  };
+  private readonly handleDragMove = (event: PointerEvent): void => {
+    const drag = this.drag; if (!drag) return;
+    if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > DRAG_THRESHOLD_PX) drag.moved = true;
+    const overCanvas = document.elementFromPoint(event.clientX, event.clientY) === this.canvas;
+    drag.chip.hidden = overCanvas || !drag.moved; drag.chip.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
+    if (overCanvas) this.updatePreviewAt(event); else { this.preview.visible = false; this.footprint.visible = false; }
+  };
+  private readonly handleDragEnd = (event: PointerEvent): void => {
+    const drag = this.drag; if (!drag) return; this.endDragListeners();
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    if (target === this.canvas) { this.placeAt(event); if (!event.shiftKey) this.stopPlacing(this.status.textContent ?? ""); }
+    else if (!drag.moved) { if (!this.preview.visible) this.setStatus(`Carrying ${getWorldAsset(drag.assetId)?.label}: click the ground to place (Shift keeps placing), R rotates, Esc cancels.`); }
+    else this.stopPlacing("Drop cancelled.");
+  };
+  private endDragListeners(): void {
+    this.drag?.chip.remove(); this.drag = undefined; document.body.classList.remove("is-dragging-asset");
+    window.removeEventListener("pointermove", this.handleDragMove); window.removeEventListener("pointerup", this.handleDragEnd); window.removeEventListener("pointercancel", this.cancelDrag);
+  }
+  private readonly cancelDrag = (): void => { if (!this.drag) return; this.endDragListeners(); this.stopPlacing("Drop cancelled."); };
+
+  private readonly handleCanvasClick = (event: PointerEvent): void => { if (event.button !== 0 || this.drag) return; const hit = this.point(event); if (this.placing && hit) { this.placeAt(event); if (!event.shiftKey) this.stopPlacing(this.status.textContent ?? ""); return; } if (!this.placing) { const hitObject = this.raycaster.intersectObjects([...this.view.instances.values()], true).find((entry) => !entry.object.userData.editorIgnore); const id = findInstance(hitObject?.object ?? null); if (id) this.selectInstance(id); } };
   private readonly commitTransform = (): void => {
     const item = this.area.instances.find((candidate) => candidate.id === this.selectedId);
     const group = this.selectedId ? this.view.instances.get(this.selectedId) : undefined;
@@ -155,7 +215,7 @@ export class WorldEditor {
     });
   };
   private duplicate(): void { const item = this.area.instances.find((candidate) => candidate.id === this.selectedId); if (!item) return; this.mutate("Instance duplicated.", () => { const copy = createInstance(this.area, item.assetId, `${item.assetId.replace("plaza.", "")}-${Date.now().toString(36)}`, item.transform.x + SNAP, item.transform.z + SNAP); copy.transform.rotationY = item.transform.rotationY; const link = this.area.controlLinks.find((candidate) => candidate.controllerId === item.id); if (link) this.area.controlLinks.push({ controllerId: copy.id, targetId: link.targetId }); this.view.addInstance(copy); this.selectInstance(copy.id); }); }
-  private stopPlacing(): void { this.placing = false; this.preview.visible = false; this.preview.clear(); this.setStatus("Placement stopped."); }
+  private stopPlacing(message = "Placement stopped."): void { this.placing = false; this.placingAssetId = undefined; this.preview.visible = false; this.footprint.visible = false; this.preview.clear(); this.setStatus(message); }
   private togglePlayableChunk(): void { const position = this.selectedId ? this.area.instances.find((item) => item.id === this.selectedId)?.transform : this.orbit.target; const coordinate = worldChunkCoordinates(position?.x ?? 0, position?.z ?? 0); let chunkX = coordinate.x; let chunkZ = coordinate.z; this.mutate("Playable chunk updated.", () => { const chunk = toggleWorldChunkPlayable(this.area, coordinate.x, coordinate.z); chunkX = chunk.x; chunkZ = chunk.z; }); this.setStatus(`Chunk ${chunkX}, ${chunkZ} is now ${this.area.chunks.find((chunk) => chunk.x === chunkX && chunk.z === chunkZ)?.playable ? "playable" : "editor-only"}.`); }
   private removeSelected(): void { const index = this.area.instances.findIndex((item) => item.id === this.selectedId); if (index < 0) return; const removed = this.area.instances[index]; this.mutate(`${removed.label} deleted.`, () => { this.area.instances.splice(index, 1); this.area.controlLinks = this.area.controlLinks.filter((link) => link.controllerId !== removed.id && link.targetId !== removed.id); const group = this.view.instances.get(removed.id); if (group) this.view.remove(group); this.view.instances.delete(removed.id); this.selectInstance(this.area.instances[0]?.id); }); }
   private moveSelected(dx: number, dz: number): void {
@@ -175,6 +235,11 @@ export class WorldEditor {
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     const target = event.target instanceof HTMLElement;
     const targetIsTextEntry = target && (event.target.closest("input, textarea, [contenteditable]") !== null);
+    if (this.placing && !targetIsTextEntry && event.code === "KeyR" && !event.metaKey && !event.ctrlKey) {
+      event.preventDefault(); this.placingRotation = Math.round((this.placingRotation + (event.shiftKey ? -1 : 1) * PLACING_ROTATION_STEP) / PLACING_ROTATION_STEP) * PLACING_ROTATION_STEP % (Math.PI * 2);
+      this.preview.rotation.y = this.placingRotation; this.footprint.rotation.z = this.placingRotation; return;
+    }
+    if (this.drag && event.code === "Escape") { event.preventDefault(); this.cancelDrag(); return; }
     const action = resolveEditorShortcut({ code: event.code, key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, targetIsTextEntry }, this.placing, this.selectedId !== undefined);
     if (!action) return;
     event.preventDefault();
