@@ -73,6 +73,8 @@ export class RiggedCharacterView extends THREE.Group {
     this.currentAction = next;
   }
 
+  get activeClip(): string | undefined { return this.currentAction?.getClip().name; }
+
   getHandSocket(side: "left" | "right"): THREE.Object3D | undefined {
     return this.getObjectByName(`${side}_hand_socket`);
   }

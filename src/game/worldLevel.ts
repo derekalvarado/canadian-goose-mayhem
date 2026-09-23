@@ -134,11 +134,11 @@ export function createCentralPlazaRules(area: WorldArea, transitions: readonly W
     heading: janitorInstance.transform.rotationY,
     guardPosition: { x: janitorInstance.transform.x, y: janitorInstance.transform.y, z: janitorInstance.transform.z },
     investigationPosition: { x: splashPad.transform.x - 4.7, y: splashPad.transform.y, z: splashPad.transform.z },
-    observedTargetId: splashPad.id, walkSpeed: 2.2, guardRadius: 1.75, noticeRadius: 24,
+    observedTargetId: splashPad.id, walkSpeed: 1.76, guardRadius: 1.75, noticeRadius: 24,
     inspectSeconds: 3, scratchSeconds: 3, shooSeconds: 0.82,
     cleanup: hasCleanupRoute ? {
       emptySeconds: 1.8, pickupSeconds: 1.35, reactionSeconds: 0.75, toolSearchSeconds: 8,
-      shooRadius: 2.6, shooReach: 1.05, jogSpeed: 3.35, fumbleRadius: 3.4,
+      shooRadius: 2.6, shooReach: 1.05, jogSpeed: 3, fumbleRadius: 3.4,
     } : undefined,
   } : undefined;
   const splashKids = splashPad ? area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "splash-kid")

@@ -22,11 +22,13 @@ export class JanitorView extends RiggedCharacterView {
     });
   }
 
-  setActivity(activity: JanitorActivity): void {
+  /** `recoveringStolenTool` marks a jog-speed dash back to a tool the goose dropped. */
+  setActivity(activity: JanitorActivity, recoveringStolenTool = false): void {
     this.userData.gameplayState = activity;
-    const clip = activity === "walking-to-pad" || activity === "returning" || activity === "walking-to-trash"
+    const clip = recoveringStolenTool && activity === "retrieving-tool" ? "chase"
+      : activity === "walking-to-pad" || activity === "returning" || activity === "walking-to-trash"
       || activity === "walking-to-litter" || activity === "retrieving-tool" ? "walk"
-      : activity === "pursuing-tool" || activity === "chasing-goose" ? "walk"
+      : activity === "pursuing-tool" || activity === "chasing-goose" ? "chase"
       : activity === "shooing" ? "shoo"
       : activity === "emptying-trash" || activity === "picking-litter" ? "inspect"
       : activity === "reacting" ? "look"

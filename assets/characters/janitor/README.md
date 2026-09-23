@@ -22,13 +22,14 @@ between joints around the elbows, knees, and torso. Cap and face follow the head
 boots follow the legs. The model is Y-up, faces -Z, stands about 2.59 metres tall,
 and has its origin on the ground between the feet.
 
-The `idle`, `walk`, and `look` clips are exported with the skeleton. `JanitorView`
-preserves the skin, clones bones per instance, converts materials with the shared
-toon factory, and plays a subtle idle in the game. After `await view.ready`, use
-`view.playAnimation("walk")` or `view.playAnimation("look")`; the view crossfades.
+The `idle`, `look`, `walk`, `chase`, `shoo`, `inspect`, and `scratch` clips are exported
+with the skeleton. `walk` (a springy shuffle matched to the 1.76 m/s walk speed) and
+`chase` (a hunched, fist-pumping stomp matched to the 3 m/s jog speed) are sampled from
+the gait knobs in `src/game/janitorGaits.ts`, with leg IK that keeps stance feet planted
+at those speeds; change the speed in `worldLevel.ts` and the style together. `JanitorView`
+preserves the skin, clones bones per instance, converts materials with the shared toon
+factory, and picks a clip from the simulation's janitor activity.
 `WorldView.updatePresentation(delta)` advances the mixer, including pause handling.
-The walk is a basic in-place rig demonstration, not a polished locomotion cycle.
-No NPC routine, pathfinding, or gameplay movement has been added.
 
 For hand-authored animation, import the GLB into Blender and animate its existing
 armature. Author separate actions, export those actions with the mesh and skin,
@@ -47,6 +48,12 @@ Run `npm run dev` and open `/assets/characters/janitor/preview.html`. The page l
 the actual runtime GLB and toon loader, with four 45° downward views, clip buttons,
 a pause button, and a skeleton overlay. This is a development preview, not a game
 route or production build entry.
+
+For prototyping new clips, open `/assets/characters/janitor/anim-lab.html`. It builds the
+rig straight from `JanitorModel.ts`, so edits to `src/dev/janitorLab/variants.ts` hot-reload
+without exporting. Variants sit side by side with game-camera, side, and front views, frame
+stepping, and a treadmill floor that reveals foot sliding. Port a chosen variant into
+`createJanitorClips()` and run `npm run assets:janitor` to ship it.
 
 The approved 2D angle sheet remains in `concepts/characters/janitor/` as the
 visual reference.

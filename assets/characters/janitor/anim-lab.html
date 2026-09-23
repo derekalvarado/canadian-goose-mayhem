@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Janitor animation lab</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f2efe7; color: #293e39; font: 15px system-ui; }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  header.top { position: sticky; top: 0; z-index: 2; background: #f2efe7ee; padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid #d8d2c2; }
+  h1 { margin: 0 16px 0 0; font-size: 20px; }
+  button, select { font: inherit; padding: 6px 14px; border: 1px solid #879b8b; background: #fffdf6; border-radius: 6px; cursor: pointer; text-transform: capitalize; }
+  button[aria-pressed="true"] { background: #315c52; color: white; }
+  #groups { display: flex; gap: 6px; margin-right: 12px; }
+  #clock { font-variant-numeric: tabular-nums; margin-left: auto; opacity: .75; }
+  #cards { padding: 16px 24px 48px; display: grid; gap: 20px; }
+  .card { background: #fffdf6; border: 1px solid #d8d2c2; border-radius: 10px; padding: 12px 14px; }
+  .card header { display: flex; gap: 12px; align-items: baseline; } .card h2 { margin: 0; font-size: 17px; }
+  .meta { opacity: .6; font-size: 13px; } .notes { margin: 4px 0 10px; opacity: .85; }
+  .views { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+  figure { margin: 0; min-width: 0; } .view { height: 340px; border-radius: 6px; }
+  figcaption { text-align: center; font-size: 12px; opacity: .6; padding-top: 4px; }
+  body.zoom .views { grid-template-columns: 1fr 1fr 1fr; } body.zoom .view { height: 620px; }
+  @media (max-width: 800px) { .views { grid-template-columns: 1fr 1fr; } .views figure:first-child { grid-column: 1 / -1; } .view { height: 260px; } }
+</style>
+<canvas id="gl"></canvas>
+<header class="top">
+  <h1>Janitor animation lab</h1>
+  <div id="groups"></div>
+  <button id="play">Pause</button>
+  <button id="back" title="Step back one frame">◀ frame</button>
+  <button id="forward" title="Step forward one frame">frame ▶</button>
+  <button id="restart">Restart</button>
+  <select id="speed" title="Playback speed">
+    <option value="0.1">0.1×</option><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1">1×</option><option value="1.5">1.5×</option>
+  </select>
+  <button id="treadmill" title="Scroll the floor at the variant's travel speed to reveal foot sliding">Treadmill</button>
+  <button id="skeleton">Skeleton</button>
+  <button id="zoom" title="Bigger views">Zoom</button>
+  <span id="clock"></span>
+</header>
+<main id="cards"></main>
+<script type="module" src="/src/dev/janitorLab/lab.ts"></script>
+</html>

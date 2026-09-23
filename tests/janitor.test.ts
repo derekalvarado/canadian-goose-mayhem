@@ -26,7 +26,7 @@ test("exported janitor is broom-free, grounded, and has valid weighted joints an
   assert.ok(bounds.max.y > 2.5 && bounds.max.y < 2.65);
   assert.ok(bounds.max.x - bounds.min.x < 1.45);
   gltf.scene.traverse((object) => assert.doesNotMatch(object.name, /broom/i));
-  assert.deepEqual(gltf.animations.map((clip) => clip.name).sort(), ["idle", "inspect", "look", "scratch", "shoo", "walk"]);
+  assert.deepEqual(gltf.animations.map((clip) => clip.name).sort(), ["chase", "idle", "inspect", "look", "scratch", "shoo", "walk"]);
   for (const side of ["left", "right"]) {
     assert.equal(gltf.scene.getObjectByName(`${side}_hand_socket`)?.parent?.name, `${side}_wrist`);
   }
@@ -96,4 +96,35 @@ test("toon loading preserves independent animated skeletons, skin color, and edi
   first.playAnimation("look", 0);
   first.update(1);
   assert.ok(first.getObjectByName("head")!.rotation.y > 0.4);
+});
+
+test("exported clips bend knees and elbows the anatomical way", async () => {
+  const gltf = await loadJanitor();
+  const euler = new THREE.Euler();
+  for (const clip of gltf.animations) {
+    for (const track of clip.tracks) {
+      const [bone, property] = track.name.split(".");
+      if (property !== "quaternion" || !/_(knee|elbow)$/.test(bone)) continue;
+      for (let i = 0; i < track.times.length; i++) {
+        const x = euler.setFromQuaternion(new THREE.Quaternion().fromArray(track.values, i * 4)).x;
+        // Forward is -Z: knees fold the shin back with -x, elbows fold the forearm forward with +x.
+        if (bone.endsWith("knee")) assert.ok(x <= 1e-6, `${clip.name} ${bone} hyperextends (${x})`);
+        else assert.ok(x >= -1e-6, `${clip.name} ${bone} hyperextends (${x})`);
+      }
+    }
+  }
+});
+
+test("janitor stomps when chasing or recovering a stolen tool, and walks otherwise", async () => {
+  const source = await loadJanitor();
+  const view = new JanitorView(async () => source);
+  await view.ready;
+  view.setActivity("chasing-goose");
+  assert.equal(view.activeClip, "chase");
+  view.setActivity("walking-to-trash");
+  assert.equal(view.activeClip, "walk");
+  view.setActivity("retrieving-tool", true);
+  assert.equal(view.activeClip, "chase");
+  view.setActivity("retrieving-tool");
+  assert.equal(view.activeClip, "walk");
 });

@@ -56,6 +56,8 @@ export interface JanitorState {
   readonly id: string; readonly position: Readonly<Position>; readonly heading: number;
   readonly activity: JanitorActivity; readonly activitySecondsRemaining: number;
   readonly cleanupPhase?: CleanupPhase; readonly targetEntityId?: string; readonly heldToolId?: string;
+  /** Set while the goose has, or has dropped, the janitor's tool and he is going after it. */
+  readonly stolenToolId?: string;
   readonly completedTrashIdsThisLap: readonly string[];
 }
 export type SplashKidActivity = "playing" | "disappointed" | "walking-away" | "away" | "frightened" | "crying" | "returning";
@@ -243,6 +245,7 @@ export class Simulation {
       heading: this.janitor.heading, activity: this.janitor.activity,
       activitySecondsRemaining: this.janitor.activitySecondsRemaining, cleanupPhase: this.janitor.cleanupPhase,
       targetEntityId: this.janitor.targetEntityId, heldToolId: janitorTool?.definition.id,
+      stolenToolId: this.janitor.stolenToolId,
       completedTrashIdsThisLap: [...this.janitor.completedTrashIdsThisLap] } : undefined,
       splashKids: this.splashKids.map((child) => ({ id: child.definition.id, position: { ...child.position }, heading: child.heading,
         activity: child.activity, activitySecondsRemaining: child.activitySecondsRemaining })),

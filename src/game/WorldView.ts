@@ -113,7 +113,7 @@ export class WorldView extends THREE.Group {
     if (janitor) {
       const wrapper = this.instances.get(janitor.id); const view = this.gameplayViews.get(janitor.id);
       if (wrapper) { wrapper.position.set(janitor.position.x, janitor.position.y, janitor.position.z); wrapper.rotation.y = janitor.heading; }
-      if (view instanceof JanitorView) view.setActivity(janitor.activity);
+      if (view instanceof JanitorView) view.setActivity(janitor.activity, janitor.stolenToolId !== undefined);
     }
     for (const child of snapshot.splashKids) {
       const wrapper = this.instances.get(child.id); const view = this.gameplayViews.get(child.id);
