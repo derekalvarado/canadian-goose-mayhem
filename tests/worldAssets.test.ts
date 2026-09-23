@@ -135,3 +135,25 @@ test("the gas meter bank is a solid wall prop placed against the southeast store
   assert.ok(bounds.max.z - bounds.min.z <= asset.halfDepth * 2 + 0.05);
   assert.ok(bounds.min.y > -0.05 && bounds.max.y < 1.8);
 });
+
+test("coffee shop chairs stand on four legs and the square tables fit their footprints", () => {
+  const chair = createWorldAssetView("coffee.chair", new OcclusionFadeGroupRegistry(), "test.chair");
+  const feet = new Set<string>();
+  chair.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const bounds = new THREE.Box3().setFromObject(object);
+    if (bounds.min.y > 0.01) return;
+    const center = bounds.getCenter(new THREE.Vector3());
+    feet.add(`${Math.sign(center.x)},${Math.sign(center.z)}`);
+  });
+  assert.deepEqual([...feet].sort(), ["-1,-1", "-1,1", "1,-1", "1,1"], "a leg should reach the floor at every corner");
+
+  for (const assetId of ["coffee.chair", "coffee.table"]) {
+    const asset = getWorldAsset(assetId);
+    assert.ok(asset);
+    const bounds = new THREE.Box3().setFromObject(createWorldAssetView(assetId, new OcclusionFadeGroupRegistry(), `test.${assetId}`));
+    assert.ok(bounds.max.x <= asset.halfWidth + 0.01 && bounds.min.x >= -asset.halfWidth - 0.01, `${assetId} width`);
+    assert.ok(bounds.max.z <= asset.halfDepth + 0.01 && bounds.min.z >= -asset.halfDepth - 0.01, `${assetId} depth`);
+    assert.ok(bounds.min.y > -0.01 && bounds.max.y < 1.1, `${assetId} height`);
+  }
+});

@@ -54,7 +54,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "coffee.front-door", label: "Coffee shop front door", category: "architecture", halfWidth: 2.1, halfDepth: 0.18, colliders: [], warnForOverlap: false },
   { assetId: "coffee.wall-board", label: "Coffee shop menu board", category: "furniture", halfWidth: 1.7, halfDepth: 0.08, colliders: [], warnForOverlap: false },
   { assetId: "coffee.counter", label: "Coffee shop counter", category: "furniture", halfWidth: 3.1, halfDepth: 0.75, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.1, halfDepth: 0.75 }], occludesCamera: true },
-  { assetId: "coffee.table", label: "Coffee shop table", category: "furniture", halfWidth: 0.82, halfDepth: 0.82, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.74 }] },
+  { assetId: "coffee.table", label: "Coffee shop table", category: "furniture", halfWidth: 0.5, halfDepth: 0.5, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.48, halfDepth: 0.48 }] },
   { assetId: "coffee.chair", label: "Coffee shop chair", category: "furniture", halfWidth: 0.32, halfDepth: 0.32, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.28 }] },
   { assetId: "coffee.placeholder-person", label: "Coffee shop placeholder person", category: "character", halfWidth: 0.32, halfDepth: 0.32, colliders: [], warnForOverlap: false },
   { assetId: "street.sidewalk-tile", label: "Sidewalk tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: 0, surfacePriority: 3 },

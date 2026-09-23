@@ -1,4 +1,5 @@
 import { createGasMeterBank } from "./GasMeterBankView.ts";
+import { createCoffeeChair, createCoffeeTable } from "./CoffeeFurnitureView.ts";
 import { createOldTownPaving, createTownBench, createTownBed, createTownLamp, createTownLights, createTownFireplace, createTownStage, createTownBlock, createTownInlay } from "./OldTownViews.ts";
 import * as THREE from "three";
 import { JanitorView } from "./JanitorView.ts";
@@ -565,29 +566,6 @@ function createCoffeeCounter(groups: OcclusionFadeGroupRegistry, instanceId: str
   register.position.set(1.85, 1.38, -0.1);
   group.add(register);
   return registerCoffeeOcclusion(group, groups, instanceId);
-}
-
-function createCoffeeTable(): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop table graybox";
-  group.add(
-    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.1, 16), toonMaterial(PALETTE.coffee.counterTop))),
-    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 0.72, 10), toonMaterial(PALETTE.coffee.metal))),
-    finishMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.06, 12), toonMaterial(PALETTE.coffee.metal))),
-  );
-  (group.children[0] as THREE.Mesh).position.y = 0.78;
-  (group.children[1] as THREE.Mesh).position.y = 0.39;
-  (group.children[2] as THREE.Mesh).position.y = 0.04;
-  return group;
-}
-
-function createCoffeeChair(): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop chair graybox";
-  group.add(
-    box(0.56, 0.1, 0.56, PALETTE.coffee.chair, 0, 0.48, 0),
-    box(0.56, 0.66, 0.1, PALETTE.coffee.chair, 0, 0.8, 0.22),
-  );
-  for (const x of [-0.2, 0.2] as const) group.add(box(0.08, 0.44, 0.08, PALETTE.coffee.metal, x, 0.26, -0.16));
-  return group;
 }
 
 function createCoffeePlaceholderPerson(instanceId: string): THREE.Group {
