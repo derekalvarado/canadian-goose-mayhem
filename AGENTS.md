@@ -46,3 +46,45 @@ future acceptance gates.
   toon material factory for visual additions.
 - Run `npm test` and `npm run build` for gameplay changes. Add behavioral regression
   coverage for new gameplay invariants; do not require browser UI to test rules.
+
+## Adding a world asset
+
+Follow this checklist for each new prop, landmark, or building (see
+`src/game/GasMeterBankView.ts` and the `oldtown.gas-meter-bank` entries for a
+worked example).
+
+1. **Model.** Prefer a procedural Three.js builder in its own
+   `src/game/<Name>View.ts` that returns a `THREE.Group`, built only from
+   `toonMaterial()` meshes. Use a GLB under `assets/props/` loaded like
+   `TrashCanView.ts` only when the shape needs Blender; convert its materials to
+   toon materials by name. Model in meters, ground at `y = 0`, and face local `+z`
+   away from any wall it mounts against.
+2. **Colors.** Add a named group to `src/game/palette.ts`; never hard-code hex
+   colors in the builder.
+3. **Catalog.** Add an entry to `WORLD_ASSETS` in `src/game/worldAssets.ts` with a
+   stable `<area>.<name>` ID, category, `halfWidth`/`halfDepth` that enclose the
+   mesh, colliders that match what the goose should bump into, and
+   `occludesCamera` for anything tall.
+4. **Renderer.** Add a `case` for the ID in `createWorldAssetView` in
+   `src/game/PlazaWorld.ts`.
+5. **Placement.** Insert the instance into `src/game/content/world-layout.json`
+   by editing the text (re-serializing the file reformats the coffee-shop area).
+   Keep it on paving inside a playable chunk; `generate-old-town-layout.mjs` is
+   stale, so do not regenerate from it.
+6. **Existing drafts.** Bump `canonicalRevision` in the JSON and add a
+   `*_CONTENT_REVISION` constant plus an `add<Name>Content` step in
+   `src/game/worldLayout.ts` (chained outermost in `loadWorldLayout`) that adds the
+   instance once to older browser drafts. Update tests that assert the latest
+   revision. Parallel asset branches will collide on this number; renumber when
+   merging.
+7. **Tests.** In `tests/worldAssets.test.ts`, check the rendered bounds stay
+   within the catalog footprint and colliders stay inside it. In
+   `tests/oldTownRebuild.test.ts`, check the draft upgrade adds it once without
+   disturbing edits, that the goose is blocked where expected
+   (`resolveWorldAreaMovement`), and that it does not overlap neighbouring props
+   (`findWorldInstanceOverlaps`).
+8. **Look at it.** Run `npm test` and `npm run build`, then view it in the browser:
+   `?overview&dev&start=old-town-square.central-plaza` for placement, and a
+   temporary close-up page that imports the builder for detail (delete it before
+   committing). If the dev server redirects every page to the game, unregister the
+   offline service worker in that browser first.
