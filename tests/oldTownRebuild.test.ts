@@ -21,7 +21,7 @@ test("square upgrade archives the previous draft, preserves other areas, and can
   old.areas.push({ id: "custom-garden", label: "My garden", chunks: [], instances: [] });
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 12);
+  assert.equal(updated.canonicalRevision, 13);
   assert.equal(getWorldArea(updated).instances.find(i => i.id === "plaza.goose-fountain")!.transform.x, -16);
   assert.deepEqual(updated.areas[1], { ...old.areas[1], controlLinks: [] });
   const backup = store.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -51,11 +51,11 @@ test("the gameplay content update preserves authored edits and is saved once", (
   saveWorldLayout(authored, store);
 
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 12);
+  assert.equal(updated.canonicalRevision, 13);
   assert.equal(getWorldArea(updated).instances.find((item) => item.id === "plaza.goose-fountain")?.transform.x, -14.25);
   assert.ok(getWorldArea(updated).instances.some((item) => item.id === "plaza.splash-faucet"));
   assert.deepEqual(getWorldArea(updated).controlLinks, [{ controllerId: "plaza.splash-faucet", targetId: "plaza.splash-pad" }]);
-  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 12);
+  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 13);
   assert.equal(getWorldArea(updated).instances.filter((item) => item.assetId.startsWith("plaza.splash-kid-")).length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => getWorldAsset(item.assetId)?.cleanupRole === "litter").length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => ["trash-bag", "litter-picker"].includes(getWorldAsset(item.assetId)?.cleanupRole ?? "")).length, 2);
