@@ -118,3 +118,20 @@ test("cleanup props are reusable toon-shaded assets and the picker has its autho
   assert.ok(colors.has(PALETTE.plaza.iron), "picker has a dark grip and jaw");
   assert.ok(colors.has(PALETTE.plaza.awningBlue), "picker has blue trigger accents");
 });
+
+test("the gas meter bank is a solid wall prop placed against the southeast storefront", () => {
+  const asset = getWorldAsset("oldtown.gas-meter-bank");
+  assert.ok(asset);
+  assert.equal(asset.category, "prop");
+  assert.ok(asset.colliders.length > 0);
+  for (const collider of asset.colliders) {
+    assert.ok(Math.abs(collider.x) + (collider.halfWidth ?? 0) <= asset.halfWidth + 1e-9);
+    assert.ok(Math.abs(collider.z) + (collider.halfDepth ?? 0) <= asset.halfDepth + 1e-9);
+  }
+
+  const view = createWorldAssetView(asset.assetId, new OcclusionFadeGroupRegistry(), "test.gas-meters");
+  const bounds = new THREE.Box3().setFromObject(view);
+  assert.ok(bounds.max.x - bounds.min.x <= asset.halfWidth * 2 + 0.05);
+  assert.ok(bounds.max.z - bounds.min.z <= asset.halfDepth * 2 + 0.05);
+  assert.ok(bounds.min.y > -0.05 && bounds.max.y < 1.8);
+});

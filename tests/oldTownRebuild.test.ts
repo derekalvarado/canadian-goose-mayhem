@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { Building1View } from "../src/game/Building1View.ts";
 import { CANONICAL_WORLD_LAYOUT, cloneWorldLayout, getWorldArea, loadWorldLayout, loadPreviousWorldLayout, PRE_REBUILD_LAYOUT_STORAGE_KEY, WORLD_LAYOUT_STORAGE_KEY, saveWorldLayout } from "../src/game/worldLayout.ts";
-import { createCentralPlazaRules, isWorldAreaPlayable } from "../src/game/worldLevel.ts";
+import { createCentralPlazaRules, findWorldInstanceOverlaps, isWorldAreaPlayable, resolveWorldAreaMovement } from "../src/game/worldLevel.ts";
 import { getWorldAsset } from "../src/game/worldAssets.ts";
 import { FIXED_STEP, Simulation, type PlayerCommand } from "../src/game/simulation/Simulation.ts";
 
@@ -21,7 +21,7 @@ test("square upgrade archives the previous draft, preserves other areas, and can
   old.areas.push({ id: "custom-garden", label: "My garden", chunks: [], instances: [] });
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 12);
+  assert.equal(updated.canonicalRevision, 13);
   assert.equal(getWorldArea(updated).instances.find(i => i.id === "plaza.goose-fountain")!.transform.x, -16);
   assert.deepEqual(updated.areas[1], { ...old.areas[1], controlLinks: [] });
   const backup = store.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -51,11 +51,11 @@ test("the gameplay content update preserves authored edits and is saved once", (
   saveWorldLayout(authored, store);
 
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 12);
+  assert.equal(updated.canonicalRevision, 13);
   assert.equal(getWorldArea(updated).instances.find((item) => item.id === "plaza.goose-fountain")?.transform.x, -14.25);
   assert.ok(getWorldArea(updated).instances.some((item) => item.id === "plaza.splash-faucet"));
   assert.deepEqual(getWorldArea(updated).controlLinks, [{ controllerId: "plaza.splash-faucet", targetId: "plaza.splash-pad" }]);
-  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 12);
+  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 13);
   assert.equal(getWorldArea(updated).instances.filter((item) => item.assetId.startsWith("plaza.splash-kid-")).length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => getWorldAsset(item.assetId)?.cleanupRole === "litter").length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => ["trash-bag", "litter-picker"].includes(getWorldAsset(item.assetId)?.cleanupRole ?? "")).length, 2);
@@ -138,4 +138,33 @@ test("all four storefront variants load with toon materials, correct footprint, 
     assert.ok(Math.max(Math.abs(bounds.min.z),Math.abs(bounds.max.z)) <= asset.halfDepth + 1e-5);
     view.traverse(o => { if (o instanceof THREE.Mesh) assert.ok(o.material instanceof THREE.MeshToonMaterial); });
   }
+});
+
+test("drafts saved before the gas meter bank gain it once without disturbing edits", () => {
+  const store = memoryStore();
+  const old = cloneWorldLayout(CANONICAL_WORLD_LAYOUT); old.canonicalRevision = 12;
+  const plaza = getWorldArea(old);
+  plaza.instances = plaza.instances.filter(i => i.id !== "oldtown.gas-meter-bank");
+  plaza.instances.find(i => i.id === "plaza.goose-fountain")!.transform.x = -7;
+  saveWorldLayout(old, store);
+  const updated = loadWorldLayout(store);
+  assert.equal(updated.canonicalRevision, 13);
+  const meters = getWorldArea(updated).instances.filter(i => i.id === "oldtown.gas-meter-bank");
+  assert.equal(meters.length, 1);
+  assert.equal(getWorldArea(updated).instances.find(i => i.id === "plaza.goose-fountain")!.transform.x, -7);
+  // A user who later deletes the meters keeps them deleted.
+  getWorldArea(updated).instances = getWorldArea(updated).instances.filter(i => i.id !== "oldtown.gas-meter-bank");
+  saveWorldLayout(updated, store);
+  assert.equal(getWorldArea(loadWorldLayout(store)).instances.some(i => i.id === "oldtown.gas-meter-bank"), false);
+});
+
+test("the gas meter bank blocks walking without overlapping neighbouring props", () => {
+  const area = getWorldArea(CANONICAL_WORLD_LAYOUT);
+  const meters = area.instances.find(i => i.id === "oldtown.gas-meter-bank")!;
+  // Paving, the host wall and the corner tree's overhead canopy footprint are expected neighbours.
+  const expected = new Set(["ground", "architecture", "planting"]);
+  assert.deepEqual(findWorldInstanceOverlaps(area, meters.id).filter(id => !expected.has(getWorldAsset(area.instances.find(i => i.id === id)!.assetId)!.category)), []);
+  const { x, z } = meters.transform;
+  const blocked = resolveWorldAreaMovement(area, { x: x + 1.5, y: 0, z: z - 0.8 }, { x: x - 0.1, y: 0, z: z - 0.8 }, { x: 0, y: 0, z: 0 });
+  assert.ok(blocked.x > x, `expected the meters to stop the goose, reached x=${blocked.x}`);
 });

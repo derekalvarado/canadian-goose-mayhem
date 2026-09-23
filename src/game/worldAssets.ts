@@ -73,6 +73,10 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "oldtown.flower-bed", label: "Stone-edged flower bed", category: "planting", halfWidth: 2.375, halfDepth: 0.925, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 2.375, halfDepth: 0.925 }], occludesCamera: false },
   { assetId: "oldtown.lamp", label: "Old Town banner lamp", category: "lighting", halfWidth: 1, halfDepth: 0.24, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.17, halfDepth: 0.17 }], occludesCamera: false },
   { assetId: "oldtown.fireplace", label: "Communal fireplace", category: "furniture", halfWidth: 1.4, halfDepth: 0.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.4, halfDepth: 0.7 }], occludesCamera: false },
+  { assetId: "oldtown.gas-meter-bank", label: "Wall-mounted gas meter bank", category: "prop", halfWidth: 2.2, halfDepth: 0.6, colliders: [
+    { shape: "box", x: -1.45, z: -0.38, halfWidth: 0.75, halfDepth: 0.22 },
+    { shape: "box", x: 0.72, z: -0.07, halfWidth: 1.45, halfDepth: 0.53 },
+  ], occludesCamera: false },
   { assetId: "oldtown.shade-tree", label: "Old Town shade tree", category: "planting", halfWidth: 3.6, halfDepth: 2.736, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.4824 }], occludesCamera: true },
   { assetId: "oldtown.oval-inlay", label: "Oval plaza paving inlay", category: "ground", halfWidth: 13.76, halfDepth: 8, colliders: [], warnForOverlap: false },
   { assetId: "oldtown.light-span", label: "Old Town festoon span", category: "lighting", halfWidth: 0.1, halfDepth: 8.1, colliders: [], warnForOverlap: false },

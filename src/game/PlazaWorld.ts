@@ -1,3 +1,4 @@
+import { createGasMeterBank } from "./GasMeterBankView.ts";
 import { createOldTownPaving, createTownBench, createTownBed, createTownLamp, createTownLights, createTownFireplace, createTownStage, createTownBlock, createTownInlay } from "./OldTownViews.ts";
 import * as THREE from "three";
 import { JanitorView } from "./JanitorView.ts";
@@ -1275,6 +1276,7 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "oldtown.lamp": return createTownLamp();
     case "oldtown.light-span": return createTownLights();
     case "oldtown.fireplace": return createTownFireplace();
+    case "oldtown.gas-meter-bank": return createGasMeterBank();
     case "street.trash-can": return new TrashCanView();
     case "plaza.planter-cluster": return createPlanterCluster();
     case "plaza.planter-east-north": return createSinglePlanter(1.45, 3.3);

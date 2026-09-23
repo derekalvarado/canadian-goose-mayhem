@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 12,
+  "canonicalRevision": 13,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -898,6 +898,17 @@
             "y": 0,
             "z": 6.25,
             "rotationY": 3.141592653589793
+          }
+        },
+        {
+          "id": "oldtown.gas-meter-bank",
+          "assetId": "oldtown.gas-meter-bank",
+          "label": "Gas meters on the corner storefront side wall",
+          "transform": {
+            "x": 22.11,
+            "y": 0,
+            "z": 17.5,
+            "rotationY": 1.5707963267948966
           }
         },
         {

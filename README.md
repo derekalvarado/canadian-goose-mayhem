@@ -32,6 +32,26 @@ caches files as they load so it can fall back when Vite becomes unreachable. A
 phone must use HTTPS (or localhost) for service workers; plain HTTP LAN IPs
 cannot provide this browser guarantee.
 
+### Dev mode and start areas
+
+The normal URL always starts in the coffee shop. Add `?dev` to turn on dev mode,
+which shows a "DEV START · <area>" badge and lets `start=<area>` choose where the goose
+begins:
+
+```text
+http://localhost:5173/?dev&start=old-town-square.central-plaza
+```
+
+| Area | `start` value |
+| --- | --- |
+| Coffee shop interior (default) | `old-town-square.coffee-shop` (or the shorthand `coffee-shop`) |
+| Old Town Square plaza | `old-town-square.central-plaza` |
+
+`start` is ignored without `?dev`, and an unknown area falls back to the coffee
+shop. Combine it with `?overview` for an orbitable view of that area, or with
+`?edit` to open the world builder there (for example,
+`?overview&dev&start=old-town-square.central-plaza`).
+
 ## Arrange the plaza
 
 Open the same local URL with `?edit` at the end (for example,
