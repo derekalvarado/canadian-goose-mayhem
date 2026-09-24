@@ -9,6 +9,7 @@ import { DeciduousTreeView, deciduousTreeVariantForId } from "./DeciduousTreeVie
 import { Building1View } from "./Building1View.ts";
 import { TrashCanView } from "./TrashCanView.ts";
 import { BreweryTankView } from "./BreweryTankView.ts";
+import { createCoopersmith } from "./CoopersmithView.ts";
 import {
   FOUNTAIN_RADIUS,
   PAVILION_SIZE,
@@ -1211,6 +1212,9 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "oldtown.coopersmith-block": {
       const block = createTownBlock(assetId === "oldtown.miller-block" ? "miller" : "coopersmith");
       groups.register(instanceId, block); return block;
+    }
+    case "oldtown.coopersmith-pub": {
+      const pub = createCoopersmith(); groups.register(instanceId, pub); return pub;
     }
     case "oldtown.stage": {
       const stage = createTownStage(); groups.register(instanceId, stage); return stage;

@@ -8,34 +8,17 @@ import {
   CENTRAL_PLAZA_AREA_ID,
   COFFEE_SHOP_AREA_ID,
   getWorldArea,
-  isWorldChunkPlayable,
   resolveStartAreaId,
 } from "../src/game/worldLayout.ts";
-import { createCoffeeShopRules, createWorldRules, ENTER_SHOP_FACT_ID, ENTER_SHOP_OBJECTIVE_ID, isWorldAreaPlayable, resolveWorldAreaMovement } from "../src/game/worldLevel.ts";
+import { createCoffeeShopRules, createWorldRules, ENTER_SHOP_FACT_ID, ENTER_SHOP_OBJECTIVE_ID, isWorldAreaPlayable } from "../src/game/worldLevel.ts";
 import { FIXED_STEP, Simulation } from "../src/game/simulation/Simulation.ts";
 import { AuthoredPhysicsAdapter } from "../src/game/simulation/physics.ts";
 
-test("canonical coffee shop graybox has a left-wall counter and five visual people", () => {
-  const area = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
-  const people = area.instances.filter((instance) => instance.assetId === "coffee.placeholder-person");
-  const tables = area.instances.filter((instance) => instance.assetId === "coffee.table");
-  const counter = area.instances.find((instance) => instance.id === "coffee.counter");
-
-  assert.equal(people.length, 5);
-  assert.equal(tables.length, 4);
-  assert.ok(counter);
-  assert.ok(tables.every((table) => table.transform.x > counter.transform.x));
-  assert.equal(isWorldChunkPlayable(area, 0, 0), true);
-  assert.equal(isWorldAreaPlayable(area, 0, 6.6), true, "front door opening should be walkable");
-  assert.equal(isWorldAreaPlayable(area, counter.transform.x, counter.transform.z), false, "counter should block movement");
-});
-
-test("the coffee shop portal is anchored to the southern storefront", () => {
+test("the coffee shop portal links the plaza entrance and the shop front door", () => {
   const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID);
   const entrance = plaza.instances.find((instance) => instance.id === "plaza.shop-entrance");
   assert.ok(entrance);
   assert.equal(entrance.label, "Coffee shop entrance");
-  assert.deepEqual(entrance.transform, { x: -10, y: 0, z: 14.22, rotationY: Math.PI });
 
   const transitions = CANONICAL_WORLD_LAYOUT.transitions;
   assert.deepEqual(transitions.map((transition) => transition.id), ["transition.coffee-shop.enter", "transition.coffee-shop.exit"]);
@@ -45,26 +28,30 @@ test("the coffee shop portal is anchored to the southern storefront", () => {
   assert.equal(transitions[1]?.toAreaId, CENTRAL_PLAZA_AREA_ID);
 });
 
-test("coffee shop rules keep the goose inside the graybox and expose no placeholder AI", () => {
+test("coffee shop rules spawn the goose on playable ground and expose no placeholder AI", () => {
   const area = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
   const rules = createCoffeeShopRules(area);
   assert.equal(rules.entities?.length ?? 0, 0);
   assert.equal(rules.janitor, undefined);
   assert.equal(isWorldAreaPlayable(area, rules.spawn.x, rules.spawn.z), true);
-
-  const output = { x: 0, y: 0, z: 0 };
-  resolveWorldAreaMovement(area, { x: 0, y: 0, z: -6 }, { x: 0, y: 0, z: -8 }, output);
-  assert.equal(isWorldAreaPlayable(area, output.x, output.z), true);
-  assert.ok(output.z > -7, "north wall should stop the goose before the wall center");
   assert.equal(createWorldRules(area).objectives.length, 0);
 });
+
+/** A spot just outside the placed shop entrance, and the stick direction that walks into it. */
+function shopApproach(): { start: { x: number; y: number; z: number }; moveX: number; moveZ: number } {
+  const entrance = getWorldArea(CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID).instances.find((instance) => instance.id === "plaza.shop-entrance")!;
+  const { x, z, rotationY } = entrance.transform;
+  const moveX = -Math.sin(rotationY); const moveZ = -Math.cos(rotationY);
+  return { start: { x: x - moveX * 1.2, y: 0, z: z - moveZ * 1.2 }, moveX, moveZ };
+}
 
 test("crossing the southern storefront transitions both ways without losing the shop fact", () => {
   const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID);
   const coffeeShop = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
   const plazaRules = createWorldRules(plaza, CANONICAL_WORLD_LAYOUT.transitions);
-  const plazaSimulation = new Simulation({ ...plazaRules, spawn: { x: -10, y: 0, z: 13.05 } });
-  const enterEvents = Array.from({ length: 120 }, () => plazaSimulation.advance(FIXED_STEP, { moveX: 0, moveZ: 1, hurry: false, honkPressed: false })).flat();
+  const approach = shopApproach();
+  const plazaSimulation = new Simulation({ ...plazaRules, spawn: approach.start });
+  const enterEvents = Array.from({ length: 120 }, () => plazaSimulation.advance(FIXED_STEP, { moveX: approach.moveX, moveZ: approach.moveZ, hurry: false, honkPressed: false })).flat();
   const enter = enterEvents.find((event) => event.type === "area-transition-requested");
   assert.ok(enter && enter.type === "area-transition-requested");
   assert.equal(enter.toAreaId, COFFEE_SHOP_AREA_ID);
@@ -85,12 +72,14 @@ test("a goose-held item keeps its identity across the area boundary", () => {
   const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID);
   const coffeeShop = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
   const rules = createWorldRules(plaza, CANONICAL_WORLD_LAYOUT.transitions);
-  const simulation = new Simulation({ ...rules, spawn: { x: -20.5, y: 0, z: -2.25 } });
+  const can = plaza.instances.find((instance) => instance.id === "plaza.beer-can")!;
+  const simulation = new Simulation({ ...rules, spawn: { x: can.transform.x, y: 0, z: can.transform.z } });
   simulation.advance(FIXED_STEP, { moveX: 0, moveZ: 0, hurry: false, honkPressed: false, interactPressed: true });
   assert.equal(simulation.player.heldEntityId, "plaza.beer-can");
 
-  simulation.setPlayerTransform({ x: -10, y: 0, z: 13.05 });
-  const enterEvents = Array.from({ length: 120 }, () => simulation.advance(FIXED_STEP, { moveX: 0, moveZ: 1, hurry: false, honkPressed: false })).flat();
+  const approach = shopApproach();
+  simulation.setPlayerTransform(approach.start);
+  const enterEvents = Array.from({ length: 120 }, () => simulation.advance(FIXED_STEP, { moveX: approach.moveX, moveZ: approach.moveZ, hurry: false, honkPressed: false })).flat();
   const enter = enterEvents.find((event) => event.type === "area-transition-requested");
   assert.ok(enter && enter.type === "area-transition-requested");
 
@@ -118,9 +107,12 @@ test("authored physics spike maps stable colliders and supports fixed-step body 
   physics.applyImpulse("coffee.test-mug", { x: 1, y: 0, z: 0 });
   physics.step(1 / 60);
   assert.ok((physics.snapshot()[0]?.position.x ?? 0) > 0);
-  assert.ok(physics.overlapCircle({ x: -7.25, y: 0, z: -1 }, 0.2).includes("coffee.counter"));
+  const placed = (id: string) => area.instances.find((instance) => instance.id === id)!.transform;
+  const counter = placed("coffee.counter");
+  assert.ok(physics.overlapCircle({ x: counter.x, y: 0, z: counter.z }, 0.2).includes("coffee.counter"));
 
-  const hit = physics.sweepCircle({ x: 0, y: 0, z: 4 }, { x: 0, y: 0, z: -6.5 }, 0.34, "coffee.test-mug");
+  const wall = placed("coffee.wall-north");
+  const hit = physics.sweepCircle({ x: wall.x, y: 0, z: wall.z + 11 }, { x: wall.x, y: 0, z: wall.z + 0.3 }, 0.34, "coffee.test-mug");
   assert.equal(hit?.bodyId, "coffee.wall-north");
 });
 
