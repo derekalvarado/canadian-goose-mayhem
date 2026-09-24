@@ -5,6 +5,8 @@ import { OcclusionFadeGroupRegistry } from "../src/game/OcclusionFadeGroups.ts";
 import { createWorldAssetView, SplashPadView } from "../src/game/PlazaWorld.ts";
 import { PALETTE } from "../src/game/palette.ts";
 import { getWorldAsset, WORLD_ASSETS } from "../src/game/worldAssets.ts";
+import { addWorldArea, CANONICAL_WORLD_LAYOUT, cloneWorldLayout, createInstance, toggleWorldChunkPlayable, worldChunkCoordinates } from "../src/game/worldLayout.ts";
+import { isWorldAreaPlayable, resolveWorldAreaMovement } from "../src/game/worldLevel.ts";
 
 test("the corner market building is a detailed catalog asset with matching solid footprint", () => {
   const asset = getWorldAsset("plaza.corner-market-building");
@@ -171,4 +173,56 @@ test("plaza bistro sets pair a square folding table with two facing chairs insid
   assert.ok(bounds.max.x <= asset.halfWidth + 0.01 && bounds.min.x >= -asset.halfWidth - 0.01, "width");
   assert.ok(bounds.max.z <= asset.halfDepth + 0.01 && bounds.min.z >= -asset.halfDepth - 0.01, "depth");
   assert.ok(bounds.min.y > -0.03 && bounds.max.y < 1.1, "height");
+});
+
+test("CooperSmith's pub keeps its tapered block, pergola and umbrella patio inside the catalog footprint", () => {
+  const asset = getWorldAsset("oldtown.coopersmith-pub");
+  assert.ok(asset);
+  assert.equal(asset.category, "architecture");
+  assert.equal(asset.occludesCamera, true);
+  for (const collider of asset.colliders) {
+    const halfX = collider.shape === "circle" ? collider.radius ?? 0 : collider.halfWidth ?? 0;
+    const halfZ = collider.shape === "circle" ? collider.radius ?? 0 : collider.halfDepth ?? 0;
+    assert.ok(Math.abs(collider.x) + halfX <= asset.halfWidth + 1e-9, `collider at ${collider.x},${collider.z} width`);
+    assert.ok(Math.abs(collider.z) + halfZ <= asset.halfDepth + 1e-9, `collider at ${collider.x},${collider.z} depth`);
+  }
+
+  const groups = new OcclusionFadeGroupRegistry();
+  const view = createWorldAssetView(asset.assetId, groups, "test.coopersmith");
+  assert.ok(groups.groupById("test.coopersmith"));
+  const bounds = new THREE.Box3().setFromObject(view);
+  assert.ok(bounds.min.x >= -asset.halfWidth - 0.01 && bounds.max.x <= asset.halfWidth + 0.01, `width ${bounds.min.x}..${bounds.max.x}`);
+  assert.ok(bounds.min.z >= -asset.halfDepth - 0.01 && bounds.max.z <= asset.halfDepth + 0.01, `depth ${bounds.min.z}..${bounds.max.z}`);
+  assert.ok(bounds.min.y > -0.01 && bounds.max.y > 8.5 && bounds.max.y < 10.5, `height ${bounds.max.y}`);
+
+  let umbrellas = 0;
+  view.traverse((object) => { if (object.name === "CooperSmith's black patio umbrella") umbrellas += 1; });
+  assert.equal(umbrellas, 7);
+});
+
+test("the goose walks into CooperSmith's patio through its gate but not through the fence or brick", () => {
+  const world = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+  const area = addWorldArea(world, "pub-test", "Pub test");
+  const [ox, oz] = [20, 20];
+  createInstance(area, "plaza.paving-base", "pub-test.paving", ox, oz);
+  createInstance(area, "oldtown.coopersmith-pub", "pub-test.pub", ox, oz);
+  const chunk = worldChunkCoordinates(ox, oz);
+  toggleWorldChunkPlayable(area, chunk.x, chunk.z);
+  const walkable = (x: number, z: number) => isWorldAreaPlayable(area, ox + x, oz + z);
+
+  assert.equal(walkable(-8, 0), true, "open paving beside the long side wall");
+  assert.equal(walkable(-5.2, -4), false, "the long side wall blocks");
+  assert.equal(walkable(2.49, 4.15), false, "the diagonal facade blocks just in front of its face");
+  assert.equal(walkable(3.03, 4.73), true, "the goose can walk along the diagonal facade");
+  assert.equal(walkable(-3.15, 8.1), true, "the goose can stand at the square-end door");
+  assert.equal(walkable(1.4, 10.6), false, "the front fence blocks");
+  assert.equal(walkable(1.9, 9.6), true, "there is room between the umbrella tables");
+
+  // Walk from outside the gate into the patio: x steps through the gap in the left run.
+  const position = { x: ox - 7, y: 0, z: oz + 8.15 };
+  for (let i = 0; i < 20; i++) resolveWorldAreaMovement(area, position, { x: position.x + 0.1, y: 0, z: position.z }, position);
+  assert.ok(position.x > ox - 5.5, `the gate lets the goose in (reached x ${position.x - ox})`);
+  const blocked = { x: ox - 7, y: 0, z: oz + 9 };
+  for (let i = 0; i < 20; i++) resolveWorldAreaMovement(area, blocked, { x: blocked.x + 0.1, y: 0, z: blocked.z }, blocked);
+  assert.ok(blocked.x < ox - 5.9 - 0.3, "the fence beside the gate stops the goose");
 });

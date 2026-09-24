@@ -43,6 +43,14 @@ export interface WorldAssetDefinition {
   readonly gameplayRole?: "janitor" | "splash-kid" | "shop-entrance";
 }
 
+/** Evenly spaced circle colliders tracing a diagonal wall or fence, ends included. */
+function circlesAlong(x0: number, z0: number, x1: number, z1: number, count: number, radius: number): WorldAssetCollider[] {
+  return Array.from({ length: count }, (_, i) => {
+    const t = i / (count - 1);
+    return { shape: "circle", x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, radius };
+  });
+}
+
 export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.paving-patch", label: "Paving patch", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: 0, surfacePriority: 1 },
   { assetId: "plaza.paving-patch-large", label: "Large paving patch", category: "ground", halfWidth: 8, halfDepth: 8, colliders: [], surfaceHeight: 0, surfacePriority: 1 },
@@ -68,6 +76,28 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "street.building5", label: "Sage townhouse", category: "architecture", halfWidth: 3.15, halfDepth: 3.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.05, halfDepth: 3.16 }], occludesCamera: true },
   { assetId: "oldtown.miller-block", label: "Miller Block — historic brick corner", category: "architecture", halfWidth: 8.2, halfDepth: 5.1, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.99, halfDepth: 4.07 }], occludesCamera: true },
   { assetId: "oldtown.coopersmith-block", label: "CooperSmith’s — glazed canopy block", category: "architecture", halfWidth: 8.9, halfDepth: 5.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 8.69, halfDepth: 4.07 }], occludesCamera: true },
+  { assetId: "oldtown.coopersmith-pub", label: "CooperSmith’s — tapered pub & umbrella patio", category: "architecture", halfWidth: 6.1, halfDepth: 10.8, colliders: [
+    // Brick block: the full-width rear, then boxes stepping in under the
+    // diagonal facade, with small circles sealing the sawtooth along it.
+    { shape: "box", x: 0.5, z: -5, halfWidth: 5.5, halfDepth: 5.6 },
+    { shape: "box", x: -0.4125, z: 1.45, halfWidth: 4.5875, halfDepth: 0.85 },
+    { shape: "box", x: -1.325, z: 3.15, halfWidth: 3.675, halfDepth: 0.85 },
+    { shape: "box", x: -2.2375, z: 4.85, halfWidth: 2.7625, halfDepth: 0.85 },
+    { shape: "box", x: -3.15, z: 6.55, halfWidth: 1.85, halfDepth: 0.85 },
+    ...circlesAlong(-1.3, 7.4, 5.8, 0.786, 17, 0.25),
+    // Patio fence; the gap in the left run (z 7.6–8.7) is the gate.
+    { shape: "box", x: -5.45, z: 6.2, halfWidth: 0.45, halfDepth: 0.05 },
+    { shape: "box", x: -5.9, z: 6.9, halfWidth: 0.05, halfDepth: 0.7 },
+    { shape: "box", x: -5.9, z: 8.95, halfWidth: 0.05, halfDepth: 0.25 },
+    ...circlesAlong(-5.9, 9.2, -4.6, 10.6, 7, 0.1),
+    { shape: "box", x: 0.6, z: 10.6, halfWidth: 5.2, halfDepth: 0.05 },
+    { shape: "box", x: 5.8, z: 5.693, halfWidth: 0.05, halfDepth: 4.907 },
+    // Pergola posts and the umbrella tables (poles stand in the tables).
+    { shape: "circle", x: 0.4836, z: 8.7451, radius: 0.08 },
+    { shape: "circle", x: 2.9715, z: 6.4277, radius: 0.08 },
+    { shape: "circle", x: 5.4593, z: 4.1103, radius: 0.08 },
+    ...[[-4.1, 9.6], [-1.7, 9.6], [0.7, 9.6], [3.1, 9.6], [1, 7.1], [3.4, 7.1], [4, 4.8]].map(([x, z]) => ({ shape: "circle" as const, x, z, radius: 0.4 })),
+  ], occludesCamera: true },
   { assetId: "oldtown.stage", label: "Old Town performance stage", category: "landmark", halfWidth: 7, halfDepth: 3.65, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 6.3, halfDepth: 2.7 }], occludesCamera: true },
   { assetId: "oldtown.brewery-tank", label: "Brewery fermentation tank", category: "landmark", halfWidth: 2.5, halfDepth: 2.5, colliders: [{ shape: "circle", x: 0, z: 0, radius: 2.5 }], occludesCamera: true },
   { assetId: "oldtown.bench", label: "Old Town bench", category: "furniture", halfWidth: 1.125, halfDepth: 0.35, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.125, halfDepth: 0.35 }], occludesCamera: false },

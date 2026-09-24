@@ -61,6 +61,13 @@ Open `?animation` on the dev server for the close-up movement studio. It uses th
 production `Goose` view, with walk/run selection, turning, held poses, moving gaze
 target, honk/grab/startle, slow motion, pause, and frame stepping. Drag to orbit.
 
+Open `/assets/characters/goose/anim-lab.html` to compare walk variants side by
+side against the exported clip, at the game's walking cadence and speed. It poses
+the exported rig with a TypeScript port of `gait()` (`src/dev/gooseLab/gait.ts`);
+variants are knob sets in `src/dev/gooseLab/variants.ts` and hot-reload on save.
+Port a chosen variant's values into `scripts/animate-goose.py`, re-export, and
+update `SHIPPED_WALK` so `tests/gooseLab.test.ts` keeps the port matching the GLB.
+
 `GooseAnimation.ts` owns presentation blending. Gameplay retains its fixed step,
 speed, heading, collision, and event ownership. The renderer interpolates adjacent
 simulation transforms for smoother displays above 60 Hz. Head tracking glances at
