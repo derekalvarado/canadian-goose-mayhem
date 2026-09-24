@@ -83,11 +83,15 @@ worked example).
    revision. Parallel asset branches will collide on this number; renumber when
    merging.
 7. **Tests.** In `tests/worldAssets.test.ts`, check the rendered bounds stay
-   within the catalog footprint and colliders stay inside it. In
-   `tests/oldTownRebuild.test.ts`, check the draft upgrade adds it once without
-   disturbing edits, that the goose is blocked where expected
-   (`resolveWorldAreaMovement`), and that it does not overlap neighbouring props
-   (`findWorldInstanceOverlaps`).
+   within the catalog footprint and colliders stay inside it; to check where the
+   goose is blocked (`resolveWorldAreaMovement`), place the asset in a test-built
+   area rather than the canonical layout. If you added a draft upgrade, check in
+   `tests/oldTownRebuild.test.ts` that it adds the instance once without
+   disturbing edits.
+   The world layout is still being arranged in the editor, so never assert where
+   things sit in `world-layout.json`: no hard-coded coordinates, routes, or
+   "does not overlap its neighbours" checks against canonical placements. When a
+   behavioural test needs a placed object, read its position from the layout.
 8. **Look at it.** Run `npm test` and `npm run build`, then view it in the browser:
    `?overview&dev&start=old-town-square.central-plaza` for placement, and a
    temporary close-up page that imports the builder for detail (delete it before
