@@ -148,7 +148,7 @@ export class Goose extends THREE.Group {
     speedRatio: number,
     turnAmount: number,
     wingsSpread: boolean,
-    aggressive: boolean,
+    sneakPose: boolean,
   ): void {
     if (!this.mixer || !Number.isFinite(delta) || delta <= 0) return;
     const dt = Math.min(delta, 0.1);
@@ -161,7 +161,7 @@ export class Goose extends THREE.Group {
       yaw = Math.atan2(-this.localTarget.x, -this.localTarget.z);
       pitch = Math.atan2(this.localTarget.y - 0.8, Math.hypot(this.localTarget.x, this.localTarget.z));
     }
-    this.animation.update(dt, speedRatio, turnAmount, wingsSpread, aggressive, yaw, pitch);
+    this.animation.update(dt, speedRatio, turnAmount, wingsSpread, sneakPose, yaw, pitch);
     for (const name of ["idle", "walk", "hurry", "sneak"] as GooseLocomotion[]) {
       const action = this.actions.get(name);
       if (!action) continue;
@@ -169,7 +169,7 @@ export class Goose extends THREE.Group {
       if (name !== "idle") action.time = this.animation.phase * action.getClip().duration;
     }
     this.advanceHeldPose("wings_spread", wingsSpread, dt);
-    this.advanceHeldPose("aggressive", aggressive, dt);
+    this.advanceHeldPose("aggressive", sneakPose, dt);
     const flutter = THREE.MathUtils.smoothstep(this.animation.speed, 0.6, 1);
     const wingWeight = this.animation.wings ** 2;
     this.actions.get("wing_flap")?.setEffectiveWeight(wingWeight * (1 - flutter));
@@ -229,7 +229,7 @@ export class Goose extends THREE.Group {
 
   private applySecondaryMotion(): void {
     const state = this.animation;
-    const attention = 1 - state.threat * 0.85;
+    const attention = 1 - state.headDown * 0.85;
     // Upper-neck layering leaves the authored planted feet untouched.
     for (let index = 3; index <= 6; index += 1) {
       this.rotateBone(`neck_${index}`, state.lookPitch * attention * 0.13,

@@ -217,8 +217,9 @@ export class Game {
     }
 
     const frame = this.input.sample();
+    this.touchControls?.syncPoseState(frame.wingsSpread, frame.sneaking, frame.threatening);
     if (delta > 0) {
-      if (frame.move.lengthSq() > 0.001 || frame.hurry || frame.interactPressed || frame.wingsSpread || frame.aggressive) {
+      if (frame.move.lengthSq() > 0.001 || frame.hurry || frame.interactPressed || frame.wingsSpread || frame.sneaking || frame.threatening) {
         this.lastInputTime = performance.now();
         this.controlsCard.classList.remove("controls-card--quiet");
       }
@@ -241,7 +242,8 @@ export class Game {
         honkPressed: frame.honkPressed,
         interactPressed: frame.interactPressed,
         wingsSpread: frame.wingsSpread,
-        aggressive: frame.aggressive,
+        sneaking: frame.sneaking,
+        threatening: frame.threatening,
       });
       this.syncPlayerView();
       this.syncPoopViews();
@@ -269,8 +271,8 @@ export class Game {
       this.simulation.elapsed,
       player.speed / HURRY_SPEED,
       player.turnAmount,
-      player.wingsSpread,
-      player.aggressive,
+      player.wingsSpread || player.threatening,
+      player.sneaking || player.threatening,
     );
     if (this.goose.stepped) void this.audio.playFootstep();
     this.updateInteractionPrompt(frame.device);
@@ -292,6 +294,8 @@ export class Game {
     if (!nextArea) return;
     this.transitioning = true;
     this.input.clear();
+    this.touchControls?.clear();
+    this.touchControls?.syncPoseState(false, false, false);
     this.simulation.suspend();
     this.transitionCurtain.classList.remove("area-transition-curtain--revealing");
     this.transitionCurtain.classList.add("area-transition-curtain--covered");
@@ -467,13 +471,15 @@ export class Game {
       requireElement<HTMLButtonElement>("#honk-button"),
       requireElement<HTMLButtonElement>("#interact-button"),
       requireElement<HTMLButtonElement>("#wings-button"),
-      requireElement<HTMLButtonElement>("#aggressive-button"),
+      requireElement<HTMLButtonElement>("#sneak-button"),
+      requireElement<HTMLButtonElement>("#threat-button"),
       {
         onMove: ({ moveX, moveY, hurry }) => this.input.setTouchMovement(moveX, moveY, hurry),
         onHonk: () => this.input.queueTouchHonk(),
         onInteract: () => this.input.queueTouchInteraction(),
-        onWings: (held) => this.input.setTouchPose("wings", held),
-        onAggressive: (held) => this.input.setTouchPose("aggressive", held),
+        onWings: () => this.input.toggleTouchPose("wings"),
+        onSneak: () => this.input.toggleTouchPose("sneak"),
+        onThreatening: (held) => this.input.setTouchThreatening(held),
         onTouchUsed: () => { this.coarseTouchDevice = true; },
       },
     );
@@ -565,6 +571,7 @@ export class Game {
       this.simulation.suspend();
       this.input.clear();
       this.touchControls?.clear();
+      this.touchControls?.syncPoseState(false, false, false);
       this.audio.setPaused(this.paused);
       this.clock.getDelta();
     }

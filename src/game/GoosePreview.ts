@@ -56,7 +56,7 @@ export async function startGoosePreview(canvas: HTMLCanvasElement): Promise<void
     <label style="display:block;margin-top:10px">Turn <input id="preview-turn" aria-label="Turn" type="range" min="-1" max="1" step=".05" value="0"></label>
     <label style="display:block">Playback <select id="preview-rate"><option value="1">Normal</option><option value=".25">Quarter speed</option><option value=".5">Half speed</option></select></label>
     <label style="display:block;margin-top:10px"><input id="preview-wings" type="checkbox"> Spread wings</label>
-    <label style="display:block"><input id="preview-threat" type="checkbox"> Threat / sneak</label>
+    <label style="display:block"><input id="preview-threat" type="checkbox"> Lower head / sneak</label>
     <label style="display:block"><input id="preview-look" type="checkbox"> Follow moving target</label>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px"><button id="preview-honk">Honk</button><button id="preview-grab">Grab</button><button id="preview-spook">Startle</button><button id="preview-pause">Pause</button><button id="preview-step">Step frame</button></div>
     <p id="preview-status" role="status" style="margin:10px 0 0">Ready</p>

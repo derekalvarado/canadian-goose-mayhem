@@ -32,7 +32,7 @@ export class GooseAnimationState {
   lookYaw = 0;
   lookPitch = 0;
   wings = 0;
-  threat = 0;
+  headDown = 0;
   elapsed = 0;
   speed = 0;
   acceleration = 0;
@@ -43,7 +43,7 @@ export class GooseAnimationState {
   // itself reads as a step.
   private stepIndex: number | undefined;
 
-  update(delta: number, speedRatio: number, turn: number, wings: boolean, threat: boolean,
+  update(delta: number, speedRatio: number, turn: number, wings: boolean, sneakPose: boolean,
     lookYaw = 0, lookPitch = 0): void {
     if (!Number.isFinite(delta) || delta <= 0) return;
     const dt = Math.min(delta, 0.1);
@@ -55,9 +55,9 @@ export class GooseAnimationState {
     this.acceleration = damp(this.acceleration, (this.speed - oldSpeed) / dt, 0.12, dt);
     const target = {
       idle: 1 - moving,
-      walk: moving * (1 - hurry) * (threat ? 0 : 1),
+      walk: moving * (1 - hurry) * (sneakPose ? 0 : 1),
       hurry: moving * hurry,
-      sneak: moving * (1 - hurry) * (threat ? 1 : 0),
+      sneak: moving * (1 - hurry) * (sneakPose ? 1 : 0),
     };
     for (const name of Object.keys(this.weights) as GooseLocomotion[]) {
       this.weights[name] = damp(this.weights[name], target[name], GOOSE_ANIMATION.locomotionBlendSeconds, dt);
@@ -75,7 +75,7 @@ export class GooseAnimationState {
     this.stepIndex = stepIndex;
     this.turn = damp(this.turn, clamp(turn, -1, 1), GOOSE_ANIMATION.turnBlendSeconds, dt);
     this.wings = damp(this.wings, wings ? 1 : 0, GOOSE_ANIMATION.poseBlendSeconds, dt);
-    this.threat = damp(this.threat, threat ? 1 : 0, GOOSE_ANIMATION.poseBlendSeconds, dt);
+    this.headDown = damp(this.headDown, sneakPose ? 1 : 0, GOOSE_ANIMATION.poseBlendSeconds, dt);
     this.lookYaw = damp(this.lookYaw, clamp(lookYaw, -GOOSE_ANIMATION.maxLookYaw, GOOSE_ANIMATION.maxLookYaw), GOOSE_ANIMATION.lookBlendSeconds, dt);
     this.lookPitch = damp(this.lookPitch, clamp(lookPitch, -GOOSE_ANIMATION.maxLookPitch, GOOSE_ANIMATION.maxLookPitch), GOOSE_ANIMATION.lookBlendSeconds, dt);
     this.elapsed += dt;

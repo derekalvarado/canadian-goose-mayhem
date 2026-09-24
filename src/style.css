@@ -378,14 +378,16 @@ kbd,
 .touch-movement-area { position: absolute; inset: 30% 45% 0 0; pointer-events: auto; touch-action: none; }
 .touch-stick { position: fixed; width: 104px; height: 104px; margin: -52px; border: 2px solid rgb(243 242 233 / 42%); border-radius: 50%; background: rgb(15 26 18 / 26%); pointer-events: none; }
 .touch-knob { position: absolute; top: 35px; left: 35px; width: 34px; height: 34px; border-radius: 50%; background: rgb(243 242 233 / 76%); box-shadow: 0 2px 8px rgb(5 13 8 / 32%); }
-.touch-action-cluster { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, 82px); grid-template-rows: repeat(2, 82px); grid-template-areas: "honk aggressive" "wings interact"; gap: 8px; align-items: center; justify-items: center; pointer-events: none; }
+.touch-action-cluster { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, 82px); grid-template-rows: repeat(3, 82px); grid-template-areas: "honk threat" "wings sneak" ". interact"; gap: 8px; align-items: center; justify-items: center; pointer-events: none; }
 .honk-button { grid-area: honk; width: 62px; height: 62px; border: 2px solid rgb(177 212 113 / 68%); border-radius: 50%; background: rgb(35 75 53 / 88%); color: var(--goose-white); font: inherit; font-size: .64rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; pointer-events: auto; touch-action: none; transition: transform 100ms ease, background 100ms ease; }
 .interact-button { grid-area: interact; width: 82px; height: 82px; border: 2px solid rgb(241 211 139 / 78%); border-radius: 50%; background: rgb(158 79 67 / 90%); color: var(--goose-white); font: inherit; font-size: .72rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; pointer-events: auto; touch-action: none; }
 .honk-button:active, .interact-button:active { transform: scale(.93); }
 .pose-button { position: relative; width: 62px; height: 62px; border: 2px solid rgb(177 212 113 / 68%); border-radius: 50%; background: rgb(35 75 53 / 88%); color: var(--goose-white); font: inherit; font-size: .64rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; pointer-events: auto; touch-action: none; transition: transform 100ms ease, background 100ms ease; }
 .pose-button:active { transform: scale(.93); background: rgb(80 112 62 / 94%); }
+.pose-button[aria-pressed="true"] { background: rgb(110 139 69 / 98%); box-shadow: 0 0 0 3px rgb(177 212 113 / 22%); }
 .pose-button--wings { grid-area: wings; }
-.pose-button--aggressive { grid-area: aggressive; }
+.pose-button--sneak { grid-area: sneak; }
+.pose-button--threat { grid-area: threat; border-color: rgb(241 211 139 / 78%); background: rgb(158 79 67 / 90%); }
 .settings-menu, .rotate-message { position: absolute; inset: 0; z-index: 15; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: rgb(15 26 18 / 68%); }
 .settings-menu[hidden], .rotate-message[hidden] { display: none; }
 .settings-card { width: min(360px, 100%); padding: 22px; border: 1px solid var(--line); border-radius: 8px 22px 8px 22px; background: var(--paper); box-shadow: 0 18px 48px rgb(5 13 8 / 32%); }

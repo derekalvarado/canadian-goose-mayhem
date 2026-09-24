@@ -175,7 +175,7 @@ test("turning off the splash pad makes kids protest, walk away, and return when 
 });
 
 test("a nearby threatening goose makes kids run away and cry before returning", () => {
-  for (const pose of [{ aggressive: true }, { wingsSpread: true }]) {
+  for (const pose of [{ threatening: true }, { wingsSpread: true }]) {
     const simulation = new Simulation(splashKidRules());
     const events = simulation.advance(FIXED_STEP, { ...idle, ...pose });
     assert.ok(events.some((event) => event.type === "splash-kid-frightened" && event.actorId === "kid"));
@@ -185,6 +185,15 @@ test("a nearby threatening goose makes kids run away and cry before returning", 
     for (let tick = 0; tick < 600 && simulation.world.splashKids[0].activity !== "playing"; tick += 1) simulation.advance(FIXED_STEP, idle);
     assert.equal(simulation.world.splashKids[0].activity, "playing");
   }
+});
+
+test("the sneak pose does not frighten nearby kids", () => {
+  const simulation = new Simulation(splashKidRules());
+  const events = simulation.advance(FIXED_STEP, { ...idle, sneaking: true });
+  assert.equal(simulation.player.sneaking, true);
+  assert.equal(simulation.player.threatening, false);
+  assert.equal(simulation.world.splashKids[0].activity, "playing");
+  assert.equal(events.some((event) => event.type === "splash-kid-frightened"), false);
 });
 
 test("frightened kids scatter to different spots on the far side from the goose", () => {
@@ -200,7 +209,7 @@ test("frightened kids scatter to different spots on the far side from the goose"
     entities: [{ id: "pad", label: "Splash pad", position: position(3), active: true }],
     splashKids: [kid("north", 2.2, 1.4), kid("middle", 2.6, 0.1), kid("south", 2.1, -1.3)],
   });
-  simulation.advance(FIXED_STEP, { ...idle, aggressive: true });
+  simulation.advance(FIXED_STEP, { ...idle, threatening: true });
   assert.deepEqual(simulation.world.splashKids.map((child) => child.activity), ["frightened", "frightened", "frightened"]);
   for (let tick = 0; tick < 240; tick += 1) simulation.advance(FIXED_STEP, idle);
   const spots = simulation.world.splashKids.map((child) => child.position);
@@ -227,6 +236,6 @@ test("playing kids stop to splash at each route point, and a scare still interru
 
   const scared = new Simulation({ ...rules, splashKids: [{ ...rules.splashKids![0], splashSeconds: 5 }] });
   for (let tick = 0; tick < 120 && scared.world.splashKids[0].activity !== "splashing"; tick += 1) scared.advance(FIXED_STEP, idle);
-  scared.advance(FIXED_STEP, { ...idle, aggressive: true });
+  scared.advance(FIXED_STEP, { ...idle, threatening: true });
   assert.equal(scared.world.splashKids[0].activity, "frightened");
 });

@@ -8,7 +8,8 @@ export interface InputFrame {
   honkPressed: boolean;
   interactPressed: boolean;
   wingsSpread: boolean;
-  aggressive: boolean;
+  sneaking: boolean;
+  threatening: boolean;
   device: InputDevice;
 }
 
@@ -27,6 +28,8 @@ const MOVEMENT_KEYS = new Set([
   "KeyQ",
   "KeyE",
   "KeyF",
+  "ControlLeft",
+  "ControlRight",
 ]);
 
 function applyDeadzone(value: number, deadzone = 0.18): number {
@@ -43,10 +46,13 @@ export class InputController {
   private gamepadHonkWasDown = false;
   private interactionQueued = false;
   private gamepadInteractWasDown = false;
-  private touchWingsSpread = false;
-  private touchAggressive = false;
+  private wingsSpread = false;
+  private sneaking = false;
+  private gamepadWingsWasDown = false;
+  private gamepadSneakWasDown = false;
   private touchMove = new THREE.Vector2();
   private touchHurry = false;
+  private touchThreatening = false;
   private connectedGamepad = false;
   private readonly onDeviceChanged: (device: InputDevice, connected: boolean) => void;
 
@@ -66,8 +72,7 @@ export class InputController {
     let hurry = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
     let honkPressed = this.honkQueued;
     let interactPressed = this.interactionQueued;
-    let wingsSpread = this.keys.has("KeyQ");
-    let aggressive = this.keys.has("KeyE");
+    let threatening = this.keys.has("ControlLeft") || this.keys.has("ControlRight") || this.touchThreatening;
     this.honkQueued = false;
     this.interactionQueued = false;
 
@@ -83,20 +88,26 @@ export class InputController {
       const gamepadHonkDown = Boolean(gamepad.buttons[0]?.pressed);
       const gamepadInteractDown = Boolean(gamepad.buttons[1]?.pressed);
       const gamepadWingsSpread = Boolean(gamepad.buttons[2]?.pressed);
-      const gamepadAggressive = Boolean(gamepad.buttons[3]?.pressed);
+      const gamepadSneaking = Boolean(gamepad.buttons[3]?.pressed);
+      const gamepadThreatening = Boolean(gamepad.buttons[4]?.pressed);
       const gamepadActive = Math.hypot(stickX, stickY) > 0.03
         || gamepadHurry
         || gamepadHonkDown
         || gamepadInteractDown
         || gamepadWingsSpread
-        || gamepadAggressive;
+        || gamepadSneaking
+        || gamepadThreatening;
+
+      if (gamepadWingsSpread && !this.gamepadWingsWasDown) this.wingsSpread = !this.wingsSpread;
+      if (gamepadSneaking && !this.gamepadSneakWasDown) this.sneaking = !this.sneaking;
+      threatening ||= gamepadThreatening;
+      this.gamepadWingsWasDown = gamepadWingsSpread;
+      this.gamepadSneakWasDown = gamepadSneaking;
 
       if (gamepadActive) {
         horizontal = stickX;
         vertical = stickY;
         hurry = gamepadHurry;
-        wingsSpread = gamepadWingsSpread;
-        aggressive = gamepadAggressive;
         if (this.lastDevice !== "gamepad") {
           this.lastDevice = "gamepad";
           this.onDeviceChanged("gamepad", true);
@@ -111,6 +122,8 @@ export class InputController {
       this.connectedGamepad = false;
       this.gamepadHonkWasDown = false;
       this.gamepadInteractWasDown = false;
+      this.gamepadWingsWasDown = false;
+      this.gamepadSneakWasDown = false;
     }
 
     if (this.touchMove.lengthSq() > 0 || this.touchHurry) {
@@ -118,9 +131,6 @@ export class InputController {
       vertical = this.touchMove.y;
       hurry = this.touchHurry;
     }
-    wingsSpread ||= this.touchWingsSpread;
-    aggressive ||= this.touchAggressive;
-
     this.movement.set(horizontal, vertical);
     if (this.movement.lengthSq() > 1) this.movement.normalize();
 
@@ -129,8 +139,9 @@ export class InputController {
       hurry,
       honkPressed,
       interactPressed,
-      wingsSpread,
-      aggressive,
+      wingsSpread: this.wingsSpread,
+      sneaking: this.sneaking,
+      threatening,
       device: this.lastDevice,
     };
   }
@@ -142,8 +153,9 @@ export class InputController {
     this.movement.set(0, 0);
     this.touchMove.set(0, 0);
     this.touchHurry = false;
-    this.touchWingsSpread = false;
-    this.touchAggressive = false;
+    this.wingsSpread = false;
+    this.sneaking = false;
+    this.touchThreatening = false;
   }
 
   setTouchMovement(moveX: number, moveY: number, hurry: boolean): void {
@@ -172,9 +184,17 @@ export class InputController {
     }
   }
 
-  setTouchPose(pose: "wings" | "aggressive", held: boolean): void {
-    if (pose === "wings") this.touchWingsSpread = held;
-    else this.touchAggressive = held;
+  toggleTouchPose(pose: "wings" | "sneak"): void {
+    if (pose === "wings") this.wingsSpread = !this.wingsSpread;
+    else this.sneaking = !this.sneaking;
+    if (this.lastDevice !== "touch") {
+      this.lastDevice = "touch";
+      this.onDeviceChanged("touch", this.connectedGamepad);
+    }
+  }
+
+  setTouchThreatening(held: boolean): void {
+    this.touchThreatening = held;
     if (held && this.lastDevice !== "touch") {
       this.lastDevice = "touch";
       this.onDeviceChanged("touch", this.connectedGamepad);
@@ -185,10 +205,13 @@ export class InputController {
     if (!MOVEMENT_KEYS.has(event.code)) return;
     if (event.target instanceof HTMLElement && event.target.closest("button, input, textarea, select, [contenteditable]")) return;
     event.preventDefault();
+    const wasDown = this.keys.has(event.code);
     this.keys.add(event.code);
 
     if (event.code === "Space" && !event.repeat) this.honkQueued = true;
     if (event.code === "KeyF" && !event.repeat) this.interactionQueued = true;
+    if (event.code === "KeyQ" && !event.repeat && !wasDown) this.wingsSpread = !this.wingsSpread;
+    if (event.code === "KeyE" && !event.repeat && !wasDown) this.sneaking = !this.sneaking;
     if (this.lastDevice !== "keyboard") {
       this.lastDevice = "keyboard";
       this.onDeviceChanged("keyboard", this.connectedGamepad);

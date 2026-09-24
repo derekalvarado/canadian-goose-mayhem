@@ -4,12 +4,13 @@ interface TouchControlsOptions {
   onMove(command: TouchCommand): void;
   onHonk(): void;
   onInteract(): void;
-  onWings(held: boolean): void;
-  onAggressive(held: boolean): void;
+  onWings(): void;
+  onSneak(): void;
+  onThreatening(held: boolean): void;
   onTouchUsed(): void;
 }
 
-type HeldPose = "wings" | "aggressive";
+type TogglePose = "wings" | "sneak";
 
 /** DOM adapter for the reusable floating joystick and multitouch action buttons. */
 export class TouchControls {
@@ -17,8 +18,7 @@ export class TouchControls {
   private movementPointerId: number | null = null;
   private honkPointerId: number | null = null;
   private interactPointerId: number | null = null;
-  private wingsPointerId: number | null = null;
-  private aggressivePointerId: number | null = null;
+  private threatPointerId: number | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -26,8 +26,9 @@ export class TouchControls {
     private readonly knob: HTMLElement,
     private readonly honk: HTMLButtonElement,
     private readonly interact: HTMLButtonElement,
-    wings: HTMLButtonElement,
-    aggressive: HTMLButtonElement,
+    private readonly wings: HTMLButtonElement,
+    private readonly sneak: HTMLButtonElement,
+    private readonly threat: HTMLButtonElement,
     private readonly options: TouchControlsOptions,
   ) {
     root.addEventListener("pointerdown", this.onMovementStart);
@@ -43,28 +44,30 @@ export class TouchControls {
     interact.addEventListener("pointerup", this.onPointerEnd);
     interact.addEventListener("pointercancel", this.onPointerEnd);
     interact.addEventListener("lostpointercapture", this.onPointerEnd);
-    wings.addEventListener("pointerdown", (event) => this.onPoseStart("wings", wings, event));
-    wings.addEventListener("pointerup", this.onPointerEnd);
-    wings.addEventListener("pointercancel", this.onPointerEnd);
-    wings.addEventListener("lostpointercapture", this.onPointerEnd);
-    aggressive.addEventListener("pointerdown", (event) => this.onPoseStart("aggressive", aggressive, event));
-    aggressive.addEventListener("pointerup", this.onPointerEnd);
-    aggressive.addEventListener("pointercancel", this.onPointerEnd);
-    aggressive.addEventListener("lostpointercapture", this.onPointerEnd);
+    wings.addEventListener("pointerdown", (event) => this.onPosePress("wings", event));
+    sneak.addEventListener("pointerdown", (event) => this.onPosePress("sneak", event));
+    threat.addEventListener("pointerdown", this.onThreatStart);
+    threat.addEventListener("pointerup", this.onPointerEnd);
+    threat.addEventListener("pointercancel", this.onPointerEnd);
+    threat.addEventListener("lostpointercapture", this.onPointerEnd);
   }
 
   clear = (): void => {
     this.movementPointerId = null;
     this.honkPointerId = null;
     this.interactPointerId = null;
-    this.wingsPointerId = null;
-    this.aggressivePointerId = null;
+    this.threatPointerId = null;
     this.joystick.end();
     this.options.onMove({ moveX: 0, moveY: 0, hurry: false });
-    this.options.onWings(false);
-    this.options.onAggressive(false);
+    this.options.onThreatening(false);
     this.stick.hidden = true;
   };
+
+  syncPoseState(wingsSpread: boolean, sneaking: boolean, threatening: boolean): void {
+    this.wings.setAttribute("aria-pressed", String(wingsSpread));
+    this.sneak.setAttribute("aria-pressed", String(sneaking));
+    this.threat.setAttribute("aria-pressed", String(threatening));
+  }
 
   private readonly onMovementStart = (event: PointerEvent): void => {
     if (event.pointerType !== "touch" || event.target !== this.root || this.movementPointerId !== null) return;
@@ -103,14 +106,19 @@ export class TouchControls {
     event.preventDefault();
   };
 
-  private onPoseStart(pose: HeldPose, button: HTMLButtonElement, event: PointerEvent): void {
-    if (event.pointerType !== "touch") return;
-    if (pose === "wings" ? this.wingsPointerId !== null : this.aggressivePointerId !== null) return;
+  private readonly onThreatStart = (event: PointerEvent): void => {
+    if (event.pointerType !== "touch" || this.threatPointerId !== null) return;
     this.options.onTouchUsed();
-    if (pose === "wings") this.wingsPointerId = event.pointerId;
-    else this.aggressivePointerId = event.pointerId;
-    button.setPointerCapture(event.pointerId);
-    this.setPose(pose, true);
+    this.threatPointerId = event.pointerId;
+    this.threat.setPointerCapture(event.pointerId);
+    this.options.onThreatening(true);
+    event.preventDefault();
+  };
+
+  private onPosePress(pose: TogglePose, event: PointerEvent): void {
+    if (event.pointerType !== "touch") return;
+    this.options.onTouchUsed();
+    this.togglePose(pose);
     event.preventDefault();
   }
 
@@ -123,19 +131,15 @@ export class TouchControls {
     }
     if (event.pointerId === this.honkPointerId) this.honkPointerId = null;
     if (event.pointerId === this.interactPointerId) this.interactPointerId = null;
-    if (event.pointerId === this.wingsPointerId) {
-      this.wingsPointerId = null;
-      this.setPose("wings", false);
-    }
-    if (event.pointerId === this.aggressivePointerId) {
-      this.aggressivePointerId = null;
-      this.setPose("aggressive", false);
+    if (event.pointerId === this.threatPointerId) {
+      this.threatPointerId = null;
+      this.options.onThreatening(false);
     }
   };
 
-  private setPose(pose: HeldPose, held: boolean): void {
-    if (pose === "wings") this.options.onWings(held);
-    else this.options.onAggressive(held);
+  private togglePose(pose: TogglePose): void {
+    if (pose === "wings") this.options.onWings();
+    else this.options.onSneak();
   }
 
   private render(x: number, y: number): void {

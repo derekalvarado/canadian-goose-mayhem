@@ -86,8 +86,8 @@ test("a stolen picker is boundedly recovered to its safe home and the litter tar
   assert.equal(simulation.world.entities.filter((entity) => entity.id === "picker").length, 1);
 });
 
-test("nearby honk, wings, and threat poses fumble pickup before retrying the same item", () => {
-  for (const interruption of [{ honkPressed: true }, { wingsSpread: true }, { aggressive: true }]) {
+test("nearby honk, wings, and held threat poses fumble pickup before retrying the same item", () => {
+  for (const interruption of [{ honkPressed: true }, { wingsSpread: true }, { threatening: true }]) {
     const simulation = new Simulation(cleanupRules({ spawn: 3, shooRadius: 0.1 }));
     runUntil(simulation, () => simulation.world.janitor?.activity === "picking-litter");
     const target = simulation.world.janitor?.targetEntityId;
@@ -97,6 +97,16 @@ test("nearby honk, wings, and threat poses fumble pickup before retrying the sam
     runUntil(simulation, () => simulation.world.entities.find((entity) => entity.id === target)?.containedBy === "bag");
     assert.equal(simulation.world.entities.filter((entity) => entity.id === target).length, 1);
   }
+});
+
+test("sneaking past the janitor does not interrupt litter pickup", () => {
+  const simulation = new Simulation(cleanupRules({ spawn: 4.2, shooRadius: 0.1 }));
+  runUntil(simulation, () => simulation.world.janitor?.activity === "picking-litter");
+  const target = simulation.world.janitor?.targetEntityId;
+  const events = simulation.advance(FIXED_STEP, { ...idle, sneaking: true });
+  assert.equal(simulation.world.janitor?.activity, "picking-litter");
+  assert.equal(events.some((event) => event.type === "janitor-fumbled"), false);
+  assert.equal(simulation.world.entities.find((entity) => entity.id === target)?.containedBy, undefined);
 });
 
 test("cleaned litter can be pulled from the bag, dropped, and collected again in a later pass", () => {

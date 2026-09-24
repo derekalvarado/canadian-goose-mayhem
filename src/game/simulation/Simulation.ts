@@ -4,13 +4,13 @@ export interface Position { x: number; y: number; z: number }
 export interface PlayerState {
   readonly id: "goose"; readonly position: Readonly<Position>; readonly velocity: Readonly<Position>;
   readonly heading: number; readonly speed: number; readonly turnAmount: number;
-  readonly wingsSpread: boolean; readonly aggressive: boolean; readonly spooked: boolean;
+  readonly wingsSpread: boolean; readonly sneaking: boolean; readonly threatening: boolean; readonly spooked: boolean;
   readonly heldEntityId?: string;
 }
 export interface GoosePoop { readonly id: string; readonly position: Readonly<Position> }
 export interface PlayerCommand {
   readonly moveX: number; readonly moveZ: number; readonly hurry: boolean; readonly honkPressed: boolean;
-  readonly interactPressed?: boolean; readonly wingsSpread?: boolean; readonly aggressive?: boolean;
+  readonly interactPressed?: boolean; readonly wingsSpread?: boolean; readonly sneaking?: boolean; readonly threatening?: boolean;
 }
 export interface CarryableDefinition {
   readonly interactionRange: number; readonly carryHeight: number; readonly carryDistance: number;
@@ -177,7 +177,7 @@ export class Simulation {
   private readonly poopRecords: GoosePoop[] = [];
   private readonly splashKids: MutableSplashKid[] = [];
   private janitor?: MutableJanitor;
-  private heading = 0; private turnAmount = 0; private wingsSpread = false; private aggressive = false;
+  private heading = 0; private turnAmount = 0; private wingsSpread = false; private sneaking = false; private threatening = false;
   private accumulator = 0; private honkQueued = false; private interactionQueued = false;
   private tickCount = 0; private idleSeconds = 0; private poopSequence = 0;
   private heldEntityId?: string; private spookedSeconds = 0;
@@ -233,7 +233,7 @@ export class Simulation {
   get player(): PlayerState {
     return { id: "goose", position: { ...this.position }, velocity: { ...this.velocity }, heading: this.heading,
       speed: Math.hypot(this.velocity.x, this.velocity.z), turnAmount: this.turnAmount,
-      wingsSpread: this.wingsSpread, aggressive: this.aggressive, spooked: this.spookedSeconds > 0,
+      wingsSpread: this.wingsSpread, sneaking: this.sneaking, threatening: this.threatening, spooked: this.spookedSeconds > 0,
       heldEntityId: this.heldEntityId };
   }
   get world(): WorldSnapshot {
@@ -317,13 +317,13 @@ export class Simulation {
   suspend(): void {
     this.accumulator = 0; this.honkQueued = false; this.interactionQueued = false;
     Object.assign(this.previousPosition, this.position); this.previousHeading = this.heading;
-    this.wingsSpread = false; this.aggressive = false;
+    this.wingsSpread = false; this.sneaking = false; this.threatening = false;
   }
   reset(): void {
     Object.assign(this.position, this.rules.spawn); Object.assign(this.velocity, { x: 0, y: 0, z: 0 });
     Object.assign(this.pushDirection, { x: 0, y: 0, z: 0 }); this.heading = this.rules.spawnHeading;
     Object.assign(this.previousPosition, this.position); this.previousHeading = this.heading;
-    this.turnAmount = 0; this.wingsSpread = false; this.aggressive = false; this.tickCount = 0;
+    this.turnAmount = 0; this.wingsSpread = false; this.sneaking = false; this.threatening = false; this.tickCount = 0;
     this.idleSeconds = 0; this.poopSequence = 0; this.heldEntityId = undefined; this.spookedSeconds = 0;
     this.poopRecords.length = 0; this.durableFacts.clear();
     for (const entity of this.entitiesById.values()) {
@@ -350,7 +350,7 @@ export class Simulation {
 
   private step(command: PlayerCommand, events: GameplayEvent[]): void {
     Object.assign(this.previousPosition, this.position); this.previousHeading = this.heading;
-    this.wingsSpread = command.wingsSpread === true; this.aggressive = command.aggressive === true;
+    this.wingsSpread = command.wingsSpread === true; this.sneaking = command.sneaking === true; this.threatening = command.threatening === true;
     const interacted = this.interactionQueued;
     if (interacted) { this.resolveInteraction(events); this.interactionQueued = false; }
     const requestedX = Number.isFinite(command.moveX) ? command.moveX : 0;
@@ -388,7 +388,7 @@ export class Simulation {
         && (this.janitor?.activity === "guarding" || this.janitor?.activity === "shooing");
       if (!guarded && distance2d(this.position, zone.position) <= zone.radius) this.durableFacts.add(zone.factId);
     }
-    if (hasInput || honked || interacted || this.wingsSpread || this.aggressive || this.spookedSeconds > 0) this.idleSeconds = 0;
+    if (hasInput || honked || interacted || this.wingsSpread || this.sneaking || this.threatening || this.spookedSeconds > 0) this.idleSeconds = 0;
     else { this.idleSeconds += FIXED_STEP; if (this.idleSeconds + 1e-10 >= GOOSE_POOP_IDLE_SECONDS) this.leavePoop(events); }
     this.tickCount += 1;
     for (const objectiveId of this.objectives.evaluate(this.world)) events.push({ type: "objective-completed", objectiveId });
@@ -664,7 +664,7 @@ export class Simulation {
       if (this.moveJanitorToward(this.position, cleanup.jogSpeed) || distance2d(janitor.position, this.position) <= cleanup.shooReach) this.shooGoose(events, false);
       return;
     }
-    if (janitor.activity === "picking-litter" && (honked || this.wingsSpread || this.aggressive)
+    if (janitor.activity === "picking-litter" && (honked || this.wingsSpread || this.threatening)
       && distance2d(janitor.position, this.position) <= cleanup.fumbleRadius) {
       const entityId = janitor.targetEntityId; if (!entityId) return;
       this.rememberCleanupTask(); janitor.activity = "reacting"; janitor.reactionReason = "fumble";
@@ -787,7 +787,7 @@ export class Simulation {
     for (const child of this.splashKids) {
       const definition = child.definition; const target = this.entitiesById.get(definition.observedTargetId);
       if (!target || target.active === undefined) continue;
-      const threatened = (this.aggressive || this.wingsSpread) && distance2d(child.position, this.position) <= definition.threatRadius;
+      const threatened = (this.threatening || this.wingsSpread) && distance2d(child.position, this.position) <= definition.threatRadius;
       if (threatened && child.activity !== "frightened" && child.activity !== "crying") {
         child.activity = "frightened"; child.activitySecondsRemaining = 0;
         child.destination = this.chooseSplashKidRetreat(child, this.position);
