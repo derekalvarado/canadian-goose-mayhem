@@ -9,10 +9,11 @@ import { CatalogDrawer, createDragChip, type AssetCatalog, type PaletteHost } fr
 import { WorldView } from "./WorldView.ts";
 import { resolveEditorShortcut, WorldEditorHistory, type WorldEditorSnapshot } from "./worldEditorHistory.ts";
 
-const SNAP = 0.25; const ROTATION_SNAP = THREE.MathUtils.degToRad(5); const PLACING_ROTATION_STEP = THREE.MathUtils.degToRad(15); const CAMERA_ORBIT_STEP = THREE.MathUtils.degToRad(8); const CAMERA_ZOOM_FACTOR = 1.18;
+const SNAP = 0.25; const ROTATION_SNAP = THREE.MathUtils.degToRad(5); const PLACING_ROTATION_STEP = THREE.MathUtils.degToRad(15); const CAMERA_ORBIT_STEP = THREE.MathUtils.degToRad(8); const CAMERA_ORBIT_SPEED = THREE.MathUtils.degToRad(110); const CAMERA_ZOOM_FACTOR = 1.18; const CAMERA_ZOOM_SPEED = 1.85; const CAMERA_FLY_SPEED = 18;
 const DRAG_THRESHOLD_PX = 6;
 const LITTER_PICKER_ASSET_ID = "prop.litter-picker";
 const LITTER_PICKER_GROUND_ROTATION_X = Math.PI / 2;
+const EDITOR_HELD_CAMERA_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyU", "KeyO", "Space", "ShiftLeft", "ShiftRight"]);
 function download(contents: string): void { const blob = new Blob([contents], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "goose-game-world.json"; link.click(); URL.revokeObjectURL(url); }
 function findInstance(object: THREE.Object3D | null): string | undefined { for (let node = object; node; node = node.parent) { const id = node.userData.worldInstanceId as string | undefined; if (id) return id; } return undefined; }
 function cleanId(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "area"; }
@@ -26,6 +27,8 @@ export class WorldEditor {
   private readonly preview = new THREE.Group(); private readonly outline = new THREE.BoxHelper(new THREE.Object3D(), 0xf1d38b);
   private readonly history = new WorldEditorHistory(); private undoButton?: HTMLButtonElement; private redoButton?: HTMLButtonElement;
   private world: WorldLayout; private view: WorldView; private areaId = CENTRAL_PLAZA_AREA_ID; private selectedId?: string; private placing = false;
+  private readonly flyKeys = new Set<string>(); private flyFrame?: number; private flyLastTime = 0;
+  private readonly flyForward = new THREE.Vector3(); private readonly flyRight = new THREE.Vector3(); private readonly flyDirection = new THREE.Vector3();
   // Placement ghost for assets dragged or picked up from the catalog.
   private placingAssetId?: string; private placingRotation = 0; private lastPointer = { x: 0, y: 0 };
   private readonly footprint = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x8fdc97, transparent: true, opacity: 0.38, depthWrite: false }));
@@ -40,7 +43,7 @@ export class WorldEditor {
     const authoringGrid = new THREE.GridHelper(4096, 64, 0xf1d38b, 0x766d60); authoringGrid.position.y = -0.02; authoringGrid.userData.editorIgnore = true; scene.add(authoringGrid);
     this.transform = new TransformControls(camera, canvas); this.transform.setSpace("world"); this.transform.showY = false; this.transform.setTranslationSnap(SNAP); this.transform.setRotationSnap(ROTATION_SNAP); this.transform.setSize(0.82); scene.add(this.transform.getHelper());
     this.transform.addEventListener("dragging-changed", (event) => { this.orbit.enabled = event.value !== true; if (event.value === true) this.history.begin(this.snapshot()); else if (this.history.commit(this.snapshot())) this.save("Saved automatically."); }); this.transform.addEventListener("objectChange", this.commitTransform);
-    document.body.classList.add("editor-mode"); this.buildPanel(); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); this.history.reset(this.snapshot()); window.addEventListener("keydown", this.handleKeyDown, { passive: false }); canvas.addEventListener("pointermove", this.movePreview); canvas.addEventListener("pointerup", this.handleCanvasClick); window.addEventListener("pointermove", this.trackPointer);
+    document.body.classList.add("editor-mode"); this.buildPanel(); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); this.history.reset(this.snapshot()); window.addEventListener("keydown", this.handleKeyDown, { passive: false }); window.addEventListener("keyup", this.handleKeyUp, { passive: false }); window.addEventListener("blur", this.clearFlyKeys); canvas.addEventListener("pointermove", this.movePreview); canvas.addEventListener("pointerup", this.handleCanvasClick); window.addEventListener("pointermove", this.trackPointer);
     this.catalog = new CatalogDrawer(this.paletteHost); document.querySelector("#game-shell")?.append(this.catalog.root);
   }
   private get area(): WorldArea { return getWorldArea(this.world, this.areaId); }
@@ -73,7 +76,7 @@ export class WorldEditor {
     this.shortcutDrawer.className = "editor-shortcuts";
     this.shortcutDrawer.hidden = true;
     this.shortcutDrawer.setAttribute("aria-label", "World editor keyboard shortcuts");
-    this.shortcutDrawer.innerHTML = `<div class="editor-shortcuts__header"><div><p class="editor-shortcuts__eyebrow">Editor help</p><h2>Keyboard shortcuts</h2></div></div><div class="editor-shortcuts__columns"><section><h3>Camera</h3><p><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> orbit</p><p><kbd>U</kbd><kbd>O</kbd> zoom out / in</p><p><kbd>H</kbd> focus selected</p><p><kbd>Home</kbd> reset view</p></section><section><h3>Object</h3><p><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> move selected</p><p><kbd>Shift</kbd> + arrows move farther</p><p><kbd>Q</kbd><kbd>E</kbd> rotate selected</p><p><kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd> next / previous</p></section><section><h3>Placement & editing</h3><p><kbd>Enter</kbd> place at camera focus</p><p><kbd>Shift</kbd> + <kbd>Enter</kbd> keep placing</p><p><kbd>R</kbd> rotate preview · <kbd>Esc</kbd> cancel</p><p><kbd>Delete</kbd> remove · <kbd>⌘/Ctrl</kbd> + <kbd>Z</kbd> undo</p></section></div>`;
+    this.shortcutDrawer.innerHTML = `<div class="editor-shortcuts__header"><div><p class="editor-shortcuts__eyebrow">Editor help</p><h2>Keyboard shortcuts</h2></div></div><div class="editor-shortcuts__columns"><section><h3>Camera</h3><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> hold to fly</p><p><kbd>Space</kbd> / <kbd>Shift</kbd> up / down</p><p><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> hold to orbit</p><p><kbd>U</kbd><kbd>O</kbd> hold to zoom out / in</p><p><kbd>H</kbd> focus · <kbd>Home</kbd> reset</p></section><section><h3>Object</h3><p><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> move selected</p><p><kbd>Shift</kbd> + arrows move farther</p><p><kbd>Q</kbd><kbd>E</kbd> rotate selected</p><p><kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd> next / previous</p></section><section><h3>Placement & editing</h3><p><kbd>Enter</kbd> place at camera focus</p><p><kbd>Shift</kbd> + <kbd>Enter</kbd> keep placing</p><p><kbd>R</kbd> rotate preview · <kbd>Esc</kbd> cancel</p><p><kbd>Delete</kbd> remove · <kbd>⌘/Ctrl</kbd> + <kbd>Z</kbd> undo</p></section></div>`;
     const close = this.button("Close", () => this.toggleShortcuts(false)); close.className = "editor-shortcuts__close"; close.setAttribute("aria-label", "Close keyboard shortcuts"); this.shortcutDrawer.querySelector(".editor-shortcuts__header")?.append(close);
   }
   private toggleShortcuts(open = !this.shortcutsOpen): void { this.shortcutsOpen = open; this.shortcutDrawer.hidden = !open; this.shortcutToggle?.setAttribute("aria-expanded", String(open)); if (open) this.shortcutDrawer.querySelector<HTMLButtonElement>("button")?.focus(); }
@@ -269,21 +272,21 @@ export class WorldEditor {
     const nextIndex = (currentIndex + direction + this.area.instances.length) % this.area.instances.length;
     this.selectInstance(this.area.instances[nextIndex].id);
   }
-  private orbitCamera(horizontal: number, vertical: number): void {
+  private orbitCamera(horizontal: number, vertical: number, step = CAMERA_ORBIT_STEP): void {
     const offset = new THREE.Vector3().subVectors(this.camera.position, this.orbit.target);
     const spherical = new THREE.Spherical().setFromVector3(offset);
-    spherical.theta -= horizontal * CAMERA_ORBIT_STEP;
-    spherical.phi -= vertical * CAMERA_ORBIT_STEP;
+    spherical.theta -= horizontal * step;
+    spherical.phi -= vertical * step;
     spherical.phi = THREE.MathUtils.clamp(spherical.phi, this.orbit.minPolarAngle, this.orbit.maxPolarAngle);
     spherical.makeSafe();
     this.camera.position.setFromSpherical(spherical).add(this.orbit.target);
     this.orbit.update();
   }
-  private zoomCamera(direction: number): void {
+  private zoomCamera(direction: number, factor = CAMERA_ZOOM_FACTOR): void {
     const offset = new THREE.Vector3().subVectors(this.camera.position, this.orbit.target);
     const distance = offset.length(); if (distance === 0) return;
     const minimum = Math.max(this.orbit.minDistance, 0.5); const maximum = Number.isFinite(this.orbit.maxDistance) ? this.orbit.maxDistance : 280;
-    const nextDistance = THREE.MathUtils.clamp(distance * (direction > 0 ? 1 / CAMERA_ZOOM_FACTOR : CAMERA_ZOOM_FACTOR), minimum, maximum);
+    const nextDistance = THREE.MathUtils.clamp(distance * (direction > 0 ? 1 / factor : factor), minimum, maximum);
     this.camera.position.copy(this.orbit.target).add(offset.normalize().multiplyScalar(nextDistance));
     this.orbit.update();
   }
@@ -291,9 +294,53 @@ export class WorldEditor {
     const group = this.selectedId ? this.view.instances.get(this.selectedId) : undefined; if (!group) return;
     this.orbit.target.set(group.position.x, group.position.y, group.position.z); this.orbit.update();
   }
+  private startFlyLoop(): void {
+    if (this.flyFrame !== undefined) return;
+    this.flyLastTime = performance.now();
+    this.flyFrame = requestAnimationFrame(this.updateFlyCamera);
+  }
+  private readonly updateFlyCamera = (time: number): void => {
+    this.flyFrame = undefined;
+    if (this.flyKeys.size === 0) return;
+    const delta = Math.min(Math.max((time - this.flyLastTime) / 1000, 0), 0.05); this.flyLastTime = time;
+    this.camera.getWorldDirection(this.flyForward); this.flyForward.y = 0;
+    if (this.flyForward.lengthSq() > 0) this.flyForward.normalize();
+    this.flyRight.crossVectors(this.flyForward, this.camera.up).normalize();
+    this.flyDirection.set(
+      Number(this.flyKeys.has("KeyD")) - Number(this.flyKeys.has("KeyA")),
+      Number(this.flyKeys.has("Space")) - Number(this.flyKeys.has("ShiftLeft") || this.flyKeys.has("ShiftRight")),
+      Number(this.flyKeys.has("KeyS")) - Number(this.flyKeys.has("KeyW")),
+    );
+    const vertical = this.flyDirection.y;
+    this.flyDirection.y = 0;
+    if (this.flyDirection.lengthSq() > 1) this.flyDirection.normalize();
+    const orbitHorizontal = Number(this.flyKeys.has("KeyL")) - Number(this.flyKeys.has("KeyJ"));
+    const orbitVertical = Number(this.flyKeys.has("KeyI")) - Number(this.flyKeys.has("KeyK"));
+    if (orbitHorizontal !== 0 || orbitVertical !== 0) this.orbitCamera(orbitHorizontal, orbitVertical, CAMERA_ORBIT_SPEED * delta);
+    const zoomDirection = Number(this.flyKeys.has("KeyO")) - Number(this.flyKeys.has("KeyU"));
+    if (zoomDirection !== 0) this.zoomCamera(zoomDirection, Math.pow(CAMERA_ZOOM_SPEED, delta));
+    this.camera.position.addScaledVector(this.flyRight, this.flyDirection.x * CAMERA_FLY_SPEED * delta);
+    this.camera.position.addScaledVector(this.flyForward, -this.flyDirection.z * CAMERA_FLY_SPEED * delta);
+    this.camera.position.y += vertical * CAMERA_FLY_SPEED * delta;
+    this.orbit.target.addScaledVector(this.flyRight, this.flyDirection.x * CAMERA_FLY_SPEED * delta);
+    this.orbit.target.addScaledVector(this.flyForward, -this.flyDirection.z * CAMERA_FLY_SPEED * delta);
+    this.orbit.target.y += vertical * CAMERA_FLY_SPEED * delta;
+    this.orbit.update();
+    this.flyFrame = requestAnimationFrame(this.updateFlyCamera);
+  };
+  private clearFlyKeys = (): void => {
+    this.flyKeys.clear();
+    if (this.flyFrame !== undefined) { cancelAnimationFrame(this.flyFrame); this.flyFrame = undefined; }
+  };
+  private readonly handleKeyUp = (event: KeyboardEvent): void => {
+    if (EDITOR_HELD_CAMERA_KEYS.has(event.code)) this.flyKeys.delete(event.code);
+  };
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     const target = event.target instanceof HTMLElement;
     const targetIsTextEntry = target && (event.target.closest("input, textarea, select, button, [contenteditable]") !== null);
+    if (!targetIsTextEntry && EDITOR_HELD_CAMERA_KEYS.has(event.code)) {
+      event.preventDefault(); this.flyKeys.add(event.code); this.startFlyLoop(); return;
+    }
     if (this.placing && !targetIsTextEntry && event.code === "KeyR" && !event.metaKey && !event.ctrlKey) {
       event.preventDefault(); this.placingRotation = Math.round((this.placingRotation + (event.shiftKey ? -1 : 1) * PLACING_ROTATION_STEP) / PLACING_ROTATION_STEP) * PLACING_ROTATION_STEP % (Math.PI * 2);
       this.preview.rotation.y = this.placingRotation; this.footprint.rotation.z = this.placingRotation; return;

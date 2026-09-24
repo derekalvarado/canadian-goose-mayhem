@@ -68,9 +68,10 @@ exported arrangement, and **Reset defaults** clears the browser draft and return
 to the checked-in canonical layout.
 
 The editor also supports laptop-friendly keyboard controls. Press **?** or **F1**
-to open the shortcut drawer. `IJKL` orbit the camera, `U`/`O` zoom, `H` focuses
-the selected object, the arrow keys move it, `Q`/`E` rotate it, and `Tab` cycles
-through objects. While placing an asset, **Enter** places it at the camera focus;
+to open the shortcut drawer. Hold `WASD` to fly the camera, use `Space`/`Shift`
+to move up/down, hold `IJKL` to orbit, and hold `U`/`O` to zoom out/in. `H`
+focuses the selected object, the arrow keys move it, `Q`/`E` rotate it, and `Tab` cycles through
+objects. While placing an asset, **Enter** places it at the camera focus;
 **Shift+Enter** keeps placing. **Home** resets the view, **R** rotates the
 placement preview, and **Esc** cancels placement.
 
