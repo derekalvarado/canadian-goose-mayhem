@@ -21,6 +21,7 @@ const GAS_METER_CONTENT_REVISION = 13;
 const BREWERY_TANK_CONTENT_REVISION = 14;
 const GAS_METER_PAIR_CONTENT_REVISION = 15;
 const NORTHEAST_SOUTHWEST_RELABEL_REVISION = 16;
+const COOPERSMITH_PUB_REVISION = 17;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -425,6 +426,29 @@ function renameNorthSouthRows(layout: WorldLayout, store?: WorldLayoutStorage): 
   return validated;
 }
 
+/**
+ * Swaps the placeholder CooperSmith's block for the photo-based tapered pub in
+ * drafts saved before it existed. The two shapes differ, so the instance keeps
+ * its identity but takes the canonical transform; a draft that deleted it stays
+ * without one.
+ */
+function swapCoopersmithPub(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= COOPERSMITH_PUB_REVISION) return layout;
+  const updated = cloneWorldLayout(layout);
+  const canonical = getWorldArea(CANONICAL_WORLD_LAYOUT).instances.find((item) => item.id === "oldtown.coopersmith");
+  for (const item of getWorldArea(updated).instances) {
+    if (item.assetId !== "oldtown.coopersmith-block" || item.id !== "oldtown.coopersmith" || !canonical) continue;
+    item.assetId = canonical.assetId; item.label = canonical.label; item.transform = { ...canonical.transform };
+  }
+  updated.canonicalRevision = COOPERSMITH_PUB_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its CooperSmith's update could not be saved", error); return layout; }
+  }
+  return validated;
+}
+
 export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
   try {
     const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -438,9 +462,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store);
+    if (saved) return swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
