@@ -35,6 +35,24 @@ test("gait never restarts at the walk/hurry threshold; head turns are bounded", 
   assert.equal(JSON.stringify(state), snapshot, "paused or invalid frames must not animate");
 });
 
+test("footstep is reported twice per gait cycle only while moving", () => {
+  const state = new GooseAnimationState();
+  let steps = 0;
+  for (let i = 0; i < 600; i++) {
+    state.update(1/60, 0.5, 0, false, false);
+    if (state.stepped) steps += 1;
+  }
+  assert.ok(steps >= 8, "a walking goose must land audible footsteps");
+
+  const idle = new GooseAnimationState();
+  let idleSteps = 0;
+  for (let i = 0; i < 120; i++) {
+    idle.update(1/60, 0, 0, false, false);
+    if (idle.stepped) idleSteps += 1;
+  }
+  assert.equal(idleSteps, 0, "a stationary goose must not trigger footsteps");
+});
+
 test("blend weights and head tracking agree at 30, 60, and 144 FPS", () => {
   const states = [30,60,144].map((fps) => {
     const state = new GooseAnimationState();

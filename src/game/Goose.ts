@@ -131,6 +131,11 @@ export class Goose extends THREE.Group {
     return this.mouthSocket;
   }
 
+  /** True only for the render frame in which the walk cycle lands a foot. */
+  get stepped(): boolean {
+    return this.animation.stepped;
+  }
+
   /** Optional visible point of interest, in world coordinates. */
   setLookTarget(target?: Readonly<{ x: number; y: number; z: number }>): void {
     this.hasLookTarget = target !== undefined;

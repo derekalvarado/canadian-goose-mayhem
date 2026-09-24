@@ -6,6 +6,14 @@ export const GOOSE_ANIMATION = {
   poseBlendSeconds: 0.2,
   maxLookYaw: 0.85,
   maxLookPitch: 0.38,
+  // Trims the walk clip's 0.8-2.6 cycles/sec cadence range for a less hurried gait.
+  gaitCadenceScale: 0.875,
+  // Shifts where in the gait cycle the footstep sound fires, as a fraction of
+  // one cycle. 0 fires at the walk clip's leg-swing extremes (phase 0/0.5);
+  // positive delays the sound, negative fires it earlier. Effective range is
+  // only ±0.25: the two contacts are exactly half a cycle apart, so offsets a
+  // half-cycle apart (e.g. 0.25 and -0.25) are identical.
+  footstepPhaseOffset: -0.25,
 } as const;
 
 export type GooseLocomotion = "idle" | "walk" | "hurry" | "sneak";
@@ -28,6 +36,12 @@ export class GooseAnimationState {
   elapsed = 0;
   speed = 0;
   acceleration = 0;
+  /** True only for the update() call in which a foot contacts the ground. */
+  stepped = false;
+  // undefined until the first update() establishes a baseline, so that
+  // baseline (which depends on GOOSE_ANIMATION.footstepPhaseOffset) never
+  // itself reads as a step.
+  private stepIndex: number | undefined;
 
   update(delta: number, speedRatio: number, turn: number, wings: boolean, threat: boolean,
     lookYaw = 0, lookPitch = 0): void {
@@ -51,8 +65,14 @@ export class GooseAnimationState {
     // All gaits share one normalized contact phase, even while crossfading.
     // The plaza's stylized movement speed is retained; cadence is intentionally
     // bounded so high speed cannot turn the legs into an unreadable blur.
-    const cadence = 0.8 + 1.8 * this.speed;
+    const cadence = (0.8 + 1.8 * this.speed) * GOOSE_ANIMATION.gaitCadenceScale;
     this.phase = (this.phase + dt * cadence * smooth(this.speed, 0.01, 0.1)) % 1;
+    // Each gait cycle has two foot contacts (phase 0 and 0.5); report a step
+    // whenever the contact half crossed, including the wrap back to 0.
+    const contactPhase = (this.phase + GOOSE_ANIMATION.footstepPhaseOffset + 1) % 1;
+    const stepIndex = Math.floor(contactPhase * 2);
+    this.stepped = this.stepIndex !== undefined && stepIndex !== this.stepIndex;
+    this.stepIndex = stepIndex;
     this.turn = damp(this.turn, clamp(turn, -1, 1), GOOSE_ANIMATION.turnBlendSeconds, dt);
     this.wings = damp(this.wings, wings ? 1 : 0, GOOSE_ANIMATION.poseBlendSeconds, dt);
     this.threat = damp(this.threat, threat ? 1 : 0, GOOSE_ANIMATION.poseBlendSeconds, dt);

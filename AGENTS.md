@@ -64,7 +64,8 @@ worked example).
 3. **Catalog.** Add an entry to `WORLD_ASSETS` in `src/game/worldAssets.ts` with a
    stable `<area>.<name>` ID, category, `halfWidth`/`halfDepth` that enclose the
    mesh, colliders that match what the goose should bump into, and
-   `occludesCamera` for anything tall.
+   `occludesCamera` for anything tall. Characters usually set `warnForOverlap:
+   false`, so the editor won't flag them standing inside furniture — check by hand.
 4. **Renderer.** Add a `case` for the ID in `createWorldAssetView` in
    `src/game/PlazaWorld.ts`.
 5. **Placement.** Insert the instance into `src/game/content/world-layout.json`
@@ -74,7 +75,11 @@ worked example).
 6. **Existing drafts.** Bump `canonicalRevision` in the JSON and add a
    `*_CONTENT_REVISION` constant plus an `add<Name>Content` step in
    `src/game/worldLayout.ts` (chained outermost in `loadWorldLayout`) that adds the
-   instance once to older browser drafts. Update tests that assert the latest
+   instance once to older browser drafts. The same pattern covers renaming or
+   restructuring existing instances, not just additions (see
+   `renameNorthSouthRows`). A saved draft always wins over canonical, so editing
+   the JSON alone won't change an already-open editor tab until its draft
+   migrates past the new revision. Update tests that assert the latest
    revision. Parallel asset branches will collide on this number; renumber when
    merging.
 7. **Tests.** In `tests/worldAssets.test.ts`, check the rendered bounds stay

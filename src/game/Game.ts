@@ -272,6 +272,7 @@ export class Game {
       player.wingsSpread,
       player.aggressive,
     );
+    if (this.goose.stepped) void this.audio.playFootstep();
     this.updateInteractionPrompt(frame.device);
 
     if (performance.now() - this.lastInputTime > 6200) {
