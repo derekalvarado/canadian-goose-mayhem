@@ -16,8 +16,8 @@ const precacheFiles = collectFiles(distDirectory)
   .filter((path) => path !== serviceWorkerPath)
   .sort();
 const precacheUrls = [
-  "/",
-  ...precacheFiles.map((path) => `/${relative(distDirectory, path).split(sep).join("/")}`),
+  "./",
+  ...precacheFiles.map((path) => relative(distDirectory, path).split(sep).join("/")),
 ].sort();
 const buildHash = createHash("sha256").update(JSON.stringify(precacheUrls));
 for (const path of precacheFiles) {

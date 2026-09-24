@@ -24,7 +24,7 @@ async function fetchWithTimeout(request) {
 async function cacheNavigation(request, response) {
   const cache = await caches.open(RUNTIME_CACHE_NAME);
   await cache.put(request, response.clone());
-  await cache.put(new Request(new URL("/index.html", self.location.origin)), response.clone());
+  await cache.put(new Request(new URL("index.html", self.location)), response.clone());
 }
 
 async function warmCache(urls) {
@@ -50,8 +50,8 @@ self.addEventListener("message", (event) => {
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(PRECACHE_CACHE_NAME);
-    const installUrls = HAS_PRECACHE ? PRECACHE_URLS : ["/"];
-    await Promise.all(installUrls.map((url) => cache.add(url).catch(() => undefined)));
+    const installUrls = HAS_PRECACHE ? PRECACHE_URLS : ["./"];
+    await Promise.all(installUrls.map((url) => cache.add(new URL(url, self.location)).catch(() => undefined)));
     await self.skipWaiting();
   })());
 });
@@ -79,8 +79,8 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith((async () => {
       const cached = await findCached(request)
-        ?? (await caches.match("/index.html"))
-        ?? (await caches.match("/"));
+        ?? (await caches.match(new URL("index.html", self.location)))
+        ?? (await caches.match(new URL("./", self.location)));
       if (HAS_PRECACHE && cached) return cached;
 
       try {

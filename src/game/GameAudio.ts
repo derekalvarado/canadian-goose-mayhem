@@ -1,10 +1,10 @@
-const HONK_URL = "/audio/canada-goose-honk.mp3";
+const HONK_URL = `${import.meta.env.BASE_URL}audio/canada-goose-honk.mp3`;
 
 // 3 more recorded variants (pat2-4) sit alongside this one in
 // public/audio/footsteps/ but are unused for now — pinned to a single
 // variant while its timing/tone is still being evaluated. See
 // assets/audio/README.md for source/license.
-const FOOTSTEP_URL = "/audio/footsteps/goose-footstep-pat1.mp3";
+const FOOTSTEP_URL = `${import.meta.env.BASE_URL}audio/footsteps/goose-footstep-pat1.mp3`;
 
 /** Browser audio output consumes gameplay events; it never decides gameplay. */
 export class GameAudio {

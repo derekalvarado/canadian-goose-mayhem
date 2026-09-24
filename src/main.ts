@@ -3,11 +3,12 @@ import { Game } from "./game/Game";
 
 function registerOfflineServiceWorker(): void {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
-  void navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).then((registration) => {
+  const base = import.meta.env.BASE_URL;
+  void navigator.serviceWorker.register(`${base}service-worker.js`, { scope: base }).then((registration) => {
     const warmOfflineCache = (): void => {
       const worker = navigator.serviceWorker.controller ?? registration.active;
       if (!worker) return;
-      const urls = new Set<string>(["/", "/index.html", location.href]);
+      const urls = new Set<string>([base, `${base}index.html`, location.href]);
       for (const entry of performance.getEntriesByType("resource")) {
         if (entry.name.startsWith(location.origin)) urls.add(entry.name);
       }

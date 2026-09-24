@@ -60,8 +60,8 @@ export async function startGoosePreview(canvas: HTMLCanvasElement): Promise<void
     <label style="display:block"><input id="preview-look" type="checkbox"> Follow moving target</label>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px"><button id="preview-honk">Honk</button><button id="preview-grab">Grab</button><button id="preview-spook">Startle</button><button id="preview-pause">Pause</button><button id="preview-step">Step frame</button></div>
     <p id="preview-status" role="status" style="margin:10px 0 0">Ready</p>
-    <a href="/assets/characters/goose/anim-lab.html" style="color:#fff;display:block;margin-top:12px">Compare walk variants side by side →</a>
-    <a href="/" style="color:#fff;display:inline-block;margin-top:6px">Return to the plaza →</a>`;
+    <a href="${import.meta.env.BASE_URL}assets/characters/goose/anim-lab.html" style="color:#fff;display:block;margin-top:12px">Compare walk variants side by side →</a>
+    <a href="${import.meta.env.BASE_URL}" style="color:#fff;display:inline-block;margin-top:6px">Return to the plaza →</a>`;
   document.body.append(panel);
   const input = (id: string) => panel.querySelector<HTMLInputElement>(`#preview-${id}`)!;
   const select = (id: string) => panel.querySelector<HTMLSelectElement>(`#preview-${id}`)!;
