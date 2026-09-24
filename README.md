@@ -67,6 +67,13 @@ replacing `src/game/content/plaza-layout.json`. **Import layout** restores an
 exported arrangement, and **Reset defaults** clears the browser draft and returns
 to the checked-in canonical layout.
 
+The editor also supports laptop-friendly keyboard controls. Press **?** or **F1**
+to open the shortcut drawer. `IJKL` orbit the camera, `U`/`O` zoom, `H` focuses
+the selected object, the arrow keys move it, `Q`/`E` rotate it, and `Tab` cycles
+through objects. While placing an asset, **Enter** places it at the camera focus;
+**Shift+Enter** keeps placing. **Home** resets the view, **R** rotates the
+placement preview, and **Esc** cancels placement.
+
 ## Controls
 
 - Move: `WASD`, arrow keys, or the controller left stick

@@ -20,7 +20,15 @@ export type EditorShortcutAction =
   | { type: "redo" }
   | { type: "stop-placing" }
   | { type: "delete-selected" }
-  | { type: "move-selected"; dx: number; dz: number };
+  | { type: "move-selected"; dx: number; dz: number; step?: number }
+  | { type: "rotate-selected"; direction: number }
+  | { type: "select-next"; direction: number }
+  | { type: "orbit-camera"; horizontal: number; vertical: number }
+  | { type: "zoom-camera"; direction: number }
+  | { type: "focus-selected" }
+  | { type: "reset-view" }
+  | { type: "place-at-focus"; keepPlacing: boolean }
+  | { type: "toggle-shortcuts" };
 
 export function resolveEditorShortcut(input: EditorKeyInput, placing: boolean, hasSelection: boolean): EditorShortcutAction | undefined {
   const modifier = input.metaKey || input.ctrlKey;
@@ -31,15 +39,30 @@ export function resolveEditorShortcut(input: EditorKeyInput, placing: boolean, h
   const isDelete = input.code === "Delete" || input.code === "Backspace";
   if (placing && (isEscape || isDelete)) return { type: "stop-placing" };
   if (input.targetIsTextEntry) return undefined;
-  if (!placing && !hasSelection) return undefined;
-  if (!placing && isDelete) return { type: "delete-selected" };
+
+  if (input.code === "F1" || (input.code === "Slash" && input.shiftKey) || input.key === "?") return { type: "toggle-shortcuts" };
+  if (input.code === "Home") return { type: "reset-view" };
 
   if (!placing) {
-    if (input.code === "ArrowLeft") return { type: "move-selected", dx: -1, dz: 0 };
-    if (input.code === "ArrowRight") return { type: "move-selected", dx: 1, dz: 0 };
-    if (input.code === "ArrowUp") return { type: "move-selected", dx: 0, dz: -1 };
-    if (input.code === "ArrowDown") return { type: "move-selected", dx: 0, dz: 1 };
+    if (input.code === "KeyJ") return { type: "orbit-camera", horizontal: -1, vertical: 0 };
+    if (input.code === "KeyL") return { type: "orbit-camera", horizontal: 1, vertical: 0 };
+    if (input.code === "KeyI") return { type: "orbit-camera", horizontal: 0, vertical: 1 };
+    if (input.code === "KeyK") return { type: "orbit-camera", horizontal: 0, vertical: -1 };
+    if (input.code === "KeyU") return { type: "zoom-camera", direction: -1 };
+    if (input.code === "KeyO") return { type: "zoom-camera", direction: 1 };
+    if (input.code === "KeyH") return hasSelection ? { type: "focus-selected" } : undefined;
+    if (input.code === "Tab") return { type: "select-next", direction: input.shiftKey ? -1 : 1 };
+    if (input.code === "KeyQ") return hasSelection ? { type: "rotate-selected", direction: -1 } : undefined;
+    if (input.code === "KeyE") return hasSelection ? { type: "rotate-selected", direction: 1 } : undefined;
+    if (isDelete) return hasSelection ? { type: "delete-selected" } : undefined;
+    if (input.code === "ArrowLeft") return hasSelection ? { type: "move-selected", dx: -1, dz: 0, ...(input.shiftKey ? { step: 4 } : {}) } : undefined;
+    if (input.code === "ArrowRight") return hasSelection ? { type: "move-selected", dx: 1, dz: 0, ...(input.shiftKey ? { step: 4 } : {}) } : undefined;
+    if (input.code === "ArrowUp") return hasSelection ? { type: "move-selected", dx: 0, dz: -1, ...(input.shiftKey ? { step: 4 } : {}) } : undefined;
+    if (input.code === "ArrowDown") return hasSelection ? { type: "move-selected", dx: 0, dz: 1, ...(input.shiftKey ? { step: 4 } : {}) } : undefined;
+  } else if (input.code === "Enter") {
+    return { type: "place-at-focus", keepPlacing: input.shiftKey };
   }
+
   return undefined;
 }
 
