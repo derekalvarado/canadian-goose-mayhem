@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 16,
+  "canonicalRevision": 17,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -230,13 +230,13 @@
         },
         {
           "id": "oldtown.coopersmith",
-          "assetId": "oldtown.coopersmith-block",
-          "label": "CooperSmith’s block (photo interpretation)",
+          "assetId": "oldtown.coopersmith-pub",
+          "label": "CooperSmith’s Pub & Brewing",
           "transform": {
-            "x": -32,
+            "x": -33.07,
             "y": 0,
-            "z": 14.75,
-            "rotationY": 2.5307274153917776
+            "z": 14.52,
+            "rotationY": 1.7808
           }
         },
         {
