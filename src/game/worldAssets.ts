@@ -68,6 +68,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "street.sidewalk-tile", label: "Sidewalk tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: 0, surfacePriority: 3 },
   { assetId: "street.road-tile", label: "Lowered road tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: -0.15, surfacePriority: 2 },
   { assetId: "street.curb-straight", label: "Straight curb", category: "ground", halfWidth: 4, halfDepth: 0.2, colliders: [] },
+  { assetId: "street.manhole-cover", label: "Sewer manhole cover", category: "ground", halfWidth: 0.4, halfDepth: 0.4, colliders: [], warnForOverlap: false },
   { assetId: "plaza.building-frontage", label: "Building frontage", category: "architecture", halfWidth: 22, halfDepth: 22, colliders: [], occludesCamera: true, pivotOffset: { x: 0, z: -20 }, warnForOverlap: false },
   { assetId: "street.building1", label: "Building 1 — arched brick storefront", category: "architecture", halfWidth: 3.45, halfDepth: 3.45, colliders: [{ shape: "box", x: 0, z: -0.184, halfWidth: 3.289, halfDepth: 3.197 }], occludesCamera: true },
   { assetId: "street.building2", label: "Café with striped awning", category: "architecture", halfWidth: 3.45, halfDepth: 3.72, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.35, halfDepth: 3.16 }], occludesCamera: true },

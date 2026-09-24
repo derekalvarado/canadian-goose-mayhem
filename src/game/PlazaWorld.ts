@@ -1,4 +1,5 @@
 import { createGasMeterBank } from "./GasMeterBankView.ts";
+import { createManholeCover } from "./ManholeCoverView.ts";
 import { createCoffeeChair, createCoffeeTable } from "./CoffeeFurnitureView.ts";
 import { createBistroSet } from "./PlazaBistroView.ts";
 import { createOldTownPaving, createTownBench, createTownBed, createTownLamp, createTownLights, createTownFireplace, createTownStage, createTownBlock, createTownInlay } from "./OldTownViews.ts";
@@ -1226,6 +1227,7 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
       return tank;
     }
     case "oldtown.oval-inlay": return createTownInlay();
+    case "street.manhole-cover": return createManholeCover();
     case "oldtown.bench": return createTownBench();
     case "oldtown.flower-bed": return createTownBed();
     case "oldtown.lamp": return createTownLamp();

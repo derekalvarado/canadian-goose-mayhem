@@ -138,6 +138,19 @@ test("the gas meter bank is a solid wall prop placed against the southeast store
   assert.ok(bounds.min.y > -0.05 && bounds.max.y < 1.8);
 });
 
+test("the sewer manhole cover is a flush, walk-through ground decal", () => {
+  const asset = getWorldAsset("street.manhole-cover");
+  assert.ok(asset);
+  assert.equal(asset.category, "ground");
+  assert.deepEqual(asset.colliders, []);
+
+  const view = createWorldAssetView(asset.assetId, new OcclusionFadeGroupRegistry(), "test.manhole-cover");
+  const bounds = new THREE.Box3().setFromObject(view);
+  assert.ok(bounds.max.x - bounds.min.x <= asset.halfWidth * 2 + 0.05);
+  assert.ok(bounds.max.z - bounds.min.z <= asset.halfDepth * 2 + 0.05);
+  assert.ok(bounds.min.y >= 0 && bounds.max.y < 0.1, "cover sits flush with the ground");
+});
+
 test("coffee shop chairs stand on four legs and the square tables fit their footprints", () => {
   const chair = createWorldAssetView("coffee.chair", new OcclusionFadeGroupRegistry(), "test.chair");
   const feet = new Set<string>();
