@@ -150,21 +150,36 @@ def envelope(t, knots):
     return knots[-1][1]
 
 
+# Hurry and sneak keep the shared rocking; the walk waddles. Its rump swivels
+# around the chest (yaw_pivot meters ahead of the hips) under a steady neck,
+# and the tail swings wide a beat behind with a flick at each footfall.
+# Tune variants in assets/characters/goose/anim-lab.html (src/dev/gooseLab).
+SWAY = dict(body_yaw=0.015, body_roll=0.045, body_sway=0.012, yaw_pivot=0, chest_counter_yaw=0,
+            tail_yaw=0.04, tail_lag=0.5, tail_roll=0, tail_flick=0)
+WADDLE = dict(SWAY, body_yaw=0.08, body_roll=0.07, body_sway=0.02, yaw_pivot=0.26, chest_counter_yaw=1,
+              tail_yaw=0.16, tail_lag=1.1, tail_roll=0.05, tail_flick=0.03)
+
+
 def gait(t, duration, running=False, sneaking=False):
     phase = t / duration
     wave = math.tau * phase
+    s = SWAY if running or sneaking else WADDLE
     bob = (0.012 if sneaking else 0.022 if running else 0.013) * (1-math.cos(2*wave))
     lean = -0.12 if running else -0.065 if sneaking else -0.025
-    pose('body', (lean, 0.015*math.sin(wave), 0.045*math.cos(wave)),
-         (0.012*math.cos(wave), bob - (0.026 if sneaking else 0), 0))
-    pose('chest', (-lean*0.4, 0, -0.014*math.cos(wave)))
+    yaw = s['body_yaw']*math.sin(wave)
+    pose('body', (lean, yaw, s['body_roll']*math.cos(wave)),
+         (s['body_sway']*math.cos(wave) + s['yaw_pivot']*math.sin(yaw), bob - (0.026 if sneaking else 0), 0))
+    pose('chest', (-lean*0.4, -yaw*s['chest_counter_yaw'], -0.014*math.cos(wave)))
     for i in range(1, 7):
         # The neck stabilizes the head; each joint follows a little later.
         pose('neck_' + str(i), ((0.008 if sneaking else 0.014)*math.sin(2*wave-i*0.32)
              + (-0.035 if running else -0.04 if sneaking and i < 4 else 0), 0,
              -0.006*math.cos(wave-i*0.2)))
     pose('head', (0.04 if running else 0.015, 0.015*math.sin(wave-0.5), 0))
-    pose('tail', (0.035*math.sin(2*wave-0.7), 0.04*math.sin(wave-0.5), 0))
+    swing = math.sin(wave-s['tail_lag'])
+    pose('tail', (0.035*math.sin(2*wave-0.7),
+                  s['tail_yaw']*swing + s['tail_flick']*math.sin(2*wave-2*s['tail_lag']),
+                  s['tail_roll']*swing))
     for side, sign, shift in [('left', -1, 0), ('right', 1, 0.5)]:
         p = (phase+shift) % 1
         stance = 0.56 if not running else 0.48

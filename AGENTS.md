@@ -3,6 +3,17 @@
 This file is the shared instructions file for all AI coding agents working in
 this repository (Claude, Codex, Gemini, etc.), not just one vendor's tool.
 
+## Working with the owner
+
+The owner is not a programmer and cannot debug or fix the code on their own.
+
+- Report results in plain language: what changed in the game, what to look at,
+  and anything they need to decide. Keep it short.
+- Do not explain how things work under the hood (file internals, math, rendering
+  or export pipelines, test mechanics) unless they ask.
+- If something is broken or risky, say so plainly and propose the fix, rather
+  than explaining the mechanism and leaving them to act on it.
+
 ## Commands
 
 - `npm install` — install dependencies
@@ -46,6 +57,9 @@ future acceptance gates.
   toon material factory for visual additions.
 - Run `npm test` and `npm run build` for gameplay changes. Add behavioral regression
   coverage for new gameplay invariants; do not require browser UI to test rules.
+- Write tests only for logic: rules, behavior, state changes, and calculations.
+  Do not write tests that pin constants or tuning values, or that check where an
+  asset sits in the world or how big it is; check those by looking in the browser.
 
 ## Adding a world asset
 
@@ -82,16 +96,16 @@ worked example).
    migrates past the new revision. Update tests that assert the latest
    revision. Parallel asset branches will collide on this number; renumber when
    merging.
-7. **Tests.** In `tests/worldAssets.test.ts`, check the rendered bounds stay
-   within the catalog footprint and colliders stay inside it; to check where the
-   goose is blocked (`resolveWorldAreaMovement`), place the asset in a test-built
-   area rather than the canonical layout. If you added a draft upgrade, check in
-   `tests/oldTownRebuild.test.ts` that it adds the instance once without
-   disturbing edits.
-   The world layout is still being arranged in the editor, so never assert where
-   things sit in `world-layout.json`: no hard-coded coordinates, routes, or
-   "does not overlap its neighbours" checks against canonical placements. When a
-   behavioural test needs a placed object, read its position from the layout.
+7. **Tests.** Test logic only (see the testing rule above). If you added a draft
+   upgrade, check in `tests/oldTownRebuild.test.ts` that it adds the instance once
+   without disturbing edits. To test collision behavior (where the goose is
+   blocked, `resolveWorldAreaMovement`), place the asset in a test-built area
+   rather than the canonical layout. Do not add tests for its bounds, footprint,
+   or collider placement, and never assert where things sit in
+   `world-layout.json` (no hard-coded coordinates, routes, or "does not overlap
+   its neighbours" checks): the layout is still being arranged in the editor, so
+   check placement by eye in step 8. When a behavioral test needs a placed
+   object, read its position from the layout.
 8. **Look at it.** Run `npm test` and `npm run build`, then view it in the browser:
    `?overview&dev&start=old-town-square.central-plaza` for placement, and a
    temporary close-up page that imports the builder for detail (delete it before
