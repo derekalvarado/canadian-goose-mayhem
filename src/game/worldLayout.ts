@@ -22,6 +22,7 @@ const BREWERY_TANK_CONTENT_REVISION = 14;
 const GAS_METER_PAIR_CONTENT_REVISION = 15;
 const NORTHEAST_SOUTHWEST_RELABEL_REVISION = 16;
 const COOPERSMITH_PUB_REVISION = 17;
+const OLD_TOWN_PLACEMENT_REVISION = 18;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -433,7 +434,7 @@ function renameNorthSouthRows(layout: WorldLayout, store?: WorldLayoutStorage): 
  * without one.
  */
 function swapCoopersmithPub(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
-  if (layout.canonicalRevision >= COOPERSMITH_PUB_REVISION) return layout;
+  if (layout.canonicalRevision >= COOPERSMITH_PUB_REVISION) return updateOldTownPlacement(layout, store);
   const updated = cloneWorldLayout(layout);
   const canonical = getWorldArea(CANONICAL_WORLD_LAYOUT).instances.find((item) => item.id === "oldtown.coopersmith");
   for (const item of getWorldArea(updated).instances) {
@@ -445,6 +446,41 @@ function swapCoopersmithPub(layout: WorldLayout, store?: WorldLayoutStorage): Wo
   if (store) {
     try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
     catch (error) { console.warn("Keeping the previous world because its CooperSmith's update could not be saved", error); return layout; }
+  }
+  return updateOldTownPlacement(validated, store);
+}
+
+/** Applies the latest editor-authored plaza arrangement to untouched older drafts. */
+function updateOldTownPlacement(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= OLD_TOWN_PLACEMENT_REVISION) return layout;
+  const updated = cloneWorldLayout(layout);
+  const plaza = getWorldArea(updated);
+  const sameTransform = (item: WorldInstance, expected: WorldTransform) => item.transform.x === expected.x
+    && item.transform.y === expected.y && item.transform.z === expected.z && item.transform.rotationY === expected.rotationY;
+  const moveDefault = (id: string, previous: WorldTransform, next: WorldTransform) => {
+    const item = plaza.instances.find((candidate) => candidate.id === id);
+    if (item && sameTransform(item, previous)) item.transform = { ...next };
+  };
+  moveDefault("plaza.paving", { x: 0, y: 0, z: 0, rotationY: 0 }, { x: 0.25, y: 0, z: 0, rotationY: 0 });
+  moveDefault("plaza.goose-fountain", { x: -16, y: 0, z: -1, rotationY: 0 }, { x: -16, y: 0, z: -1, rotationY: 4.799655442984401 });
+  moveDefault("plaza.pavilion-stage", { x: 20, y: 0, z: 0, rotationY: -1.5707963267948966 }, { x: 20, y: 0, z: -2.25, rotationY: 5.235987755982988 });
+  moveDefault("oldtown.coopersmith", { x: -33.07, y: 0, z: 14.52, rotationY: 1.7808 }, { x: -33.07, y: 0, z: 14.52, rotationY: 1.8680664625997156 });
+  moveDefault("oldtown.southwest.tree-2", { x: 9, y: 0, z: -8.5, rotationY: 1.4 }, { x: 8.25, y: 0, z: -8.5, rotationY: 1.7490658503988659 });
+  moveDefault("plaza.splash-faucet", { x: -7.75, y: 0, z: 0, rotationY: -1.5707963267948966 }, { x: -6, y: 0, z: 7, rotationY: 6.108652381980152 });
+  const removedDefaults = new Map<string, { assetId: string; transform: WorldTransform }>([
+    ["oldtown.southwest.bed-1", { assetId: "oldtown.flower-bed", transform: { x: 3.8, y: 0, z: -8.5, rotationY: 0 } }],
+    ["oldtown.southwest.bed-2", { assetId: "oldtown.flower-bed", transform: { x: 12.8, y: 0, z: -8.5, rotationY: 0 } }],
+    ["oldtown.southwest.tree-3", { assetId: "nature.deciduous-tree", transform: { x: 16, y: 0, z: -8.5, rotationY: 0 } }],
+  ]);
+  plaza.instances = plaza.instances.filter((item) => {
+    const expected = removedDefaults.get(item.id);
+    return !expected || item.assetId !== expected.assetId || !sameTransform(item, expected.transform);
+  });
+  updated.canonicalRevision = OLD_TOWN_PLACEMENT_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its plaza placement update could not be saved", error); return layout; }
   }
   return validated;
 }

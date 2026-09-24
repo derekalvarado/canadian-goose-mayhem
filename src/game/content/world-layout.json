@@ -46,7 +46,7 @@
           "assetId": "plaza.paving-base",
           "label": "Central pedestrian square",
           "transform": {
-            "x": 0,
+            "x": 0.25,
             "y": 0,
             "z": 0,
             "rotationY": 0
@@ -181,7 +181,7 @@
             "x": -16,
             "y": 0,
             "z": -1,
-            "rotationY": 0
+            "rotationY": 4.799655442984401
           }
         },
         {
@@ -202,8 +202,8 @@
           "transform": {
             "x": 20,
             "y": 0,
-            "z": 0,
-            "rotationY": -1.5707963267948966
+            "z": -2.25,
+            "rotationY": 5.235987755982988
           }
         },
         {
@@ -236,7 +236,7 @@
             "x": -33.07,
             "y": 0,
             "z": 14.52,
-            "rotationY": 1.7808
+            "rotationY": 1.8680664625997156
           }
         },
         {
@@ -383,17 +383,6 @@
           }
         },
         {
-          "id": "oldtown.southwest.bed-1",
-          "assetId": "oldtown.flower-bed",
-          "label": "Flower and shrub bed",
-          "transform": {
-            "x": 3.8,
-            "y": 0,
-            "z": -8.5,
-            "rotationY": 0
-          }
-        },
-        {
           "id": "oldtown.southwest.bench-1",
           "assetId": "oldtown.bench",
           "label": "Bench facing square",
@@ -409,21 +398,10 @@
           "assetId": "nature.deciduous-tree",
           "label": "Shade tree",
           "transform": {
-            "x": 9,
+            "x": 8.25,
             "y": 0,
             "z": -8.5,
-            "rotationY": 1.4
-          }
-        },
-        {
-          "id": "oldtown.southwest.bed-2",
-          "assetId": "oldtown.flower-bed",
-          "label": "Flower and shrub bed",
-          "transform": {
-            "x": 12.8,
-            "y": 0,
-            "z": -8.5,
-            "rotationY": 0
+            "rotationY": 1.7490658503988659
           }
         },
         {
@@ -434,17 +412,6 @@
             "x": 9,
             "y": 0,
             "z": -6.8,
-            "rotationY": 0
-          }
-        },
-        {
-          "id": "oldtown.southwest.tree-3",
-          "assetId": "nature.deciduous-tree",
-          "label": "Shade tree",
-          "transform": {
-            "x": 16,
-            "y": 0,
-            "z": -8.5,
             "rotationY": 0
           }
         },
@@ -827,10 +794,10 @@
           "assetId": "plaza.splash-faucet",
           "label": "Splash-pad faucet",
           "transform": {
-            "x": -7.75,
+            "x": -6,
             "y": 0,
-            "z": 0,
-            "rotationY": -1.5707963267948966
+            "z": 7,
+            "rotationY": 6.108652381980152
           }
         },
         {
