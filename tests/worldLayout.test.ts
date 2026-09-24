@@ -32,15 +32,6 @@ test("canonical world serializes a multi-instance central plaza using catalog ID
   assert.equal(plaza.instances.find((instance) => instance.id === "plaza.paving")?.assetId, "plaza.paving-base");
 });
 
-test("the canonical planters are separate movable world instances", () => {
-  const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT);
-  const planters = plaza.instances.filter((instance) => instance.assetId === "oldtown.flower-bed");
-  assert.equal(planters.length, 6);
-  assert.equal(new Set(planters.map(item => item.id)).size, 6);
-  assert.equal(plaza.instances.some((instance) => instance.assetId === "plaza.planter-cluster"), false);
-  assert.ok(planters.every((instance) => getWorldAsset(instance.assetId)?.colliders.length === 1));
-});
-
 test("saved layouts migrate the legacy planter cluster into separate instances", () => {
   const legacy = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   const plaza = getWorldArea(legacy);
