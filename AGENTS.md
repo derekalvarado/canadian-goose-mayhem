@@ -3,6 +3,17 @@
 This file is the shared instructions file for all AI coding agents working in
 this repository (Claude, Codex, Gemini, etc.), not just one vendor's tool.
 
+## Working with the owner
+
+The owner is not a programmer and cannot debug or fix the code on their own.
+
+- Report results in plain language: what changed in the game, what to look at,
+  and anything they need to decide. Keep it short.
+- Do not explain how things work under the hood (file internals, math, rendering
+  or export pipelines, test mechanics) unless they ask.
+- If something is broken or risky, say so plainly and propose the fix, rather
+  than explaining the mechanism and leaving them to act on it.
+
 ## Commands
 
 - `npm install` — install dependencies
@@ -46,6 +57,9 @@ future acceptance gates.
   toon material factory for visual additions.
 - Run `npm test` and `npm run build` for gameplay changes. Add behavioral regression
   coverage for new gameplay invariants; do not require browser UI to test rules.
+- Write tests only for logic: rules, behavior, state changes, and calculations.
+  Do not write tests that pin constants or tuning values, or that check where an
+  asset sits in the world or how big it is; check those by looking in the browser.
 
 ## Adding a world asset
 
@@ -77,12 +91,10 @@ worked example).
    instance once to older browser drafts. Update tests that assert the latest
    revision. Parallel asset branches will collide on this number; renumber when
    merging.
-7. **Tests.** In `tests/worldAssets.test.ts`, check the rendered bounds stay
-   within the catalog footprint and colliders stay inside it. In
+7. **Tests.** Test logic only (see the testing rule above). In
    `tests/oldTownRebuild.test.ts`, check the draft upgrade adds it once without
-   disturbing edits, that the goose is blocked where expected
-   (`resolveWorldAreaMovement`), and that it does not overlap neighbouring props
-   (`findWorldInstanceOverlaps`).
+   disturbing edits. Do not add tests for its bounds, footprint, collider
+   placement, or overlap with neighbours; check those by eye in step 8.
 8. **Look at it.** Run `npm test` and `npm run build`, then view it in the browser:
    `?overview&dev&start=old-town-square.central-plaza` for placement, and a
    temporary close-up page that imports the builder for detail (delete it before
