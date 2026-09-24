@@ -186,3 +186,47 @@ test("a nearby threatening goose makes kids run away and cry before returning", 
     assert.equal(simulation.world.splashKids[0].activity, "playing");
   }
 });
+
+test("frightened kids scatter to different spots on the far side from the goose", () => {
+  // Pad centred at x = 3 with the goose at its west edge; kids spread across the pad.
+  const around = [[5.8,4.7], [5.8,-4.7], [-5.8,4.7], [-5.8,-4.7], [6.4,0], [0,6.2], [0,-6.2]].map(([x, z]) => position(3 + x, z));
+  const kid = (id: string, x: number, z: number) => ({
+    id, position: position(x, z), heading: 0, observedTargetId: "pad",
+    playRoute: [position(x, z)], retreatPositions: around,
+    playSpeed: 1, fleeSpeed: 3, threatRadius: 5, disappointedSeconds: 1, crySeconds: 1,
+  });
+  const simulation = new Simulation({
+    spawn: position(0), spawnHeading: 0, resolveMovement: openMovement, objectives: [],
+    entities: [{ id: "pad", label: "Splash pad", position: position(3), active: true }],
+    splashKids: [kid("north", 2.2, 1.4), kid("middle", 2.6, 0.1), kid("south", 2.1, -1.3)],
+  });
+  simulation.advance(FIXED_STEP, { ...idle, aggressive: true });
+  assert.deepEqual(simulation.world.splashKids.map((child) => child.activity), ["frightened", "frightened", "frightened"]);
+  for (let tick = 0; tick < 240; tick += 1) simulation.advance(FIXED_STEP, idle);
+  const spots = simulation.world.splashKids.map((child) => child.position);
+  for (let a = 0; a < spots.length; a += 1) {
+    assert.ok(spots[a].x > 3, `kid ${a} ran toward the goose's side`);
+    for (let b = a + 1; b < spots.length; b += 1) {
+      assert.ok(Math.hypot(spots[a].x - spots[b].x, spots[a].z - spots[b].z) > 3, `kids ${a} and ${b} fled to the same spot`);
+    }
+  }
+});
+
+test("playing kids stop to splash at each route point, and a scare still interrupts them", () => {
+  const rules = splashKidRules();
+  const simulation = new Simulation({ ...rules, splashKids: [{ ...rules.splashKids![0], splashSeconds: 1 }] });
+  for (let tick = 0; tick < 120 && simulation.world.splashKids[0].activity !== "splashing"; tick += 1) simulation.advance(FIXED_STEP, idle);
+  const stop = simulation.world.splashKids[0];
+  assert.equal(stop.activity, "splashing");
+  assert.deepEqual(stop.position, position(3));
+  for (let tick = 0; tick < 30; tick += 1) simulation.advance(FIXED_STEP, idle);
+  assert.equal(simulation.world.splashKids[0].activity, "splashing");
+  assert.deepEqual(simulation.world.splashKids[0].position, position(3), "kids stay put while splashing");
+  for (let tick = 0; tick < 40; tick += 1) simulation.advance(FIXED_STEP, idle);
+  assert.equal(simulation.world.splashKids[0].activity, "playing");
+
+  const scared = new Simulation({ ...rules, splashKids: [{ ...rules.splashKids![0], splashSeconds: 5 }] });
+  for (let tick = 0; tick < 120 && scared.world.splashKids[0].activity !== "splashing"; tick += 1) scared.advance(FIXED_STEP, idle);
+  scared.advance(FIXED_STEP, { ...idle, aggressive: true });
+  assert.equal(scared.world.splashKids[0].activity, "frightened");
+});

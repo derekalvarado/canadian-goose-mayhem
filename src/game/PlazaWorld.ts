@@ -1192,6 +1192,7 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.street-janitor": return new JanitorView();
     case "plaza.splash-kid-runner": return new SplashKidView("runner");
     case "plaza.splash-kid-boots": return new SplashKidView("boots");
+    case "plaza.splash-kid-floaties": return new SplashKidView("floaties");
     case "oldtown.shade-tree":
     case "nature.deciduous-tree": {
       const tree = new DeciduousTreeView(undefined, deciduousTreeVariantForId(instanceId));

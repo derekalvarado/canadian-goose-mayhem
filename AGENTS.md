@@ -142,5 +142,5 @@ animation work.
    with `-x`, elbows bend with `+x`, `+y` turns toward the character's left. Probe
    an unfamiliar rig with a one-joint test pose in the lab before authoring clips,
    and keep a regression test like the janitor's hyperextension check.
-7. **Close-up checks.** Lab pages accept `?group=<tab>&zoom&paused` so a specific
+7. **Close-up checks.** Lab pages accept `?group=<tab>&zoom&paused` (plus `&only=<card name text>` and `&t=<seconds>`) so a specific
    view can be opened in a separate tab without disturbing the user's saved settings.

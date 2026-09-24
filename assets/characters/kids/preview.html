@@ -8,14 +8,14 @@
   header { padding: 24px 32px 12px; } h1 { margin: 0 0 8px; font-size: 24px; } p { margin: 0 0 16px; }
   button { font: inherit; padding: 8px 16px; border: 1px solid #879b8b; background: #fffdf6; border-radius: 6px; cursor: pointer; }
   button[aria-pressed="true"] { background: #315c52; color: white; }
-  #views { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 12px 24px 24px; }
+  #views { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 12px 24px 24px; }
   figure { margin: 0; min-width: 0; } canvas { width: 100%; height: 620px; display: block; border-radius: 8px; }
   figcaption { text-align: center; padding: 10px; } #status { padding: 0 32px; }
   @media(max-width:760px) { #views { grid-template-columns: 1fr; } canvas { height: 500px; } }
 </style>
 <header>
   <h1>Splash-pad kids · low-detail rigs</h1>
-  <p>Runner and yellow-boots variants at game scale. Arms use shallow tapered prisms rather than rounded tubes.</p>
+  <p>Milo (runner), June (yellow boots), and Ari (water wings) at game scale, built from soft rounded forms.</p>
   <button data-clip="idle" aria-pressed="true">Idle</button>
   <button data-clip="walk" aria-pressed="false">Walk</button>
   <button data-clip="run" aria-pressed="false">Run</button>
@@ -34,12 +34,12 @@
   const sun = new THREE.DirectionalLight(0xffffff, Math.PI * 0.42); sun.position.set(-3, 7, -5); sun.layers.enable(1); sun.layers.enable(2); scene.add(sun);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), toonMaterial(0xe5e0d3));
   floor.rotation.x = -Math.PI / 2; floor.position.y = -0.006; floor.receiveShadow = true; scene.add(floor);
-  const kids = [new SplashKidView('runner'), new SplashKidView('boots')]; kids[0].position.x = -1.2; kids[1].position.x = 1.2;
+  const kids = [new SplashKidView('runner'), new SplashKidView('boots'), new SplashKidView('floaties')]; kids.forEach((kid, index) => kid.position.x = (index - 1) * 2.4);
   scene.add(...kids); await Promise.all(kids.map((kid) => kid.ready));
   kids.forEach((kid, index) => kid.traverse((object) => object.layers.set(index + 1)));
   const skeletons = kids.map((kid, index) => { const helper = new THREE.SkeletonHelper(kid); helper.layers.set(index + 1); helper.visible = false; scene.add(helper); return helper; });
   const panes = [];
-  for (const [index, [label, targetX]] of [['Runner · flat sandals', -1.2], ['Yellow boots · hands-up silhouette', 1.2]].entries()) {
+  for (const [index, [label, targetX]] of [['Milo · runner', -2.4], ['June · yellow boots', 0], ['Ari · water wings', 2.4]].entries()) {
     const figure = document.createElement('figure'); const canvas = document.createElement('canvas'); const caption = document.createElement('figcaption');
     caption.textContent = label; figure.append(canvas, caption); document.querySelector('#views').append(figure);
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.toneMapping = THREE.NoToneMapping; renderer.shadowMap.enabled = true;
@@ -51,7 +51,7 @@
     document.querySelectorAll('[data-clip]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
   };
   document.querySelector('#rig').onclick = (event) => { const visible = !skeletons[0].visible; skeletons.forEach((helper) => helper.visible = visible); event.currentTarget.setAttribute('aria-pressed', String(visible)); };
-  document.querySelector('#status').textContent = 'Loaded · 1.18 m · 18 janitor-compatible bones · six in-place clips · flat-arm invariant';
+  document.querySelector('#status').textContent = 'Loaded · 1.0–1.25 m · 18 janitor-compatible bones · six in-place clips';
   const clock = new THREE.Clock(); function frame() {
     requestAnimationFrame(frame); const delta = Math.min(clock.getDelta(), 0.1); kids.forEach((kid) => kid.update(delta));
     for (const {renderer, camera, canvas} of panes) { const width = canvas.clientWidth, height = canvas.clientHeight;

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 17,
+  "canonicalRevision": 19,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -846,7 +846,7 @@
         },
         {
           "id": "plaza.splash-kid-ari",
-          "assetId": "plaza.splash-kid-runner",
+          "assetId": "plaza.splash-kid-floaties",
           "label": "Ari at the splash pad",
           "transform": {
             "x": -1.8,

@@ -113,10 +113,12 @@ The camera automatically follows the goose from a fixed diagonal, top-down angle
 - `src/game/Goose.ts` — runtime loader, layered clips, and head tracking for the rigged Canada goose
 - `src/game/GooseAnimation.ts` — presentation-only gait phase and blend state
 - `src/game/GooseModel.ts` — bootstrap goose geometry and original prototype animation recipe
-- `src/game/SplashKidModel.ts` — reproducible low-detail child rigs with flat arms and play/reaction clips
+- `src/game/SplashKidModel.ts` — three soft, rounded splash-pad kids (Milo, June, Ari) with play/reaction clips
+- `src/game/splashKidMoves.ts` — kid pose builders: contact-planted skips and gallops, splashes, flee runs, and crying
 - `src/game/JanitorModel.ts` — procedural janitor mesh, rig, and exported clips
 - `src/game/janitorGaits.ts` — knob-driven walk/chase gaits with leg IK that keeps stance feet planted
-- `src/dev/janitorLab/` — dev-only janitor animation lab: variants, lab runtime, and rig helpers
+- `src/dev/animLab/` — shared runtime for the dev-only character animation labs
+- `src/dev/janitorLab/`, `src/dev/kidLab/` — janitor and splash-kid lab variants and rig helpers
 - `assets/characters/goose/goose-animated.blend` — current editable Blender character and animation source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
@@ -151,7 +153,8 @@ animation lab: clip variants side by side with the shipped clips, game-camera, s
 and front views, frame stepping, and a treadmill floor that shows foot sliding. It
 builds the rig from source, so edits to `src/dev/janitorLab/variants.ts` or
 `JanitorModel.ts` reload in about a second. Use `?group=chase&zoom` to open a tab
-close up. New character animation is prototyped in a lab like this before it ships;
+close up. `/assets/characters/kids/anim-lab.html` is the same lab for the splash-pad
+kids. New character animation is prototyped in a lab like this before it ships;
 see [AGENTS.md](AGENTS.md#prototyping-character-animation).
 
 ## Coffee shop graybox

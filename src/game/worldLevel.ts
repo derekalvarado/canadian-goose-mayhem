@@ -1,5 +1,6 @@
 import { getWorldAsset, type WorldAssetCollider } from "./worldAssets.ts";
 import { CENTRAL_PLAZA_AREA_ID, COFFEE_SHOP_AREA_ID, isWorldChunkPlayable, type WorldArea, type WorldAreaTransition, type WorldInstance } from "./worldLayout.ts";
+import { SPLASH_KID_FLEE_SPEED, SPLASH_KID_PLAY_SPEEDS, splashKidVariantOf } from "./splashKidTuning.ts";
 import type { AreaTransitionDefinition, Position, WorldEntityDefinition, WorldRules } from "./simulation/Simulation.ts";
 
 export const WORLD_GOOSE_RADIUS = 0.34;
@@ -156,9 +157,10 @@ export function createCentralPlazaRules(area: WorldArea, transitions: readonly W
       return {
         id: item.id, position: { x: item.transform.x, y: item.transform.y, z: item.transform.z }, heading: item.transform.rotationY,
         observedTargetId: splashPad.id, playRoute: route,
-        retreatPositions: [[5.8,4.7], [5.8,-4.7], [-5.8,4.7], [-5.8,-4.7]].map(([x, z]) => worldPoint(splashPad, x, z)),
-        playSpeed: 1.35 + index * 0.08, fleeSpeed: 3.15, threatRadius: 4.4,
-        disappointedSeconds: 2, crySeconds: 3,
+        // Spread around the pad so a scare scatters the kids; the faucet side (-x) stays clear.
+        retreatPositions: [[5.8,4.7], [5.8,-4.7], [-5.8,4.7], [-5.8,-4.7], [6.4,0], [0,6.2], [0,-6.2]].map(([x, z]) => worldPoint(splashPad, x, z)),
+        playSpeed: SPLASH_KID_PLAY_SPEEDS[splashKidVariantOf(item.assetId) ?? "boots"], fleeSpeed: SPLASH_KID_FLEE_SPEED, threatRadius: 4.4,
+        disappointedSeconds: 2, crySeconds: 3, splashSeconds: [3.2, 2.6, 3.8][index % 3],
       };
     }) : [];
   const objectiveZones = entranceInstance ? [{ id: entranceInstance.id,
