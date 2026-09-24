@@ -60,12 +60,14 @@ export interface JanitorState {
   readonly stolenToolId?: string;
   readonly completedTrashIdsThisLap: readonly string[];
 }
-export type SplashKidActivity = "playing" | "disappointed" | "walking-away" | "away" | "frightened" | "crying" | "returning";
+export type SplashKidActivity = "playing" | "splashing" | "disappointed" | "walking-away" | "away" | "frightened" | "crying" | "returning";
 export interface SplashKidDefinition {
   readonly id: string; readonly position: Readonly<Position>; readonly heading: number;
   readonly observedTargetId: string; readonly playRoute: readonly Readonly<Position>[];
   readonly retreatPositions: readonly Readonly<Position>[]; readonly playSpeed: number; readonly fleeSpeed: number;
   readonly threatRadius: number; readonly disappointedSeconds: number; readonly crySeconds: number;
+  /** Seconds spent splashing in place at each play-route stop; 0 or absent keeps the kid moving. */
+  readonly splashSeconds?: number;
 }
 export interface SplashKidState {
   readonly id: string; readonly position: Readonly<Position>; readonly heading: number;
@@ -788,8 +790,7 @@ export class Simulation {
       const threatened = (this.aggressive || this.wingsSpread) && distance2d(child.position, this.position) <= definition.threatRadius;
       if (threatened && child.activity !== "frightened" && child.activity !== "crying") {
         child.activity = "frightened"; child.activitySecondsRemaining = 0;
-        child.destination = { ...definition.retreatPositions.reduce((best, candidate) =>
-          distance2d(candidate, this.position) > distance2d(best, this.position) ? candidate : best) };
+        child.destination = this.chooseSplashKidRetreat(child, this.position);
         events.push({ type: "splash-kid-frightened", actorId: definition.id, position: { ...child.position } });
       }
       if (child.activity === "frightened") {
@@ -807,14 +808,13 @@ export class Simulation {
         continue;
       }
       if (!target.active) {
-        if (child.activity === "playing" || child.activity === "returning") {
+        if (child.activity === "playing" || child.activity === "splashing" || child.activity === "returning") {
           child.activity = "disappointed"; child.activitySecondsRemaining = definition.disappointedSeconds; child.destination = undefined;
         } else if (child.activity === "disappointed") {
           child.activitySecondsRemaining = Math.max(0, child.activitySecondsRemaining - FIXED_STEP);
           if (child.activitySecondsRemaining <= 0) {
             child.activity = "walking-away";
-            child.destination = { ...definition.retreatPositions.reduce((best, candidate) =>
-              distance2d(candidate, child.position) < distance2d(best, child.position) ? candidate : best) };
+            child.destination = this.chooseSplashKidRetreat(child);
           }
         } else if (child.activity === "walking-away" && child.destination
           && this.moveSplashKidToward(child, child.destination, definition.playSpeed)) child.activity = "away";
@@ -829,11 +829,43 @@ export class Simulation {
         }
         continue;
       }
+      if (child.activity === "splashing") {
+        child.activitySecondsRemaining = Math.max(0, child.activitySecondsRemaining - FIXED_STEP);
+        if (child.activitySecondsRemaining <= 0) child.activity = "playing";
+        continue;
+      }
       if (child.activity === "playing") {
         const destination = definition.playRoute[child.routeIndex];
-        if (this.moveSplashKidToward(child, destination, definition.playSpeed)) child.routeIndex = (child.routeIndex + 1) % definition.playRoute.length;
+        if (this.moveSplashKidToward(child, destination, definition.playSpeed)) {
+          child.routeIndex = (child.routeIndex + 1) % definition.playRoute.length;
+          if ((definition.splashSeconds ?? 0) > 0) { child.activity = "splashing"; child.activitySecondsRemaining = definition.splashSeconds!; }
+        }
       }
     }
+  }
+  /**
+   * Scatter instead of flocking: prefer spots on the far side of the kid from the goose
+   * (or simply nearby when walking off), and avoid spots another kid is already heading to.
+   */
+  private chooseSplashKidRetreat(child: MutableSplashKid, threat?: Readonly<Position>): Position {
+    const claimed = this.splashKids.filter((other) => other !== child && other.destination
+      && (other.activity === "frightened" || other.activity === "walking-away" || other.activity === "crying" || other.activity === "away"))
+      .map((other) => other.destination!);
+    const awayX = threat ? child.position.x - threat.x : 0; const awayZ = threat ? child.position.z - threat.z : 0;
+    const awayLength = Math.hypot(awayX, awayZ);
+    let best = child.definition.retreatPositions[0]; let bestScore = -Infinity;
+    for (const candidate of child.definition.retreatPositions) {
+      const dx = candidate.x - child.position.x; const dz = candidate.z - child.position.z; const distance = Math.hypot(dx, dz);
+      let score = -distance;
+      if (threat) {
+        // Running toward the goose is worst; running straight away from it is best.
+        const alignment = awayLength > 1e-6 && distance > 1e-6 ? (dx * awayX + dz * awayZ) / (distance * awayLength) : 0;
+        score = alignment * 6 + distance2d(candidate, threat) * 0.5 - distance * 0.25;
+      }
+      if (claimed.some((spot) => distance2d(spot, candidate) < 1.5)) score -= 20;
+      if (score > bestScore) { bestScore = score; best = candidate; }
+    }
+    return { ...best };
   }
   private moveSplashKidToward(child: MutableSplashKid, destination: Readonly<Position>, speed: number): boolean {
     const dx = destination.x - child.position.x; const dz = destination.z - child.position.z;

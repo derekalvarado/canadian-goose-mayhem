@@ -21,7 +21,7 @@ test("square upgrade archives the previous draft, preserves other areas, and can
   old.areas.push({ id: "custom-garden", label: "My garden", chunks: [], instances: [] });
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 16);
+  assert.equal(updated.canonicalRevision, 17);
   assert.equal(getWorldArea(updated).instances.find(i => i.id === "plaza.goose-fountain")!.transform.x, -16);
   assert.deepEqual(updated.areas[1], { ...old.areas[1], controlLinks: [] });
   const backup = store.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -51,11 +51,11 @@ test("the gameplay content update preserves authored edits and is saved once", (
   saveWorldLayout(authored, store);
 
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 16);
+  assert.equal(updated.canonicalRevision, 17);
   assert.equal(getWorldArea(updated).instances.find((item) => item.id === "plaza.goose-fountain")?.transform.x, -14.25);
   assert.ok(getWorldArea(updated).instances.some((item) => item.id === "plaza.splash-faucet"));
   assert.deepEqual(getWorldArea(updated).controlLinks, [{ controllerId: "plaza.splash-faucet", targetId: "plaza.splash-pad" }]);
-  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 16);
+  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 17);
   assert.equal(getWorldArea(updated).instances.filter((item) => item.assetId.startsWith("plaza.splash-kid-")).length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => getWorldAsset(item.assetId)?.cleanupRole === "litter").length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => ["trash-bag", "litter-picker"].includes(getWorldAsset(item.assetId)?.cleanupRole ?? "")).length, 2);
@@ -120,7 +120,7 @@ test("drafts saved before the plaza rows were renamed gain the southwest/northea
   }
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 16);
+  assert.equal(updated.canonicalRevision, 17);
   const updatedPlaza = getWorldArea(updated);
   assert.equal(updatedPlaza.instances.some((item) => item.id.includes(".north.") || item.id.includes(".south.")), false);
   assert.equal(updatedPlaza.instances.find((item) => item.id === "oldtown.southwest.shop-0")?.label, "Southwest storefront 1");
@@ -159,3 +159,19 @@ test("all four storefront variants load with toon materials, correct footprint, 
   }
 });
 
+
+test("drafts saved before Ari got water wings swap the runner model once and keep other kid edits", () => {
+  const store = memoryStore();
+  const old = cloneWorldLayout(CANONICAL_WORLD_LAYOUT); old.canonicalRevision = 16;
+  const kids = getWorldArea(old).instances;
+  kids.find((item) => item.id === "plaza.splash-kid-ari")!.assetId = "plaza.splash-kid-runner";
+  kids.find((item) => item.id === "plaza.splash-kid-june")!.transform.x = -2.4;
+  saveWorldLayout(old, store);
+  const updated = loadWorldLayout(store);
+  assert.equal(updated.canonicalRevision, 17);
+  const plaza = getWorldArea(updated);
+  assert.equal(plaza.instances.find((item) => item.id === "plaza.splash-kid-ari")?.assetId, "plaza.splash-kid-floaties");
+  assert.equal(plaza.instances.find((item) => item.id === "plaza.splash-kid-milo")?.assetId, "plaza.splash-kid-runner");
+  assert.equal(plaza.instances.find((item) => item.id === "plaza.splash-kid-june")?.transform.x, -2.4);
+  assert.equal(plaza.instances.filter((item) => item.assetId.startsWith("plaza.splash-kid-")).length, 3);
+});

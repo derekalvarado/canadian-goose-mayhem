@@ -67,8 +67,9 @@ export function cycleClip(
  * - +y turns toward the janitor's left; +z lifts the right side.
  */
 
-const THIGH = 0.38, SHIN = 0.4;
-const HIP_JOINT_Y = 0.97, ANKLE_Y = 0.19;
+/** Sagittal leg dimensions for IK, metres. Defaults to the janitor rig. */
+export interface LegDimensions { thigh: number; shin: number; hipJointY: number; ankleY: number }
+export const JANITOR_LEGS: LegDimensions = { thigh: 0.38, shin: 0.4, hipJointY: 0.97, ankleY: 0.19 };
 
 export interface WalkStyle {
   /** Seconds per full cycle (two steps). */
@@ -113,10 +114,12 @@ export interface WalkStyle {
   armLag: number;
   /** Toe-up at heel strike (radians). */
   heelStrike: number;
+  /** Rig leg lengths for IK; omit for the janitor. */
+  legs?: LegDimensions;
 }
 
 /** 2-bone sagittal IK: hip pitch and knee bend that put the ankle at (y, z) relative to the hip joint. */
-function legAngles(dy: number, dz: number): [number, number] {
+export function legAngles(dy: number, dz: number, { thigh: THIGH, shin: SHIN }: LegDimensions): [number, number] {
   const reach = Math.min(Math.hypot(dy, dz), THIGH + SHIN - 1e-4);
   const toTarget = Math.atan2(-dz, -dy); // forward (-z) is positive swing
   const thighOffset = Math.acos((THIGH * THIGH + reach * reach - SHIN * SHIN) / (2 * THIGH * reach));
@@ -125,6 +128,7 @@ function legAngles(dy: number, dz: number): [number, number] {
 }
 
 export function walkPose(style: WalkStyle, p: number): Pose {
+  const legs = style.legs ?? JANITOR_LEGS;
   const stride = style.speed * style.duration;
   const half = (stride * style.stance) / 2;
   // Bob: lowest at each foot contact (p = 0, 0.5), highest at passing.
@@ -160,12 +164,12 @@ export function walkPose(style: WalkStyle, p: number): Pose {
       z = half - eased * 2 * half;
       lift = style.stepHeight * Math.sin(Math.PI * s) ** (style.liftShape ?? 1);
     }
-    const dy = ANKLE_Y + lift - (HIP_JOINT_Y + hipsY);
-    const [hip, knee] = legAngles(dy, z);
+    const dy = legs.ankleY + lift - (legs.hipJointY + hipsY);
+    const [hip, knee] = legAngles(dy, z, legs);
     const contact = q < 0.12 ? style.heelStrike * (1 - q / 0.12) : 0;
     const toeOff = q > style.stance - 0.1 && q < style.stance + 0.1 ? -0.35 * pulse((q - style.stance + 0.1) / 0.4) : 0;
     // Legs cancel the hip roll and sideways shift so feet track straight.
-    rot[`${side}_hip`] = [hip, -twist, -roll - hipsX / (HIP_JOINT_Y - ANKLE_Y)];
+    rot[`${side}_hip`] = [hip, -twist, -roll - hipsX / (legs.hipJointY - legs.ankleY)];
     rot[`${side}_knee`] = [knee, 0, 0];
     rot[`${side}_ankle`] = [-(hip + knee) + contact + toeOff, 0, 0];
 
