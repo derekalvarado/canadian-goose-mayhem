@@ -1,7 +1,9 @@
 # Game architecture and development direction
 
-Status: foundation implemented; social stealth, movable objects, villagers, reactive
-piano, gates, and saved games are still future work.
+Status: foundation implemented. Old Town Square and a coffee shop interior are
+playable with a janitor, three splash-pad kids, carryable props, one objective, and a
+hand-authored follow camera. Sight/hearing-based stealth, a rigid-body physics
+engine, reactive piano, gates/shortcuts, and saved games are still future work.
 
 ## Product contract
 
@@ -15,7 +17,9 @@ The core loop is **observe a routine → improvise a distraction → manipulate 
 object → provoke a readable reaction → exploit the opportunity → cross off a task**.
 Walking through attractive scenery is the prologue, not proof of that loop.
 
-Preserve the existing Canada goose, cel shading, camera, and controls. Develop
+Preserve the existing Canada goose, cel shading, and controls. The camera follows
+hand-drawn per-area tracks (see [Camera](#camera)); change its rules deliberately,
+not as a side effect of other work. Develop
 original places, puzzles, characters, and recordings with the requested gameplay
 qualities. Do not expand the village until one small garden proves the loop.
 
@@ -23,15 +27,19 @@ qualities. Do not expand the village until one small garden proves the loop.
 
 | Area | Current implementation | Remaining constraint |
 | --- | --- | --- |
-| Gameplay ownership | `Simulation` owns position, velocity, heading, time, and objective progress | Only the goose exists; no general object or villager state yet |
+| Gameplay ownership | `Simulation` owns the goose, world entities, the janitor, splash-pad kids, durable facts, and objective progress | NPC rules are hand-written per character, not a shared perception/intent system |
 | Timing | 60 Hz simulation, bounded catch-up, retained honk edge | No replay format or cross-platform physics determinism promise |
-| Input | Keyboard/gamepad become a world-space command | Grab, drop, drag, throw, bend, and mimic actions are not implemented |
-| Rendering | `Game` copies simulation state into Three.js; models are presentation | Future bodies and NPCs need views keyed by persistent IDs |
-| Collision | Renderer-independent forest movement adapter | Ellipse/path/circle constraints are a temporary prologue solution; no rigid bodies, sweep queries, or navigation |
-| Objectives | Independent predicates, stable IDs, completion recorded once | Only one actual task; UI is still the prologue's single objective display |
-| Progression | Finding the trail allows continued movement and backtracking | No next neighborhood or unlockable shortcut yet |
-| Sound | Honk events feed a separate browser audio output with one reusable context | No human awareness, music director, piano assets, or spatial sound yet |
-| Persistence | Session state survives movement and milestone completion | Reloading still resets everything; no save/load implementation |
+| Input | Keyboard, gamepad, and touch become a world-space command: move, hurry, honk, interact, spread wings, sneak, threaten | Drag, throw, and mimic actions are not implemented |
+| Entities | Authored props with stable IDs (for example `plaza.beer-can`); the goose and janitor share grab/drop rules; litter can be held inside the trash bag; a controller (the splash faucet) toggles a target | Capabilities are limited to carry, contain, and control; no drag, throw, open, or wear |
+| People | The janitor follows an authored cleanup route, investigates the splash pad, chases and shoos the goose, fumbles when startled, and recovers his stolen tools; kids play, splash, flee a threatening goose, cry, and return | Noticing is distance-based: no field of view, line of sight, hearing, or last-seen memory yet; routes are authored waypoints, not navigation |
+| Rendering | `Game` copies simulation snapshots into Three.js; `WorldView` renders an authored area; models are presentation | Views are rebuilt per area rather than streamed |
+| Camera | Presentation-only follow camera: optional per-area sky track, fixed diagonal fallback, janitor framing, steady held-direction controls | Tracks are authored by hand; the builder preview shows the settled pose, not the in-game glide |
+| Collision | Renderer-independent colliders from the world asset catalog (`worldLevel.ts`); an `AuthoredPhysicsAdapter` spike offers 2D bodies, overlap, and sweep queries | No rigid-body engine, 3D bodies, or navigation mesh |
+| World content | Data-driven areas and asset catalog (`worldLayout.ts`, `worldAssets.ts`), edited in the in-game builder (`?edit`) and saved as a browser draft or exported JSON | Only two areas; the legacy forest (`bramble.ts`) and plaza-only formats remain for reference and migration |
+| Objectives | Independent predicates with stable IDs, completed once; "Sneak into the coffee shop" completes from a durable fact while the janitor is not guarding the door | Only one task; the to-do list shows every task at once |
+| Progression | Doorway transitions move between the square and the coffee shop, carrying durable facts and each area's object state | No unlockable gates or shortcuts yet |
+| Sound | Honk and footstep sounds from a separate browser audio output with one reusable context | No music director, piano assets, or spatial sound yet |
+| Persistence | Session state survives area changes; the authored world layout persists in browser storage | Reloading resets gameplay; no save/load implementation |
 
 `src/` is the active browser game. Godot files and `legacy/phaser-prototype/` are
 reference experiments. Do not develop the same feature in multiple runtimes.
@@ -56,13 +64,15 @@ Avoid a second set of gameplay rules in animation callbacks, DOM handlers, or
 mesh names. A headless simulation must be able to resolve the same puzzle.
 
 Keep concrete modules and typed data. A full entity-component framework, general
-event bus, network synchronization, and an editor are not prerequisites. Introduce
-an abstraction when a real garden mechanic needs the boundary.
+event bus, and network synchronization are not prerequisites. The in-game world
+builder authors content data only; it does not add gameplay rules. Introduce an
+abstraction when a real garden mechanic needs the boundary.
 
 ### Tick order and events
 
-The current tick moves the goose, emits a honk event, then evaluates objectives.
-The garden should extend that order explicitly:
+The current tick moves the goose, emits a honk event, updates the splash-pad kids
+and the janitor, records durable facts from objective zones, then evaluates
+objectives and doorway transitions. The garden should extend that order explicitly:
 
 1. Consume player commands and NPC intents decided on the previous tick.
 2. Resolve valid actions and ownership changes, then advance physical bodies.
@@ -86,11 +96,35 @@ remaining tick fraction; these read-only samples never feed back into physics.
 Player animation uses Blender clips with presentation-only phase/blend state and
 head tracking. Resolved events trigger one-shots; animation never resolves actions.
 
+### Camera
+
+The camera is presentation. It reads the simulation snapshot but never changes
+gameplay: framing a nearby character changes what the player sees, not what that
+character knows or does.
+
+- **Tracks.** An area may define `cameraTrack`: hand-placed points (position and
+  zoom) joined into a smooth curve. The camera slides along the curve to the spot
+  nearest the goose and looks at it, so bends swing the view around corners. It
+  searches only the stretch of track near where it already is, so it never jumps
+  between distant stretches. Areas without a track use the fixed diagonal camera.
+- **Reach.** When the goose is more than a set horizontal distance from the track,
+  the camera keeps the track's height and viewing direction but leans in toward
+  the goose. Author tracks beside walking routes, not directly above them.
+- **Framing.** When the janitor is near, the camera aims between him and the goose;
+  it lets go, with hysteresis, before he would reach the edge of the frame.
+- **Controls.** Movement is camera-relative, but a held direction keeps the heading
+  it started with while the view swings. Releasing the stick or clearly choosing a
+  new direction adopts the current view.
+- **Authoring.** Tracks are edited in the builder's "Edit camera track" mode and saved
+  with the area. The logic lives in `cameraTrack.ts`, `cameraFraming.ts`, and
+  `controlHeading.ts` and is covered by headless tests.
+
 ### One world and stable object identity
 
-Before adding carryable props, introduce a world-owned registry keyed by authored
-IDs, such as `garden.thermos`, `garden.gardener`, and `garden.north-gate`. Render
-meshes and physics handles map to these IDs; neither owns their identity.
+World entities are keyed by authored IDs such as `plaza.beer-can` and
+`plaza.street-janitor`; future content follows the same pattern (`garden.thermos`,
+`garden.north-gate`). Render meshes and physics handles map to these IDs; neither
+owns their identity.
 
 Separate immutable content definitions from mutable state. An object definition
 describes shape, mass, grip points, affordances, appearance, and home location.
@@ -101,8 +135,10 @@ arbitrates all acquisition/release operations deterministically.
 
 Areas describe geography and content placement. They do not own disposable copies
 of the world's objects. Crossing an area boundary updates location without
-recreating the goose or carried objects. Start with the small village loaded
-together. If streaming later becomes necessary, stream visual assets separately
+recreating the goose or carried objects. Today one area is simulated at a time:
+the session carries durable facts and a per-area snapshot of entity state across
+each doorway so dropped and carried objects keep their identity. Move toward the
+small village loaded together. If streaming later becomes necessary, stream visual assets separately
 from authoritative state; held objects, nearby physics, and active pursuits stay
 resident. Never respawn an authored object just because its home area reloads.
 
@@ -114,7 +150,8 @@ item or scatter checks like `if item.name === "thermos"` throughout the engine.
 Objectives may target a specific authored object, but generic verbs must work on
 every compatible object.
 
-Before producing many props, run a physics spike behind a narrow adapter: body
+Before producing many props, run a physics spike behind a narrow adapter (started
+in `simulation/physics.ts` as a 2D ground-plane `AuthoredPhysicsAdapter`): body
 creation/removal, fixed stepping, constraints, impulses, overlap/sweep/line queries,
 and stable body-to-entity mapping. Select an actual rigid-body engine by testing
 the scenarios below in the browser. The current collision helper does not supply
@@ -229,7 +266,12 @@ different operations. Until saves exist, the game is explicitly session-only.
 
 ## Development sequence and exit criteria
 
-1. **Foundation (this change).** Separate simulation from views, fix gameplay time,
+Milestone 1 is done. The team then built Old Town Square rather than a single
+garden, so parts of milestones 2 and 3 exist there in an early form (carryable
+props, the physics adapter spike, a janitor routine with shooing, and one task).
+The garden gates below still apply before expanding further.
+
+1. **Foundation (done).** Separate simulation from views, fix gameplay time,
    keep objective evaluation independent, separate audio output, and remove the
    terminal trail state. Headless regression tests pass alongside the old tests.
 2. **One garden: physical interactions.** One table, one fence/gate, one container,
@@ -268,6 +310,8 @@ different operations. Until saves exist, the game is explicitly session-only.
   tab. Commands are not repeated, actors do not tunnel or explode, and progress
   persists. Profile target hardware before increasing active body/NPC counts.
 
-These garden scenarios are future acceptance gates, not claims that the current
-forest passes them. Current automated coverage is in `tests/level.test.ts` and
-`tests/simulation.test.ts`; browser playtesting and the garden systems remain to do.
+These garden scenarios are future acceptance gates, not claims that Old Town
+Square passes them. Headless tests in `tests/` cover the simulation, janitor and
+kid behavior, interactions, the coffee shop, world layout and migrations, the
+camera logic, and asset metadata; browser playtesting and the garden systems
+remain to do.
