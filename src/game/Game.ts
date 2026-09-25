@@ -14,13 +14,17 @@ import { COFFEE_SHOP_AREA_ID, getWorldArea, loadWorldLayout, resolveStartAreaId 
 import { createWorldRules } from "./worldLevel";
 import { GooseOcclusionFader } from "./GooseOcclusionFader";
 import { toonMaterial, STORYBOOK_LIGHTING } from "./toonMaterial";
+import { CAMERA_BASE_FOV, CAMERA_FOCUS_HEIGHT, CAMERA_TRACK_MAX_REACH, CameraTrackRider, limitCameraReach, SampledCameraTrack } from "./cameraTrack";
+import { SubjectFraming } from "./cameraFraming";
+import { ControlHeadingLock } from "./controlHeading";
 
-const CAMERA_FOCUS_HEIGHT = 0.55;
 // A closer follow camera keeps the smaller goose readable and makes the plaza
 // landmarks feel larger without changing their gameplay dimensions.
 const CAMERA_FOLLOW_ZOOM = 1.3;
 const CAMERA_AXIS_OFFSET = 9.6 / CAMERA_FOLLOW_ZOOM;
 const CAMERA_LEAD_SECONDS = 0.2;
+// How quickly the camera glides along its track toward the goose.
+const CAMERA_TRACK_RESPONSE = 3.2;
 
 function createPoopView(): THREE.Group {
   const poop = new THREE.Group();
@@ -60,7 +64,7 @@ export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly sunShadow = new ViewSunShadow();
-  private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.1, 300);
+  private readonly camera = new THREE.PerspectiveCamera(CAMERA_BASE_FOV, 1, 0.1, 300);
   private readonly query = new URLSearchParams(window.location.search);
   private readonly overviewMode = this.query.has("overview");
   private readonly editorMode = this.query.has("edit");
@@ -84,12 +88,13 @@ export class Game {
   private readonly audio = new GameAudio();
   private readonly moveDirection = new THREE.Vector3();
   private readonly cameraForward = new THREE.Vector3();
-  private readonly cameraRight = new THREE.Vector3();
+  private readonly controlHeading = new ControlHeadingLock();
+  private readonly framing = new SubjectFraming();
+  private cameraTrack?: CameraTrackRider;
   // Equal ground axes give a 45° diagonal; √2 vertical keeps a 45° downward pitch.
   private readonly cameraOffset = new THREE.Vector3();
   private readonly cameraFocus = new THREE.Vector3();
   private readonly desiredCameraFocus = new THREE.Vector3();
-  private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly controlsCard = requireElement<HTMLElement>("#controls-card");
   private readonly keyboardControls = requireElement<HTMLElement>("#keyboard-controls");
   private readonly gamepadControls = requireElement<HTMLElement>("#gamepad-controls");
@@ -155,7 +160,7 @@ export class Game {
       this.camera.position.set(-37, 58, -65);
       this.camera.lookAt(0, 0, 0);
       this.goose.visible = false;
-      new WorldEditor(this.scene, this.camera, canvas, this.worldLayout, this.world, this.startAreaId);
+      new WorldEditor(this.scene, this.camera, canvas, this.worldLayout, this.world, this.startAreaId, this.goose);
     }
 
     if (this.overviewMode && !this.editorMode) {
@@ -194,8 +199,15 @@ export class Game {
   }
 
   private setupCamera(): void {
+    this.useAreaCameraTrack();
     this.snapCameraToGoose();
     this.scene.add(this.camera);
+  }
+
+  private useAreaCameraTrack(): void {
+    const track = this.worldArea.cameraTrack;
+    this.cameraTrack = track ? new CameraTrackRider(new SampledCameraTrack(track)) : undefined;
+    if (!this.cameraTrack) this.setCameraZoom(1);
   }
 
   private readonly animate = (): void => {
@@ -225,14 +237,15 @@ export class Game {
       }
 
       this.camera.getWorldDirection(this.cameraForward);
-      this.cameraForward.y = 0;
-      this.cameraForward.normalize();
-      this.cameraRight.crossVectors(this.cameraForward, this.up).normalize();
-
-      this.moveDirection
-        .copy(this.cameraForward)
-        .multiplyScalar(frame.move.y)
-        .addScaledVector(this.cameraRight, frame.move.x);
+      const cameraYaw = Math.atan2(this.cameraForward.x, this.cameraForward.z);
+      const controlYaw = this.controlHeading.update(frame.move.x, frame.move.y, cameraYaw, delta);
+      const forwardX = Math.sin(controlYaw); const forwardZ = Math.cos(controlYaw);
+      // Screen-right is forward × up: (-forwardZ, 0, forwardX).
+      this.moveDirection.set(
+        forwardX * frame.move.y - forwardZ * frame.move.x,
+        0,
+        forwardZ * frame.move.y + forwardX * frame.move.x,
+      );
       if (this.moveDirection.lengthSq() > 1) this.moveDirection.normalize();
 
       const events = this.simulation.advance(delta, {
@@ -312,6 +325,9 @@ export class Game {
       this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket());
       this.syncPoopViews();
       this.renderObjectives();
+      this.useAreaCameraTrack();
+      this.controlHeading.reset();
+      this.framing.reset();
       this.snapCameraToGoose();
       this.transitionCurtain.classList.remove("area-transition-curtain--covered");
       this.transitionCurtain.classList.add("area-transition-curtain--revealing");
@@ -325,23 +341,50 @@ export class Game {
 
   private updateCamera(delta: number): void {
     const leadSeconds = this.reducedMotion ? 0 : CAMERA_LEAD_SECONDS;
-    this.desiredCameraFocus
-      .copy(this.goose.position)
-      .addScaledVector(this.velocity, leadSeconds);
-    this.desiredCameraFocus.y = this.goose.position.y + CAMERA_FOCUS_HEIGHT;
-
+    this.setDesiredCameraFocus(leadSeconds);
     const cameraDamping = 1 - Math.exp(-(this.reducedMotion ? 12 : 6.3) * delta);
     this.cameraFocus.lerp(this.desiredCameraFocus, cameraDamping);
-    this.camera.position.copy(this.cameraFocus).add(this.getCameraOffset());
+    if (this.cameraTrack) {
+      const sample = this.cameraTrack.update(this.cameraFocus.x, this.cameraFocus.z, delta, this.reducedMotion ? 12 : CAMERA_TRACK_RESPONSE);
+      this.placeCameraOnTrack(sample);
+    } else {
+      this.camera.position.copy(this.cameraFocus).add(this.getCameraOffset());
+    }
     this.camera.lookAt(this.cameraFocus);
   }
 
   private snapCameraToGoose(): void {
-    this.cameraFocus.copy(this.goose.position);
-    this.cameraFocus.y = this.goose.position.y + CAMERA_FOCUS_HEIGHT;
-    this.desiredCameraFocus.copy(this.cameraFocus);
-    this.camera.position.copy(this.cameraFocus).add(this.getCameraOffset());
+    this.setDesiredCameraFocus(0);
+    this.cameraFocus.copy(this.desiredCameraFocus);
+    if (this.cameraTrack) this.placeCameraOnTrack(this.cameraTrack.snap(this.cameraFocus.x, this.cameraFocus.z));
+    else this.camera.position.copy(this.cameraFocus).add(this.getCameraOffset());
     this.camera.lookAt(this.cameraFocus);
+  }
+
+  private setDesiredCameraFocus(leadSeconds: number): void {
+    const janitor = this.simulation.world.janitor;
+    const framed = this.framing.focus(
+      { x: this.goose.position.x, z: this.goose.position.z },
+      janitor ? [{ id: janitor.id, x: janitor.position.x, z: janitor.position.z }] : [],
+    );
+    this.desiredCameraFocus.set(
+      framed.x + this.velocity.x * leadSeconds,
+      this.goose.position.y + CAMERA_FOCUS_HEIGHT,
+      framed.z + this.velocity.z * leadSeconds,
+    );
+  }
+
+  private placeCameraOnTrack(sample: { x: number; y: number; z: number; zoom: number }): void {
+    const reach = limitCameraReach(sample, this.cameraFocus, CAMERA_TRACK_MAX_REACH);
+    this.camera.position.set(reach.x, reach.y, reach.z);
+    this.setCameraZoom(sample.zoom);
+  }
+
+  private setCameraZoom(zoom: number): void {
+    const fov = CAMERA_BASE_FOV / zoom;
+    if (Math.abs(this.camera.fov - fov) < 0.001) return;
+    this.camera.fov = fov;
+    this.camera.updateProjectionMatrix();
   }
 
   private getCameraOffset(): THREE.Vector3 {

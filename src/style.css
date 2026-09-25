@@ -659,6 +659,51 @@ kbd,
   margin-top: 12px;
 }
 
+.plaza-editor__actions--single {
+  grid-template-columns: 1fr;
+}
+
+.plaza-editor__track-point {
+  margin: 14px 0 0;
+  color: var(--goose-white);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.plaza-editor__track-fields {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.plaza-editor__track-fields label {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.plaza-editor__track-fields input[type="range"] {
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  background: none;
+  accent-color: var(--sun);
+}
+
+.plaza-editor__track-zoom-value {
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: var(--sun);
+  letter-spacing: 0;
+}
+
 .plaza-editor__fields {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

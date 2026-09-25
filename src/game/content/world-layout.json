@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 19,
+  "canonicalRevision": 20,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -993,7 +993,17 @@
           "controllerId": "plaza.splash-faucet",
           "targetId": "plaza.splash-pad"
         }
-      ]
+      ],
+      "cameraTrack": {
+        "points": [
+          { "x": -60, "y": 14, "z": -18, "zoom": 1 },
+          { "x": -20, "y": 14, "z": -18, "zoom": 1 },
+          { "x": 12, "y": 14, "z": -18, "zoom": 1 },
+          { "x": 34, "y": 14, "z": -16, "zoom": 1 },
+          { "x": 44, "y": 14, "z": -4, "zoom": 1.1 },
+          { "x": 44, "y": 14, "z": 24, "zoom": 1.1 }
+        ]
+      }
     },
     {
       "id": "old-town-square.coffee-shop",

@@ -1,6 +1,7 @@
 import canonicalWorldLayoutJson from "./content/world-layout.json" with { type: "json" };
 import { PLAZA_LAYOUT_STORAGE_KEY, type PlazaLayout, validatePlazaLayout } from "./plazaLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
+import { type CameraTrack, validateCameraTrack } from "./cameraTrack.ts";
 
 export const WORLD_LAYOUT_SCHEMA_VERSION = 3;
 export const WORLD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.v1";
@@ -24,6 +25,7 @@ const NORTHEAST_SOUTHWEST_RELABEL_REVISION = 16;
 const COOPERSMITH_PUB_REVISION = 17;
 const OLD_TOWN_PLACEMENT_REVISION = 18;
 const ARI_FLOATIES_REVISION = 19;
+const CAMERA_TRACK_REVISION = 20;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -31,7 +33,7 @@ export interface WorldPoint { x: number; y: number; z: number }
 export interface WorldInstance { id: string; assetId: string; label: string; transform: WorldTransform }
 export interface WorldChunk { x: number; z: number; playable: boolean }
 export interface WorldControlLink { controllerId: string; targetId: string }
-export interface WorldArea { id: string; label: string; chunks: WorldChunk[]; instances: WorldInstance[]; controlLinks: WorldControlLink[] }
+export interface WorldArea { id: string; label: string; chunks: WorldChunk[]; instances: WorldInstance[]; controlLinks: WorldControlLink[]; cameraTrack?: CameraTrack }
 export interface WorldAreaTransition {
   id: string;
   fromAreaId: string;
@@ -105,7 +107,8 @@ export function validateWorldLayout(value: unknown): WorldLayout {
       return [{ controllerId, targetId }];
     });
     const chunks = sourceSchema === 1 ? legacyChunks(instances, id === CENTRAL_PLAZA_AREA_ID) : validateChunks(candidate.chunks, id);
-    return { id, label: cleanLabel(candidate.label, `${id}.label`), chunks, instances, controlLinks };
+    const cameraTrack = validateCameraTrack(candidate.cameraTrack, `${id}.cameraTrack`);
+    return { id, label: cleanLabel(candidate.label, `${id}.label`), chunks, instances, controlLinks, ...(cameraTrack ? { cameraTrack } : {}) };
   });
   if (!areaIds.has(CENTRAL_PLAZA_AREA_ID)) throw new Error("World must contain the central plaza area");
   const rawTransitions = value.transitions ?? [];
@@ -501,6 +504,21 @@ function giveAriFloaties(layout: WorldLayout, store?: WorldLayoutStorage): World
   return validated;
 }
 
+function addPlazaCameraTrack(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= CAMERA_TRACK_REVISION) return layout;
+  const updated = cloneWorldLayout(layout);
+  const plaza = getWorldArea(updated);
+  const canonicalTrack = getWorldArea(CANONICAL_WORLD_LAYOUT).cameraTrack;
+  if (!plaza.cameraTrack && canonicalTrack) plaza.cameraTrack = JSON.parse(JSON.stringify(canonicalTrack)) as CameraTrack;
+  updated.canonicalRevision = CAMERA_TRACK_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its camera track update could not be saved", error); return layout; }
+  }
+  return validated;
+}
+
 export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
   try {
     const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -514,9 +532,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store), store);
+    if (saved) return addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);

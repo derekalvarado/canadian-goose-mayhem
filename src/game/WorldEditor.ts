@@ -8,6 +8,7 @@ import { findWorldInstanceOverlaps, findWorldPlacementOverlaps, getWorldGroundHe
 import { CatalogDrawer, createDragChip, type AssetCatalog, type PaletteHost } from "./editorCatalog.ts";
 import { WorldView } from "./WorldView.ts";
 import { resolveEditorShortcut, WorldEditorHistory, type WorldEditorSnapshot } from "./worldEditorHistory.ts";
+import { CameraTrackEditor } from "./CameraTrackEditor.ts";
 
 const SNAP = 0.25; const ROTATION_SNAP = THREE.MathUtils.degToRad(5); const PLACING_ROTATION_STEP = THREE.MathUtils.degToRad(15); const CAMERA_ORBIT_STEP = THREE.MathUtils.degToRad(8); const CAMERA_ORBIT_SPEED = THREE.MathUtils.degToRad(110); const CAMERA_ZOOM_FACTOR = 1.18; const CAMERA_ZOOM_SPEED = 1.85; const CAMERA_FLY_SPEED = 18;
 const DRAG_THRESHOLD_PX = 6;
@@ -34,15 +35,17 @@ export class WorldEditor {
   private readonly footprint = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x8fdc97, transparent: true, opacity: 0.38, depthWrite: false }));
   private drag?: { assetId: string; startX: number; startY: number; moved: boolean; chip: HTMLElement };
   private readonly catalog: AssetCatalog;
+  private readonly trackEditor: CameraTrackEditor; private readonly objectTools = document.createElement("div"); private trackToggle?: HTMLButtonElement;
 
-  constructor(scene: THREE.Scene, private readonly camera: THREE.Camera, private readonly canvas: HTMLCanvasElement, world = loadWorldLayout(), view?: WorldView, initialAreaId = CENTRAL_PLAZA_AREA_ID) {
+  constructor(scene: THREE.Scene, private readonly camera: THREE.PerspectiveCamera, private readonly canvas: HTMLCanvasElement, world = loadWorldLayout(), view?: WorldView, initialAreaId = CENTRAL_PLAZA_AREA_ID, goose?: THREE.Object3D) {
     this.world = world; this.areaId = world.areas.some((area) => area.id === initialAreaId) ? initialAreaId : CENTRAL_PLAZA_AREA_ID;
     this.view = view ?? new WorldView(this.area); if (!view) scene.add(this.view); scene.add(this.preview, this.outline, this.footprint); this.footprint.rotation.x = -Math.PI / 2; this.footprint.visible = false; this.footprint.renderOrder = 19; this.footprint.userData.editorIgnore = true;
     this.preview.visible = false; this.preview.userData.editorIgnore = true; this.outline.userData.editorIgnore = true; this.outline.renderOrder = 20;
     this.orbit = new OrbitControls(camera, canvas); this.orbit.mouseButtons.LEFT = null; this.orbit.mouseButtons.MIDDLE = THREE.MOUSE.ROTATE; this.orbit.target.set(0, 0, 0); this.orbit.update(); this.orbit.saveState(); this.view.setEditorChunkFocus(0, 0); this.orbit.addEventListener("change", () => this.view.setEditorChunkFocus(this.orbit.target.x, this.orbit.target.z));
     const authoringGrid = new THREE.GridHelper(4096, 64, 0xf1d38b, 0x766d60); authoringGrid.position.y = -0.02; authoringGrid.userData.editorIgnore = true; scene.add(authoringGrid);
     this.transform = new TransformControls(camera, canvas); this.transform.setSpace("world"); this.transform.showY = false; this.transform.setTranslationSnap(SNAP); this.transform.setRotationSnap(ROTATION_SNAP); this.transform.setSize(0.82); scene.add(this.transform.getHelper());
-    this.transform.addEventListener("dragging-changed", (event) => { this.orbit.enabled = event.value !== true; if (event.value === true) this.history.begin(this.snapshot()); else if (this.history.commit(this.snapshot())) this.save("Saved automatically."); }); this.transform.addEventListener("objectChange", this.commitTransform);
+    this.transform.addEventListener("dragging-changed", (event) => { this.orbit.enabled = event.value !== true; if (event.value === true) this.history.begin(this.snapshot()); else if (this.history.commit(this.snapshot())) this.save("Saved automatically."); this.updateHistoryButtons(); }); this.transform.addEventListener("objectChange", this.commitTransform);
+    const editor = this; this.trackEditor = new CameraTrackEditor(scene, camera, this.transform, this.orbit, { get area() { return editor.area; }, mutate: (message, change) => this.mutate(message, change), setStatus: (message, error) => this.setStatus(message, error) }, goose);
     document.body.classList.add("editor-mode"); this.buildPanel(); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); this.history.reset(this.snapshot()); window.addEventListener("keydown", this.handleKeyDown, { passive: false }); window.addEventListener("keyup", this.handleKeyUp, { passive: false }); window.addEventListener("blur", this.clearFlyKeys); canvas.addEventListener("pointermove", this.movePreview); canvas.addEventListener("pointerup", this.handleCanvasClick); window.addEventListener("pointermove", this.trackPointer);
     this.catalog = new CatalogDrawer(this.paletteHost); document.querySelector("#game-shell")?.append(this.catalog.root);
   }
@@ -70,7 +73,9 @@ export class WorldEditor {
     }));
     this.shortcutToggle = this.button("Shortcuts (?)", () => this.toggleShortcuts()); this.shortcutToggle.className = "plaza-editor__shortcut-button"; this.shortcutToggle.setAttribute("aria-expanded", "false"); heading.append(this.shortcutToggle);
     this.status.className = "plaza-editor__status"; this.status.setAttribute("aria-live", "polite"); this.warnings.className = "plaza-editor__warnings"; this.warnings.setAttribute("aria-live", "polite"); const help = document.createElement("p"); help.className = "plaza-editor__help"; help.textContent = "Middle-drag rotates the world; left-click selects. Drag an item from the catalog into the world, or click it and then click the ground. Shift while dropping keeps placing, R rotates the ghost, Esc cancels. Press ? or F1 for keyboard controls.";
-    this.buildShortcutDrawer(); this.panel.append(heading, areaLabel, areaActions, historyActions, placement, instanceLabel, this.controlTargetLabel, modes, fields, io, this.status, this.warnings, help); document.querySelector("#game-shell")?.append(this.panel, this.shortcutDrawer); this.updateHistoryButtons();
+    this.trackToggle = this.button("Edit camera track", () => this.setTrackMode(!this.trackEditor.active)); const trackMode = document.createElement("div"); trackMode.className = "plaza-editor__actions plaza-editor__actions--single"; trackMode.append(this.trackToggle);
+    this.objectTools.append(placement, instanceLabel, this.controlTargetLabel, modes, fields);
+    this.buildShortcutDrawer(); this.panel.append(heading, areaLabel, areaActions, historyActions, trackMode, this.objectTools, this.trackEditor.tools, io, this.status, this.warnings, help); document.querySelector("#game-shell")?.append(this.panel, this.shortcutDrawer); this.updateHistoryButtons();
   }
   private buildShortcutDrawer(): void {
     this.shortcutDrawer.className = "editor-shortcuts";
@@ -85,7 +90,7 @@ export class WorldEditor {
   private button(text: string, handler: () => void): HTMLButtonElement { const button = document.createElement("button"); button.type = "button"; button.textContent = text; button.addEventListener("click", handler); return button; }
   private refreshAreaOptions(): void { this.areaSelect.replaceChildren(...this.world.areas.map((area) => { const option = document.createElement("option"); option.value = area.id; option.textContent = area.label; return option; })); this.areaSelect.value = this.areaId; }
   private refreshInstanceOptions(): void { this.instanceSelect.replaceChildren(...this.area.instances.map((item) => { const option = document.createElement("option"); option.value = item.id; option.textContent = item.label; return option; })); if (this.selectedId) this.instanceSelect.value = this.selectedId; }
-  private selectInstance(id: string | undefined): void { this.selectedId = id; this.refreshInstanceOptions(); const item = this.area.instances.find((candidate) => candidate.id === id); const group = id ? this.view.instances.get(id) : undefined; if (!item || !group) { this.transform.detach(); this.outline.visible = false; this.controlTargetLabel.hidden = true; return; } this.transform.attach(group); this.outline.visible = true; this.outline.setFromObject(group); this.xInput.value = item.transform.x.toFixed(2); this.zInput.value = item.transform.z.toFixed(2); this.rotationInput.value = THREE.MathUtils.radToDeg(item.transform.rotationY).toFixed(1); this.refreshControlTarget(item); const overlaps = findWorldInstanceOverlaps(this.area, item.id); const missingTarget = Boolean(getWorldAsset(item.assetId)?.controller) && !this.area.controlLinks.some((link) => link.controllerId === item.id); this.warnings.textContent = missingTarget ? "This controller needs a compatible target." : overlaps.length ? `Possible overlap with ${overlaps.map((other) => this.area.instances.find((candidate) => candidate.id === other)?.label).join(", ")}.` : "No instance overlaps detected."; this.warnings.classList.toggle("has-warning", missingTarget || overlaps.length > 0); }
+  private selectInstance(id: string | undefined): void { this.selectedId = id; this.refreshInstanceOptions(); if (this.trackEditor.active) { this.outline.visible = false; this.trackEditor.refresh(); return; } const item = this.area.instances.find((candidate) => candidate.id === id); const group = id ? this.view.instances.get(id) : undefined; if (!item || !group) { this.transform.detach(); this.outline.visible = false; this.controlTargetLabel.hidden = true; return; } this.transform.attach(group); this.outline.visible = true; this.outline.setFromObject(group); this.xInput.value = item.transform.x.toFixed(2); this.zInput.value = item.transform.z.toFixed(2); this.rotationInput.value = THREE.MathUtils.radToDeg(item.transform.rotationY).toFixed(1); this.refreshControlTarget(item); const overlaps = findWorldInstanceOverlaps(this.area, item.id); const missingTarget = Boolean(getWorldAsset(item.assetId)?.controller) && !this.area.controlLinks.some((link) => link.controllerId === item.id); this.warnings.textContent = missingTarget ? "This controller needs a compatible target." : overlaps.length ? `Possible overlap with ${overlaps.map((other) => this.area.instances.find((candidate) => candidate.id === other)?.label).join(", ")}.` : "No instance overlaps detected."; this.warnings.classList.toggle("has-warning", missingTarget || overlaps.length > 0); }
   private refreshControlTarget(item: WorldInstance): void {
     const isController = Boolean(getWorldAsset(item.assetId)?.controller); this.controlTargetLabel.hidden = !isController;
     if (!isController) return;
@@ -115,6 +120,13 @@ export class WorldEditor {
     this.transform.showY = rotate;
     this.transform.showZ = !rotate;
   }
+  private setTrackMode(active: boolean): void {
+    if (active && this.placing) this.stopPlacing();
+    this.trackEditor.setActive(active); this.objectTools.hidden = active; this.warnings.hidden = active;
+    if (this.trackToggle) { this.trackToggle.textContent = active ? "Back to objects" : "Edit camera track"; this.trackToggle.classList.toggle("is-active", active); }
+    if (active) { this.outline.visible = false; this.setStatus("Editing this area's camera track."); }
+    else { this.setTransformMode("translate"); this.selectInstance(this.selectedId); this.setStatus(""); }
+  }
   private mutate(message: string, change: () => void): void {
     this.history.begin(this.snapshot());
     try { change(); } catch (error) { this.history.cancel(); throw error; }
@@ -140,6 +152,7 @@ export class WorldEditor {
   }
   private startPlacing(assetId: string): void {
     const asset = getWorldAsset(assetId); if (!asset) return;
+    if (this.trackEditor.active) this.setTrackMode(false);
     this.placing = true; this.placingAssetId = asset.assetId; this.preview.visible = true; this.preview.clear();
     const source = this.view.addInstance({ id: "editor-preview", assetId: asset.assetId, label: asset.label, transform: { x: 0, y: 0, z: 0, rotationY: 0 } }, false); this.view.remove(source); this.view.instances.delete("editor-preview"); this.preview.add(...source.children); source.clear();
     this.preview.rotation.set(asset.assetId === LITTER_PICKER_ASSET_ID ? LITTER_PICKER_GROUND_ROTATION_X : 0, this.placingRotation, 0);
@@ -205,8 +218,9 @@ export class WorldEditor {
   }
   private readonly cancelDrag = (): void => { if (!this.drag) return; this.endDragListeners(); this.stopPlacing("Drop cancelled."); };
 
-  private readonly handleCanvasClick = (event: PointerEvent): void => { if (event.button !== 0 || this.drag) return; const hit = this.point(event); if (this.placing && hit) { this.placeAt(event); if (!event.shiftKey) this.stopPlacing(this.status.textContent ?? ""); return; } if (!this.placing) { const hitObject = this.raycaster.intersectObjects([...this.view.instances.values()], true).find((entry) => !entry.object.userData.editorIgnore); const id = findInstance(hitObject?.object ?? null); if (id) this.selectInstance(id); } };
+  private readonly handleCanvasClick = (event: PointerEvent): void => { if (event.button !== 0 || this.drag) return; const hit = this.point(event); if (this.trackEditor.active && !this.placing) { this.trackEditor.handleClick(this.raycaster, hit); return; } if (this.placing && hit) { this.placeAt(event); if (!event.shiftKey) this.stopPlacing(this.status.textContent ?? ""); return; } if (!this.placing) { const hitObject = this.raycaster.intersectObjects([...this.view.instances.values()], true).find((entry) => !entry.object.userData.editorIgnore); const id = findInstance(hitObject?.object ?? null); if (id) this.selectInstance(id); } };
   private readonly commitTransform = (): void => {
+    if (this.trackEditor.active) { this.trackEditor.onTransformChange(); return; }
     const item = this.area.instances.find((candidate) => candidate.id === this.selectedId);
     const group = this.selectedId ? this.view.instances.get(this.selectedId) : undefined;
     if (!item || !group) return;
@@ -338,6 +352,10 @@ export class WorldEditor {
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     const target = event.target instanceof HTMLElement;
     const targetIsTextEntry = target && (event.target.closest("input, textarea, select, button, [contenteditable]") !== null);
+    if (this.trackEditor.looking) {
+      if (event.code === "Escape") { event.preventDefault(); this.trackEditor.exitLook(); }
+      if (EDITOR_HELD_CAMERA_KEYS.has(event.code)) return;
+    }
     if (!targetIsTextEntry && EDITOR_HELD_CAMERA_KEYS.has(event.code)) {
       event.preventDefault(); this.flyKeys.add(event.code); this.startFlyLoop(); return;
     }
@@ -348,6 +366,11 @@ export class WorldEditor {
     if (this.drag && event.code === "Escape") { event.preventDefault(); this.cancelDrag(); return; }
     const action = resolveEditorShortcut({ code: event.code, key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, targetIsTextEntry }, this.placing, this.selectedId !== undefined);
     if (!action) return;
+    if (this.trackEditor.active) {
+      if (action.type === "delete-selected") { event.preventDefault(); this.trackEditor.deletePoint(); return; }
+      if (!["undo", "redo", "orbit-camera", "zoom-camera", "reset-view", "toggle-shortcuts"].includes(action.type)) return;
+      if (this.trackEditor.looking && action.type !== "undo" && action.type !== "redo" && action.type !== "toggle-shortcuts") return;
+    }
     event.preventDefault();
     if (action.type === "undo") this.undo();
     else if (action.type === "redo") this.redo();
