@@ -28,7 +28,8 @@ export type EditorShortcutAction =
   | { type: "focus-selected" }
   | { type: "reset-view" }
   | { type: "place-at-focus"; keepPlacing: boolean }
-  | { type: "toggle-shortcuts" };
+  | { type: "toggle-shortcuts" }
+  | { type: "toggle-panels" };
 
 export function resolveEditorShortcut(input: EditorKeyInput, placing: boolean, hasSelection: boolean): EditorShortcutAction | undefined {
   const modifier = input.metaKey || input.ctrlKey;
@@ -42,14 +43,15 @@ export function resolveEditorShortcut(input: EditorKeyInput, placing: boolean, h
 
   if (input.code === "F1" || (input.code === "Slash" && input.shiftKey) || input.key === "?") return { type: "toggle-shortcuts" };
   if (input.code === "Home") return { type: "reset-view" };
+  if ((input.code === "Backslash" || input.key === "\\") && !modifier) return { type: "toggle-panels" };
 
   if (!placing) {
-    if (input.code === "KeyJ") return { type: "orbit-camera", horizontal: -1, vertical: 0 };
-    if (input.code === "KeyL") return { type: "orbit-camera", horizontal: 1, vertical: 0 };
+    if (input.code === "KeyJ") return { type: "orbit-camera", horizontal: 1, vertical: 0 };
+    if (input.code === "KeyL") return { type: "orbit-camera", horizontal: -1, vertical: 0 };
     if (input.code === "KeyI") return { type: "orbit-camera", horizontal: 0, vertical: 1 };
     if (input.code === "KeyK") return { type: "orbit-camera", horizontal: 0, vertical: -1 };
-    if (input.code === "KeyU") return { type: "zoom-camera", direction: -1 };
-    if (input.code === "KeyO") return { type: "zoom-camera", direction: 1 };
+    if (input.code === "KeyU") return { type: "zoom-camera", direction: 1 };
+    if (input.code === "KeyO") return { type: "zoom-camera", direction: -1 };
     if (input.code === "KeyH") return hasSelection ? { type: "focus-selected" } : undefined;
     if (input.code === "Tab") return { type: "select-next", direction: input.shiftKey ? -1 : 1 };
     if (input.code === "KeyQ") return hasSelection ? { type: "rotate-selected", direction: -1 } : undefined;

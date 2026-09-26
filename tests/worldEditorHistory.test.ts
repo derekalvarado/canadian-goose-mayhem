@@ -26,12 +26,14 @@ test("editor shortcuts map undo, redo, and logical arrow movement", () => {
   assert.deepEqual(key("ArrowUp"), { type: "move-selected", dx: 0, dz: -1 });
   assert.deepEqual(key("ArrowRight", { shiftKey: true }), { type: "move-selected", dx: 1, dz: 0, step: 4 });
   assert.deepEqual(key("KeyQ"), { type: "rotate-selected", direction: -1 });
-  assert.deepEqual(key("KeyL"), { type: "orbit-camera", horizontal: 1, vertical: 0 });
-  assert.deepEqual(key("KeyO"), { type: "zoom-camera", direction: 1 });
+  assert.deepEqual(key("KeyL"), { type: "orbit-camera", horizontal: -1, vertical: 0 });
+  assert.deepEqual(key("KeyO"), { type: "zoom-camera", direction: -1 });
   assert.deepEqual(key("Tab"), { type: "select-next", direction: 1 });
   assert.deepEqual(key("Tab", { shiftKey: true }), { type: "select-next", direction: -1 });
   assert.deepEqual(key("Home"), { type: "reset-view" });
   assert.deepEqual(key("F1"), { type: "toggle-shortcuts" });
+  assert.deepEqual(key("Backslash"), { type: "toggle-panels" });
+  assert.equal(key("Backslash", { targetIsTextEntry: true }), undefined, "typing a backslash in a field does not hide the panels");
   assert.deepEqual(resolveEditorShortcut({ code: "Slash", key: "?", metaKey: false, ctrlKey: false, shiftKey: true, targetIsTextEntry: false }, false, true), { type: "toggle-shortcuts" });
   assert.deepEqual(resolveEditorShortcut({ code: "Enter", key: "Enter", metaKey: false, ctrlKey: false, shiftKey: true, targetIsTextEntry: false }, true, true), { type: "place-at-focus", keepPlacing: true });
 });

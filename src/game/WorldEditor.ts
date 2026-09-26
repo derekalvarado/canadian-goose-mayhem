@@ -15,6 +15,10 @@ const DRAG_THRESHOLD_PX = 6;
 const LITTER_PICKER_ASSET_ID = "prop.litter-picker";
 const LITTER_PICKER_GROUND_ROTATION_X = Math.PI / 2;
 const EDITOR_HELD_CAMERA_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyI", "KeyJ", "KeyK", "KeyL", "KeyU", "KeyO", "Space", "ShiftLeft", "ShiftRight"]);
+const FOLDED_PANELS_KEY = "goose-game-editor-folded-panels";
+// Which panels are folded is a per-browser convenience; storage may be unavailable.
+function readFoldedPanels(): string[] { try { const value: unknown = JSON.parse(localStorage.getItem(FOLDED_PANELS_KEY) ?? "[]"); return Array.isArray(value) ? value.filter((name): name is string => typeof name === "string") : []; } catch { return []; } }
+function saveFoldedPanels(names: string[]): void { try { localStorage.setItem(FOLDED_PANELS_KEY, JSON.stringify(names)); } catch { /* ignore */ } }
 function download(contents: string): void { const blob = new Blob([contents], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "goose-game-world.json"; link.click(); URL.revokeObjectURL(url); }
 function findInstance(object: THREE.Object3D | null): string | undefined { for (let node = object; node; node = node.parent) { const id = node.userData.worldInstanceId as string | undefined; if (id) return id; } return undefined; }
 function cleanId(value: string): string { return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "area"; }
@@ -35,6 +39,7 @@ export class WorldEditor {
   private readonly footprint = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x8fdc97, transparent: true, opacity: 0.38, depthWrite: false }));
   private drag?: { assetId: string; startX: number; startY: number; moved: boolean; chip: HTMLElement };
   private readonly catalog: AssetCatalog;
+  private readonly foldable = new Map<HTMLElement, HTMLButtonElement>();
   private readonly trackEditor: CameraTrackEditor; private readonly objectTools = document.createElement("div"); private trackToggle?: HTMLButtonElement;
 
   constructor(scene: THREE.Scene, private readonly camera: THREE.PerspectiveCamera, private readonly canvas: HTMLCanvasElement, world = loadWorldLayout(), view?: WorldView, initialAreaId = CENTRAL_PLAZA_AREA_ID, goose?: THREE.Object3D) {
@@ -48,6 +53,7 @@ export class WorldEditor {
     const editor = this; this.trackEditor = new CameraTrackEditor(scene, camera, this.transform, this.orbit, { get area() { return editor.area; }, mutate: (message, change) => this.mutate(message, change), setStatus: (message, error) => this.setStatus(message, error) }, goose);
     document.body.classList.add("editor-mode"); this.buildPanel(); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); this.history.reset(this.snapshot()); window.addEventListener("keydown", this.handleKeyDown, { passive: false }); window.addEventListener("keyup", this.handleKeyUp, { passive: false }); window.addEventListener("blur", this.clearFlyKeys); canvas.addEventListener("pointermove", this.movePreview); canvas.addEventListener("pointerup", this.handleCanvasClick); window.addEventListener("pointermove", this.trackPointer);
     this.catalog = new CatalogDrawer(this.paletteHost); document.querySelector("#game-shell")?.append(this.catalog.root);
+    this.addFoldButton(this.catalog.root, "Catalog", "left"); this.addFoldButton(this.panel, "Editor", "right"); const folded = readFoldedPanels(); this.foldable.forEach((button, panel) => { if (folded.includes(button.dataset.name ?? "")) this.setPanelFolded(panel, true); });
   }
   private get area(): WorldArea { return getWorldArea(this.world, this.areaId); }
   private buildPanel(): void {
@@ -81,9 +87,20 @@ export class WorldEditor {
     this.shortcutDrawer.className = "editor-shortcuts";
     this.shortcutDrawer.hidden = true;
     this.shortcutDrawer.setAttribute("aria-label", "World editor keyboard shortcuts");
-    this.shortcutDrawer.innerHTML = `<div class="editor-shortcuts__header"><div><p class="editor-shortcuts__eyebrow">Editor help</p><h2>Keyboard shortcuts</h2></div></div><div class="editor-shortcuts__columns"><section><h3>Camera</h3><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> hold to fly</p><p><kbd>Space</kbd> / <kbd>Shift</kbd> up / down</p><p><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> hold to orbit</p><p><kbd>U</kbd><kbd>O</kbd> hold to zoom out / in</p><p><kbd>H</kbd> focus · <kbd>Home</kbd> reset</p></section><section><h3>Object</h3><p><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> move selected</p><p><kbd>Shift</kbd> + arrows move farther</p><p><kbd>Q</kbd><kbd>E</kbd> rotate selected</p><p><kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd> next / previous</p></section><section><h3>Placement & editing</h3><p><kbd>Enter</kbd> place at camera focus</p><p><kbd>Shift</kbd> + <kbd>Enter</kbd> keep placing</p><p><kbd>R</kbd> rotate preview · <kbd>Esc</kbd> cancel</p><p><kbd>Delete</kbd> remove · <kbd>⌘/Ctrl</kbd> + <kbd>Z</kbd> undo</p></section></div>`;
+    this.shortcutDrawer.innerHTML = `<div class="editor-shortcuts__header"><div><p class="editor-shortcuts__eyebrow">Editor help</p><h2>Keyboard shortcuts</h2></div></div><div class="editor-shortcuts__columns"><section><h3>Camera</h3><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> hold to fly</p><p><kbd>Space</kbd> / <kbd>Shift</kbd> up / down</p><p><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> hold to orbit</p><p><kbd>O</kbd><kbd>U</kbd> hold to zoom out / in</p><p><kbd>H</kbd> focus · <kbd>Home</kbd> reset</p><p><kbd>\\</kbd> hide / show panels</p></section><section><h3>Object</h3><p><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> move selected</p><p><kbd>Shift</kbd> + arrows move farther</p><p><kbd>Q</kbd><kbd>E</kbd> rotate selected</p><p><kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd> next / previous</p></section><section><h3>Placement & editing</h3><p><kbd>Enter</kbd> place at camera focus</p><p><kbd>Shift</kbd> + <kbd>Enter</kbd> keep placing</p><p><kbd>R</kbd> rotate preview · <kbd>Esc</kbd> cancel</p><p><kbd>Delete</kbd> remove · <kbd>⌘/Ctrl</kbd> + <kbd>Z</kbd> undo</p></section></div>`;
     const close = this.button("Close", () => this.toggleShortcuts(false)); close.className = "editor-shortcuts__close"; close.setAttribute("aria-label", "Close keyboard shortcuts"); this.shortcutDrawer.querySelector(".editor-shortcuts__header")?.append(close);
   }
+  private addFoldButton(panel: HTMLElement, name: string, side: "left" | "right"): void {
+    const button = this.button("", () => this.setPanelFolded(panel, !panel.classList.contains("is-folded"), true)); button.className = "editor-fold"; button.dataset.side = side; button.dataset.name = name;
+    button.innerHTML = `<span class="editor-fold__arrow" aria-hidden="true"></span><span class="editor-fold__label">${name}</span>`; panel.prepend(button); this.foldable.set(panel, button); this.setPanelFolded(panel, false);
+  }
+  private setPanelFolded(panel: HTMLElement, folded: boolean, remember = false): void {
+    const button = this.foldable.get(panel); if (!button) return; const name = button.dataset.name ?? "panel";
+    panel.classList.toggle("is-folded", folded); button.setAttribute("aria-expanded", String(!folded)); button.title = `${folded ? "Show" : "Hide"} ${name.toLowerCase()} (\\ hides both)`; button.setAttribute("aria-label", `${folded ? "Show" : "Hide"} ${name.toLowerCase()}`);
+    if (remember) saveFoldedPanels([...this.foldable].filter(([other]) => other.classList.contains("is-folded")).map(([, otherButton]) => otherButton.dataset.name ?? ""));
+  }
+  /** Hides both panels for a clear view of the world; pressing again brings them back. */
+  private togglePanels(): void { const fold = [...this.foldable.keys()].some((panel) => !panel.classList.contains("is-folded")); this.foldable.forEach((_, panel) => this.setPanelFolded(panel, fold, true)); }
   private toggleShortcuts(open = !this.shortcutsOpen): void { this.shortcutsOpen = open; this.shortcutDrawer.hidden = !open; this.shortcutToggle?.setAttribute("aria-expanded", String(open)); if (open) this.shortcutDrawer.querySelector<HTMLButtonElement>("button")?.focus(); }
   private label(text: string, control: HTMLElement): HTMLLabelElement { const label = document.createElement("label"); label.textContent = text; label.append(control); return label; }
   private number(text: string, input: HTMLInputElement, step: number, suffix = "m"): HTMLLabelElement { input.type = "number"; input.step = String(step); const label = this.label(text, input); const unit = document.createElement("span"); unit.className = "plaza-editor__suffix"; unit.textContent = suffix; label.append(unit); return label; }
@@ -328,10 +345,10 @@ export class WorldEditor {
     const vertical = this.flyDirection.y;
     this.flyDirection.y = 0;
     if (this.flyDirection.lengthSq() > 1) this.flyDirection.normalize();
-    const orbitHorizontal = Number(this.flyKeys.has("KeyL")) - Number(this.flyKeys.has("KeyJ"));
+    const orbitHorizontal = Number(this.flyKeys.has("KeyJ")) - Number(this.flyKeys.has("KeyL"));
     const orbitVertical = Number(this.flyKeys.has("KeyI")) - Number(this.flyKeys.has("KeyK"));
     if (orbitHorizontal !== 0 || orbitVertical !== 0) this.orbitCamera(orbitHorizontal, orbitVertical, CAMERA_ORBIT_SPEED * delta);
-    const zoomDirection = Number(this.flyKeys.has("KeyO")) - Number(this.flyKeys.has("KeyU"));
+    const zoomDirection = Number(this.flyKeys.has("KeyU")) - Number(this.flyKeys.has("KeyO"));
     if (zoomDirection !== 0) this.zoomCamera(zoomDirection, Math.pow(CAMERA_ZOOM_SPEED, delta));
     this.camera.position.addScaledVector(this.flyRight, this.flyDirection.x * CAMERA_FLY_SPEED * delta);
     this.camera.position.addScaledVector(this.flyForward, -this.flyDirection.z * CAMERA_FLY_SPEED * delta);
@@ -368,8 +385,8 @@ export class WorldEditor {
     if (!action) return;
     if (this.trackEditor.active) {
       if (action.type === "delete-selected") { event.preventDefault(); this.trackEditor.deletePoint(); return; }
-      if (!["undo", "redo", "orbit-camera", "zoom-camera", "reset-view", "toggle-shortcuts"].includes(action.type)) return;
-      if (this.trackEditor.looking && action.type !== "undo" && action.type !== "redo" && action.type !== "toggle-shortcuts") return;
+      if (!["undo", "redo", "orbit-camera", "zoom-camera", "reset-view", "toggle-shortcuts", "toggle-panels"].includes(action.type)) return;
+      if (this.trackEditor.looking && !["undo", "redo", "toggle-shortcuts", "toggle-panels"].includes(action.type)) return;
     }
     event.preventDefault();
     if (action.type === "undo") this.undo();
@@ -385,6 +402,7 @@ export class WorldEditor {
     else if (action.type === "reset-view") this.orbit.reset();
     else if (action.type === "place-at-focus") this.placeAtCameraFocus(action.keepPlacing);
     else if (action.type === "toggle-shortcuts") this.toggleShortcuts();
+    else if (action.type === "toggle-panels") this.togglePanels();
   };
   private resetDefaults(): void { this.mutate("Restored the canonical world.", () => { this.world = resetWorldLayout(); this.areaId = CENTRAL_PLAZA_AREA_ID; this.view.applyArea(this.area); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); }); }
   private async importFile(input: HTMLInputElement): Promise<void> { const file = input.files?.[0]; if (!file) return; try { const raw = JSON.parse(await file.text()); this.history.begin(this.snapshot()); try { this.world = validateWorldLayout(raw); } catch { this.world = migratePlazaLayout(validatePlazaLayout(raw)); } this.world.canonicalRevision = Math.max(this.world.canonicalRevision, 6); this.areaId = CENTRAL_PLAZA_AREA_ID; this.view.applyArea(this.area); this.refreshAreaOptions(); this.selectInstance(this.area.instances[0]?.id); if (this.history.commit(this.snapshot())) this.save(`Imported ${file.name}.`); this.updateHistoryButtons(); } catch (error) { this.history.cancel(); this.setStatus(error instanceof Error ? `Import failed: ${error.message}` : "Import failed.", true); } finally { input.value = ""; } }
