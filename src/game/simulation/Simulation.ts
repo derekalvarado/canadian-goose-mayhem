@@ -1,4 +1,5 @@
 import { Objectives, type ObjectiveDefinition } from "./Objectives.ts";
+import { CafeCrew, type CafeCrewDefinition, type CafePersonState, type CafeWorld } from "./cafeCrew.ts";
 
 export interface Position { x: number; y: number; z: number }
 export interface PlayerState {
@@ -15,8 +16,25 @@ export interface PlayerCommand {
 export interface CarryableDefinition {
   readonly interactionRange: number; readonly carryHeight: number; readonly carryDistance: number;
   readonly stealableWhileHeld?: boolean;
+  /** Heavy items keep the goose from hurrying while it carries them. */
+  readonly maxCarrySpeed?: number;
 }
-export interface ControllerDefinition { readonly targetId: string; readonly interactionPoint: Readonly<Position>; readonly interactionRange: number }
+export interface ControllerDefinition {
+  readonly targetId: string; readonly interactionPoint: Readonly<Position>; readonly interactionRange: number;
+  /** A momentary control (a bell) only switches its target on; someone else switches it back off. */
+  readonly momentary?: boolean;
+  /** Verb shown in the interaction prompt for a momentary control, e.g. "Ring". */
+  readonly verb?: string;
+}
+/** Capabilities that tasks and people look for instead of hard-coded object IDs. */
+export type EntityTag = "drink" | "pastry" | "tip-jar" | "music" | "order-cup" | "house" | "bell";
+export type EntityCondition = "clean" | "full" | "empty" | "spilled";
+/** A flat top (table, counter, shelf) that dropped or placed items rest on. */
+export interface PlacementSurface {
+  readonly id: string; readonly kind: "table" | "counter" | "shelf";
+  readonly position: Readonly<Position>; readonly rotationY: number;
+  readonly halfWidth: number; readonly halfDepth: number; readonly height: number;
+}
 export type CleanupRole = "trash-can" | "litter" | "trash-bag" | "litter-picker";
 export interface CleanupDefinition {
   readonly role: CleanupRole; readonly routeOrder?: number; readonly interactionRange?: number;
@@ -29,11 +47,20 @@ export interface WorldEntityDefinition {
   readonly assetId?: string;
   readonly active?: boolean; readonly controller?: ControllerDefinition; readonly carryable?: CarryableDefinition;
   readonly cleanup?: CleanupDefinition;
+  readonly tags?: readonly EntityTag[];
+  /** The area this object was authored in; lets tasks notice when it has been carried elsewhere. */
+  readonly homeAreaId?: string;
+  /** An item the world cannot work without (a janitor's tool): it returns home rather than stay stranded in another area. */
+  readonly essential?: boolean;
+  readonly condition?: EntityCondition;
 }
 export interface WorldEntityState {
   readonly id: string; readonly label: string; readonly position: Readonly<Position>; readonly heading: number;
   readonly assetId?: string;
   readonly active?: boolean; readonly holderId?: string; readonly containedBy?: string; readonly serviceCount: number;
+  readonly tags: readonly EntityTag[]; readonly homeAreaId?: string;
+  readonly condition?: EntityCondition; readonly orderFor?: string;
+  readonly restingOn?: string; readonly restingKind?: PlacementSurface["kind"];
 }
 export type CleanupPhase = "trash" | "litter";
 export type JanitorActivity =
@@ -83,8 +110,10 @@ export interface AreaTransitionDefinition {
   readonly targetHeading: number;
 }
 export interface WorldSnapshot {
+  readonly areaId: string;
   readonly player: PlayerState; readonly entities: readonly WorldEntityState[];
   readonly janitor?: JanitorState; readonly splashKids: readonly SplashKidState[]; readonly durableFacts: readonly string[];
+  readonly cafePeople: readonly CafePersonState[];
 }
 export type GameplayEvent =
   | { readonly type: "goose-honked"; readonly actorId: "goose"; readonly position: Readonly<Position> }
@@ -98,6 +127,9 @@ export type GameplayEvent =
   | { readonly type: "janitor-fumbled"; readonly actorId: string; readonly entityId: string }
   | { readonly type: "goose-shooed"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "splash-kid-frightened"; readonly actorId: string; readonly position: Readonly<Position> }
+  | { readonly type: "person-startled"; readonly actorId: string; readonly position: Readonly<Position> }
+  | { readonly type: "drink-spilled"; readonly actorId: string; readonly entityId: string; readonly position: Readonly<Position> }
+  | { readonly type: "order-called"; readonly actorId: string; readonly entityId: string; readonly forActorId: string; readonly position: Readonly<Position> }
   | { readonly type: "area-transition-requested"; readonly transitionId: string; readonly toAreaId: string; readonly targetPosition: Readonly<Position>; readonly targetHeading: number }
   | { readonly type: "objective-completed"; readonly objectiveId: string };
 export interface WorldRules {
@@ -108,6 +140,8 @@ export interface WorldRules {
   readonly splashKids?: readonly SplashKidDefinition[];
   readonly objectiveZones?: readonly ObjectiveZoneDefinition[];
   readonly transitions?: readonly AreaTransitionDefinition[];
+  readonly surfaces?: readonly PlacementSurface[];
+  readonly cafe?: CafeCrewDefinition;
   resolveMovement(current: Readonly<Position>, proposed: Readonly<Position>, output: Position): void;
 }
 
@@ -124,9 +158,14 @@ export interface SimulationEntityState {
   readonly holderId?: string;
   readonly containedBy?: string;
   readonly serviceCount: number;
+  readonly condition?: EntityCondition;
+  readonly orderFor?: string;
+  readonly restingOn?: string;
 }
 export interface SimulationSessionState {
   readonly durableFacts: readonly string[];
+  /** Tasks already crossed off; restored silently so they are never reported twice. */
+  readonly completedObjectiveIds?: readonly string[];
   /** Per-area entity snapshots let carried and dropped objects survive scene swaps. */
   readonly areaStates?: readonly SimulationAreaState[];
 }
@@ -134,6 +173,7 @@ export interface SimulationSessionState {
 interface MutableEntity {
   readonly definition: WorldEntityDefinition; readonly position: Position; heading: number;
   active?: boolean; holderId?: string; containedBy?: string; serviceCount: number;
+  condition?: EntityCondition; orderFor?: string; restingOn?: string;
 }
 type JanitorResume = Readonly<{ activity: JanitorActivity; targetEntityId?: string }>;
 interface MutableJanitor {
@@ -176,7 +216,9 @@ export class Simulation {
   private readonly durableFacts = new Set<string>();
   private readonly poopRecords: GoosePoop[] = [];
   private readonly splashKids: MutableSplashKid[] = [];
+  private readonly surfaces: readonly PlacementSurface[];
   private janitor?: MutableJanitor;
+  private readonly cafe?: CafeCrew;
   private heading = 0; private turnAmount = 0; private wingsSpread = false; private sneaking = false; private threatening = false;
   private accumulator = 0; private honkQueued = false; private interactionQueued = false;
   private tickCount = 0; private idleSeconds = 0; private poopSequence = 0;
@@ -185,10 +227,11 @@ export class Simulation {
   constructor(rules: WorldRules, sessionState?: SimulationSessionState) {
     this.rules = rules;
     this.objectives = new Objectives(rules.objectives);
+    this.surfaces = rules.surfaces ?? [];
     for (const definition of rules.entities ?? []) {
       if (this.entitiesById.has(definition.id)) throw new Error(`Duplicate world entity ID: ${definition.id}`);
       this.entitiesById.set(definition.id, { definition, position: { ...definition.position }, heading: definition.heading ?? 0,
-        active: definition.active, serviceCount: 0 });
+        active: definition.active, serviceCount: 0, condition: definition.condition, restingOn: this.surfaceAt(definition.position)?.id });
     }
     for (const role of ["trash-can", "litter", "trash-bag", "litter-picker"] as const) {
       this.cleanupRoutes.set(role, [...this.entitiesById.values()].filter((entity) => entity.definition.cleanup?.role === role)
@@ -220,6 +263,7 @@ export class Simulation {
       this.splashKids.push({ definition, position: { ...definition.position }, heading: definition.heading,
         activity: "playing", activitySecondsRemaining: 0, routeIndex: Math.min(1, definition.playRoute.length - 1) });
     }
+    if (rules.cafe) this.cafe = new CafeCrew(rules.cafe);
     this.reset();
     if (sessionState) this.restoreSessionState(sessionState);
   }
@@ -239,10 +283,13 @@ export class Simulation {
   get world(): WorldSnapshot {
     const janitorTool = this.janitor ? [...this.entitiesById.values()].find((entity) => entity.holderId === this.janitor?.definition.id
       && (entity.definition.cleanup?.role === "trash-bag" || entity.definition.cleanup?.role === "litter-picker")) : undefined;
-    return { player: this.player, entities: [...this.entitiesById.values()].map((entity) => ({
+    return { areaId: this.rules.areaId ?? "", player: this.player, entities: [...this.entitiesById.values()].map((entity) => ({
       id: entity.definition.id, label: entity.definition.label, position: { ...entity.position }, heading: entity.heading,
       assetId: entity.definition.assetId,
       active: entity.active, holderId: entity.holderId, containedBy: entity.containedBy, serviceCount: entity.serviceCount,
+      tags: entity.definition.tags ?? [], homeAreaId: entity.definition.homeAreaId,
+      condition: entity.condition, orderFor: entity.orderFor,
+      restingOn: entity.restingOn, restingKind: entity.restingOn ? this.surface(entity.restingOn)?.kind : undefined,
     })), janitor: this.janitor ? { id: this.janitor.definition.id, position: { ...this.janitor.position },
       heading: this.janitor.heading, activity: this.janitor.activity,
       activitySecondsRemaining: this.janitor.activitySecondsRemaining, cleanupPhase: this.janitor.cleanupPhase,
@@ -251,10 +298,11 @@ export class Simulation {
       completedTrashIdsThisLap: [...this.janitor.completedTrashIdsThisLap] } : undefined,
       splashKids: this.splashKids.map((child) => ({ id: child.definition.id, position: { ...child.position }, heading: child.heading,
         activity: child.activity, activitySecondsRemaining: child.activitySecondsRemaining })),
-      durableFacts: [...this.durableFacts] };
+      durableFacts: [...this.durableFacts], cafePeople: this.cafe?.snapshot() ?? [] };
   }
-  get objectiveList(): readonly Readonly<{ id: string; description: string; completed: boolean }>[] {
-    return this.rules.objectives.map((objective) => ({ id: objective.id, description: objective.description, completed: this.objectives.isComplete(objective.id) }));
+  get objectiveList(): readonly Readonly<{ id: string; description: string; areaId?: string; completed: boolean }>[] {
+    return this.rules.objectives.map((objective) => ({ id: objective.id, description: objective.description, areaId: objective.areaId,
+      completed: this.objectives.isComplete(objective.id) }));
   }
   get goosePoops(): readonly GoosePoop[] { return this.poopRecords.map((poop) => ({ id: poop.id, position: { ...poop.position } })); }
   get sessionState(): SimulationSessionState {
@@ -270,12 +318,16 @@ export class Simulation {
         holderId: entity.holderId,
         containedBy: entity.containedBy,
         serviceCount: entity.serviceCount,
+        condition: entity.condition,
+        orderFor: entity.orderFor,
+        restingOn: entity.restingOn,
       });
     }
     const areaStates = new Map(this.persistedAreaStates);
     areaStates.set(currentAreaId, currentEntities);
     return {
       durableFacts: [...this.durableFacts],
+      completedObjectiveIds: this.objectives.completedIds,
       areaStates: [...areaStates.entries()].map(([areaId, entities]) => ({ areaId, entities: [...entities.values()] })),
     };
   }
@@ -283,8 +335,10 @@ export class Simulation {
     if (this.heldEntityId) return `Drop ${this.entitiesById.get(this.heldEntityId)?.definition.label ?? "item"}`;
     const candidate = this.findInteractionCandidate();
     if (!candidate) return undefined;
-    if (candidate.definition.controller) {
-      const target = this.entitiesById.get(candidate.definition.controller.targetId);
+    const controller = candidate.definition.controller;
+    if (controller) {
+      if (controller.momentary) return `${controller.verb ?? "Use"} ${candidate.definition.label}`;
+      const target = this.entitiesById.get(controller.targetId);
       return `${target?.active ? "Turn off" : "Turn on"} ${candidate.definition.label}`;
     }
     if (candidate.containedBy) return `Pull out ${candidate.definition.label}`;
@@ -329,7 +383,9 @@ export class Simulation {
     for (const entity of this.entitiesById.values()) {
       Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0;
       entity.active = entity.definition.active; entity.holderId = undefined; entity.containedBy = undefined; entity.serviceCount = 0;
+      entity.condition = entity.definition.condition; entity.orderFor = undefined; entity.restingOn = this.surfaceAt(entity.position)?.id;
     }
+    this.cafe?.reset();
     if (this.janitor) {
       const janitor = this.janitor;
       Object.assign(janitor.position, janitor.definition.position); janitor.heading = janitor.definition.heading;
@@ -358,7 +414,8 @@ export class Simulation {
     const length = Math.hypot(requestedX, requestedZ); const scale = 1 / Math.max(1, length);
     const acceptingMovement = this.spookedSeconds <= 0;
     const hasInput = acceptingMovement && length * length > 0.001;
-    const speed = command.hurry ? HURRY_SPEED : WALK_SPEED;
+    const heldMaxSpeed = this.heldEntityId ? this.entitiesById.get(this.heldEntityId)?.definition.carryable?.maxCarrySpeed : undefined;
+    const speed = Math.min(command.hurry ? HURRY_SPEED : WALK_SPEED, heldMaxSpeed ?? Infinity);
     const smoothing = 1 - Math.exp(-(hasInput ? 11 : 16) * FIXED_STEP);
     this.velocity.x += ((hasInput ? requestedX * scale * speed : 0) - this.velocity.x) * smoothing;
     this.velocity.z += ((hasInput ? requestedZ * scale * speed : 0) - this.velocity.z) * smoothing;
@@ -382,6 +439,7 @@ export class Simulation {
     if (honked) { events.push({ type: "goose-honked", actorId: "goose", position: { ...this.position } }); this.honkQueued = false; }
     this.updateSplashKids(events);
     this.updateJanitor(events, honked);
+    this.cafe?.update(this.cafeWorld(events, honked), events, FIXED_STEP);
     this.syncOwnedEntities();
     for (const zone of this.rules.objectiveZones ?? []) {
       const guarded = zone.guardedBy === this.janitor?.definition.id
@@ -409,18 +467,27 @@ export class Simulation {
     }
     this.durableFacts.clear();
     for (const fact of state.durableFacts) this.durableFacts.add(fact);
+    this.objectives.restore(state.completedObjectiveIds ?? []);
     const currentAreaId = this.rules.areaId ?? "";
     const currentEntities = this.persistedAreaStates.get(currentAreaId) ?? new Map<string, SimulationEntityState>();
     this.persistedAreaStates.set(currentAreaId, currentEntities);
 
-    // A goose-held item belongs to the area it is entering. Move it out of the
-    // source area's snapshot so dropping it there later does not duplicate it.
     for (const [areaId, entities] of this.persistedAreaStates) {
       if (areaId === currentAreaId) continue;
       for (const [entityId, entity] of entities) {
-        if (entity.holderId !== "goose") continue;
-        entities.delete(entityId);
-        currentEntities.set(entityId, entity);
+        // A goose-held item belongs to the area it is entering. Move it out of the
+        // source area's snapshot so dropping it there later does not duplicate it.
+        if (entity.holderId === "goose") {
+          entities.delete(entityId);
+          currentEntities.set(entityId, entity);
+          continue;
+        }
+        const authored = this.entitiesById.get(entityId);
+        if (!authored || currentEntities.has(entityId)) continue;
+        // An essential item left behind elsewhere walks home instead of stranding this area's routine.
+        if (authored.definition.essential && authored.definition.homeAreaId === currentAreaId) { entities.delete(entityId); continue; }
+        // Otherwise the object lives in the other area now: never rebuild a second copy at home.
+        this.entitiesById.delete(entityId);
       }
     }
     for (const entityState of currentEntities.values()) {
@@ -430,25 +497,30 @@ export class Simulation {
           definition: entityState.definition,
           position: { ...entityState.position },
           heading: entityState.heading,
-          active: entityState.active,
-          holderId: entityState.holderId,
-          containedBy: entityState.containedBy,
           serviceCount: entityState.serviceCount,
         };
         this.entitiesById.set(entityState.id, entity);
       } else {
         Object.assign(entity.position, entityState.position);
         entity.heading = entityState.heading;
-        entity.active = entityState.active;
-        entity.holderId = entityState.holderId;
-        entity.containedBy = entityState.containedBy;
         entity.serviceCount = entityState.serviceCount;
+      }
+      entity.active = entityState.active;
+      entity.holderId = entityState.holderId;
+      entity.containedBy = entityState.containedBy;
+      entity.condition = entityState.condition;
+      entity.orderFor = entityState.orderFor;
+      entity.restingOn = entityState.restingOn && this.surface(entityState.restingOn) ? entityState.restingOn : undefined;
+      // People other than the janitor restart their routine on entry, so nothing may stay in their hands.
+      if (entity.holderId && entity.holderId !== "goose" && entity.holderId !== this.janitor?.definition.id) {
+        entity.holderId = undefined;
+        const home = entity.definition.homeAreaId === currentAreaId;
+        if (home) { Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0; }
+        entity.restingOn = this.surfaceAt(entity.position)?.id;
       }
       if (entity.holderId === "goose") this.heldEntityId = entity.definition.id;
     }
     this.syncOwnedEntities();
-    // Rehydrate objective completion silently; re-entering an area must not replay a completion cue.
-    this.objectives.evaluate(this.world);
   }
 
   private resolveInteraction(events: GameplayEvent[]): void {
@@ -457,6 +529,7 @@ export class Simulation {
     const controller = candidate.definition.controller;
     if (controller) {
       const target = this.entitiesById.get(controller.targetId); if (!target || target.active === undefined) return;
+      if (controller.momentary && target.active) return;
       target.active = !target.active;
       events.push({ type: "device-state-changed", actorId: "goose", controllerId: candidate.definition.id, targetId: target.definition.id, active: target.active });
       return;
@@ -468,6 +541,7 @@ export class Simulation {
     candidate.containedBy = undefined;
     this.acquireEntity(candidate, "goose");
     if (previousHolder === this.janitor?.definition.id) this.onJanitorToolStolen(candidate);
+    else if (previousHolder) this.cafe?.onItemTaken(candidate.definition.id, previousHolder);
     events.push({ type: "entity-grabbed", actorId: "goose", entityId: candidate.definition.id });
   }
   private findInteractionCandidate(): MutableEntity | undefined {
@@ -486,7 +560,7 @@ export class Simulation {
   }
   private acquireEntity(entity: MutableEntity, actorId: string): boolean {
     if (entity.holderId || entity.containedBy || !entity.definition.carryable) return false;
-    entity.holderId = actorId;
+    entity.holderId = actorId; entity.restingOn = undefined;
     if (actorId === "goose") this.heldEntityId = entity.definition.id;
     return true;
   }
@@ -495,7 +569,27 @@ export class Simulation {
     entity.holderId = undefined;
     if (placeAtHome) {
       Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0;
+      entity.restingOn = this.surfaceAt(entity.position)?.id;
     }
+  }
+  private surface(id: string): PlacementSurface | undefined { return this.surfaces.find((surface) => surface.id === id); }
+  /** The highest authored top under a point, if any. Items resting there sit at its height. */
+  private surfaceAt(point: Readonly<{ x: number; z: number }>): PlacementSurface | undefined {
+    let best: PlacementSurface | undefined;
+    for (const surface of this.surfaces) {
+      const dx = point.x - surface.position.x; const dz = point.z - surface.position.z;
+      const c = Math.cos(surface.rotationY); const s = Math.sin(surface.rotationY);
+      const localX = dx * c - dz * s; const localZ = dx * s + dz * c;
+      if (Math.abs(localX) > surface.halfWidth || Math.abs(localZ) > surface.halfDepth) continue;
+      if (!best || surface.height > best.height) best = surface;
+    }
+    return best;
+  }
+  /** One release rule for everyone: an item set down over a table, counter, or shelf rests on it; otherwise on the floor. */
+  private placeEntity(entity: MutableEntity, at: Readonly<{ x: number; z: number }>, heading: number, floorY: number): void {
+    const surface = this.surfaceAt(at);
+    entity.position.x = at.x; entity.position.z = at.z; entity.position.y = surface ? surface.position.y + surface.height : floorY;
+    entity.heading = heading; entity.restingOn = surface?.id;
   }
   private syncOwnedEntities(): void {
     const janitor = this.janitor;
@@ -512,6 +606,8 @@ export class Simulation {
         entity.position.y = janitor.position.y + carryable.carryHeight;
         entity.position.z = janitor.position.z - Math.cos(janitor.heading) * carryable.carryDistance;
         entity.heading = janitor.heading;
+      } else if (entity.holderId && this.cafe?.holdsFor(entity.holderId, entity.position)) {
+        entity.heading = this.cafe.headingOf(entity.holderId) ?? entity.heading;
       } else if (entity.containedBy) {
         const container = this.entitiesById.get(entity.containedBy);
         if (container) { Object.assign(entity.position, container.position); entity.heading = container.heading; }
@@ -521,8 +617,9 @@ export class Simulation {
   private dropHeldEntity(events: GameplayEvent[]): void {
     if (!this.heldEntityId) return;
     const entity = this.entitiesById.get(this.heldEntityId); if (!entity) return;
-    this.releaseEntity(entity, false); entity.position.x = this.position.x - Math.sin(this.heading) * 0.62;
-    entity.position.y = this.position.y; entity.position.z = this.position.z - Math.cos(this.heading) * 0.62;
+    this.releaseEntity(entity, false);
+    this.placeEntity(entity, { x: this.position.x - Math.sin(this.heading) * 0.62, z: this.position.z - Math.cos(this.heading) * 0.62 },
+      this.heading, this.position.y);
     events.push({ type: "entity-dropped", actorId: "goose", entityId: entity.definition.id, position: { ...entity.position } });
   }
 
@@ -908,13 +1005,59 @@ export class Simulation {
     return this.moveJanitorToward(target.position);
   }
   private shooGoose(events: GameplayEvent[], retrievingTool: boolean): void {
-    const janitor = this.janitor!; const dx = this.position.x - janitor.position.x; const dz = this.position.z - janitor.position.z;
-    const length = Math.max(0.0001, Math.hypot(dx, dz)); this.pushDirection.x = dx / length; this.pushDirection.z = dz / length;
-    this.spookedSeconds = SHOO_PUSH_SECONDS; this.velocity.x = 0; this.velocity.z = 0; janitor.heading = Math.atan2(-dx, -dz);
+    const janitor = this.janitor!;
+    janitor.heading = Math.atan2(-(this.position.x - janitor.position.x), -(this.position.z - janitor.position.z));
     if (!retrievingTool && janitor.definition.cleanup) this.rememberCleanupTask();
     janitor.activity = "shooing"; janitor.activitySecondsRemaining = janitor.definition.shooSeconds; janitor.shooCooldownRemaining = SHOO_COOLDOWN_SECONDS;
+    this.pushGooseAway(janitor.definition.id, janitor.position, events);
+  }
+  /** The shared non-violent setback: a short push away from someone, which makes the goose let go. */
+  private pushGooseAway(actorId: string, from: Readonly<Position>, events: GameplayEvent[]): void {
+    const dx = this.position.x - from.x; const dz = this.position.z - from.z;
+    const length = Math.max(0.0001, Math.hypot(dx, dz)); this.pushDirection.x = dx / length; this.pushDirection.z = dz / length;
+    this.spookedSeconds = SHOO_PUSH_SECONDS; this.velocity.x = 0; this.velocity.z = 0;
     this.dropHeldEntity(events);
-    events.push({ type: "goose-shooed", actorId: janitor.definition.id, position: { ...this.position } });
+    events.push({ type: "goose-shooed", actorId, position: { ...this.position } });
+  }
+  /** The narrow view of the world café people act through; every grab and release uses the goose's rules. */
+  private cafeWorld(events: GameplayEvent[], honked: boolean): CafeWorld {
+    const view = (entity: MutableEntity) => ({
+      id: entity.definition.id, position: { ...entity.position }, homePosition: { ...entity.definition.position },
+      holderId: entity.holderId, containedBy: entity.containedBy, condition: entity.condition, orderFor: entity.orderFor,
+      restingOn: entity.restingOn, restingKind: entity.restingOn ? this.surface(entity.restingOn)?.kind : undefined,
+      tags: entity.definition.tags ?? [], active: entity.active, interactionPoint: entity.definition.controller?.interactionPoint,
+    });
+    return {
+      goose: { position: { ...this.position }, heldEntityId: this.heldEntityId,
+        startling: honked || this.wingsSpread || this.threatening },
+      entity: (id) => { const entity = this.entitiesById.get(id); return entity ? view(entity) : undefined; },
+      entities: () => [...this.entitiesById.values()].map(view),
+      surface: (id) => this.surface(id),
+      acquire: (entityId, actorId) => {
+        const entity = this.entitiesById.get(entityId);
+        if (!entity || !this.acquireEntity(entity, actorId)) return false;
+        events.push({ type: "entity-grabbed", actorId, entityId });
+        return true;
+      },
+      place: (entityId, actorId, at, heading) => {
+        const entity = this.entitiesById.get(entityId); if (!entity || entity.holderId !== actorId) return false;
+        this.releaseEntity(entity, false); this.placeEntity(entity, at, heading, at.y);
+        events.push({ type: "entity-dropped", actorId, entityId, position: { ...entity.position } });
+        return true;
+      },
+      setCondition: (entityId, condition, orderFor) => {
+        const entity = this.entitiesById.get(entityId); if (!entity) return;
+        entity.condition = condition; entity.orderFor = orderFor;
+      },
+      setActive: (entityId, active, actorId) => {
+        const entity = this.entitiesById.get(entityId); if (!entity || entity.active === undefined || entity.active === active) return;
+        entity.active = active;
+        events.push({ type: "device-state-changed", actorId, targetId: entityId, active });
+      },
+      pushGoose: (actorId, from) => this.pushGooseAway(actorId, from, events),
+      recordFact: (factId) => { this.durableFacts.add(factId); },
+      emit: (event) => { events.push(event); },
+    };
   }
   private leavePoop(events: GameplayEvent[]): void {
     this.idleSeconds = 0; const id = `goose-poop-${this.poopSequence++}`;

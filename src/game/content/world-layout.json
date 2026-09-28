@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 20,
+  "canonicalRevision": 23,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -1027,7 +1027,7 @@
         },
         {
           "id": "coffee.wall-north",
-          "assetId": "coffee.wall-long",
+          "assetId": "coffee.wall-long-doorway",
           "label": "North brick wall",
           "transform": { "x": 0, "y": 0, "z": -7, "rotationY": 0 }
         },
@@ -1070,113 +1070,254 @@
         {
           "id": "coffee.counter",
           "assetId": "coffee.counter",
-          "label": "Order counter on left wall",
-          "transform": { "x": -7.25, "y": 0, "z": -1, "rotationY": 1.5707963267948966 }
+          "label": "Order counter",
+          "transform": { "x": -6.4, "y": 0, "z": -1, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.back-bar",
+          "assetId": "coffee.back-bar",
+          "label": "Espresso back bar",
+          "transform": { "x": -8.5, "y": 0, "z": -1, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.service-bell",
+          "assetId": "coffee.service-bell",
+          "label": "Service bell",
+          "transform": { "x": -5.95, "y": 1.23, "z": -3.4, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.tip-jar",
+          "assetId": "coffee.tip-jar",
+          "label": "Tip jar",
+          "transform": { "x": -5.95, "y": 1.23, "z": -1.9, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.counter-plate",
+          "assetId": "coffee.plate",
+          "label": "Pastry plate",
+          "transform": { "x": -5.95, "y": 1.23, "z": -0.4, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.counter-croissant",
+          "assetId": "coffee.counter-croissant",
+          "label": "Croissant",
+          "transform": { "x": -5.95, "y": 1.23, "z": -0.4, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.order-cup-1",
+          "assetId": "coffee.order-cup",
+          "label": "Coffee order",
+          "transform": { "x": -8.5, "y": 1.23, "z": 0.35, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.order-cup-2",
+          "assetId": "coffee.order-cup",
+          "label": "Coffee order",
+          "transform": { "x": -8.5, "y": 1.23, "z": 0.75, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.radio",
+          "assetId": "coffee.radio",
+          "label": "Café radio",
+          "transform": { "x": 8, "y": 0, "z": -6.35, "rotationY": 0 }
         },
         {
           "id": "coffee.table-1",
           "assetId": "coffee.table",
           "label": "Table 1",
-          "transform": { "x": 1.8, "y": 0, "z": -3.7, "rotationY": 0 }
-        },
-        {
-          "id": "coffee.table-2",
-          "assetId": "coffee.table",
-          "label": "Table 2",
-          "transform": { "x": 5.7, "y": 0, "z": -3.7, "rotationY": 0 }
-        },
-        {
-          "id": "coffee.table-3",
-          "assetId": "coffee.table",
-          "label": "Table 3",
-          "transform": { "x": 1.8, "y": 0, "z": 0.7, "rotationY": 0 }
-        },
-        {
-          "id": "coffee.table-4",
-          "assetId": "coffee.table",
-          "label": "Table 4",
-          "transform": { "x": 5.7, "y": 0, "z": 0.7, "rotationY": 0 }
+          "transform": { "x": 1.8, "y": 0, "z": -3.9, "rotationY": 0 }
         },
         {
           "id": "coffee.chair-1a",
           "assetId": "coffee.chair",
           "label": "Table 1 chair A",
-          "transform": { "x": 1.8, "y": 0, "z": -2.65, "rotationY": 0 }
+          "transform": { "x": 1.8, "y": 0, "z": -2.8, "rotationY": 0 }
         },
         {
           "id": "coffee.chair-1b",
           "assetId": "coffee.chair",
           "label": "Table 1 chair B",
-          "transform": { "x": 1.8, "y": 0, "z": -4.75, "rotationY": 3.141592653589793 }
+          "transform": { "x": 1.8, "y": 0, "z": -5, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.table-2",
+          "assetId": "coffee.table",
+          "label": "Table 2",
+          "transform": { "x": 5.7, "y": 0, "z": -3.9, "rotationY": 0 }
         },
         {
           "id": "coffee.chair-2a",
           "assetId": "coffee.chair",
           "label": "Table 2 chair A",
-          "transform": { "x": 5.7, "y": 0, "z": -2.65, "rotationY": 0 }
+          "transform": { "x": 5.7, "y": 0, "z": -2.8, "rotationY": 0 }
         },
         {
           "id": "coffee.chair-2b",
           "assetId": "coffee.chair",
           "label": "Table 2 chair B",
-          "transform": { "x": 5.7, "y": 0, "z": -4.75, "rotationY": 3.141592653589793 }
+          "transform": { "x": 5.7, "y": 0, "z": -5, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.table-3",
+          "assetId": "coffee.table",
+          "label": "Table 3",
+          "transform": { "x": 1.8, "y": 0, "z": 1.2, "rotationY": 0 }
         },
         {
           "id": "coffee.chair-3a",
           "assetId": "coffee.chair",
           "label": "Table 3 chair A",
-          "transform": { "x": 1.8, "y": 0, "z": 1.75, "rotationY": 0 }
+          "transform": { "x": 1.8, "y": 0, "z": 2.3, "rotationY": 0 }
         },
         {
           "id": "coffee.chair-3b",
           "assetId": "coffee.chair",
           "label": "Table 3 chair B",
-          "transform": { "x": 1.8, "y": 0, "z": -0.35, "rotationY": 3.141592653589793 }
+          "transform": { "x": 1.8, "y": 0, "z": 0.1, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.table-4",
+          "assetId": "coffee.table",
+          "label": "Table 4",
+          "transform": { "x": 5.7, "y": 0, "z": 1.2, "rotationY": 0 }
         },
         {
           "id": "coffee.chair-4a",
           "assetId": "coffee.chair",
           "label": "Table 4 chair A",
-          "transform": { "x": 5.7, "y": 0, "z": 1.75, "rotationY": 0 }
+          "transform": { "x": 5.7, "y": 0, "z": 2.3, "rotationY": 0 }
         },
         {
           "id": "coffee.chair-4b",
           "assetId": "coffee.chair",
           "label": "Table 4 chair B",
-          "transform": { "x": 5.7, "y": 0, "z": -0.35, "rotationY": 3.141592653589793 }
+          "transform": { "x": 5.7, "y": 0, "z": 0.1, "rotationY": 3.141592653589793 }
         },
         {
-          "id": "coffee.person-barista",
-          "assetId": "coffee.placeholder-person",
-          "label": "Placeholder barista",
-          "transform": { "x": -8.35, "y": 0, "z": -1, "rotationY": 0 }
+          "id": "coffee.laptop",
+          "assetId": "coffee.laptop",
+          "label": "Laptop",
+          "transform": { "x": 1.8, "y": 0.95, "z": -4.3, "rotationY": 0 }
         },
         {
-          "id": "coffee.person-customer-1",
-          "assetId": "coffee.placeholder-person",
-          "label": "Placeholder customer 1",
-          "transform": { "x": 1.8, "y": 0, "z": -3.05, "rotationY": 3.141592653589793 }
+          "id": "coffee.mug-reader",
+          "assetId": "coffee.mug",
+          "label": "Coffee mug",
+          "transform": { "x": 5.4, "y": 0.95, "z": -4.3, "rotationY": 0 }
         },
         {
-          "id": "coffee.person-customer-2",
-          "assetId": "coffee.placeholder-person",
-          "label": "Placeholder customer 2",
-          "transform": { "x": 5.7, "y": 0, "z": -3.05, "rotationY": 3.141592653589793 }
+          "id": "coffee.reader-plate",
+          "assetId": "coffee.plate",
+          "label": "Plate",
+          "transform": { "x": 5.98, "y": 0.95, "z": -4.22, "rotationY": 0 }
         },
         {
-          "id": "coffee.person-customer-3",
-          "assetId": "coffee.placeholder-person",
-          "label": "Placeholder customer 3",
-          "transform": { "x": 1.8, "y": 0, "z": 0.35, "rotationY": 3.141592653589793 }
+          "id": "coffee.croissant-reader",
+          "assetId": "coffee.croissant",
+          "label": "Croissant",
+          "transform": { "x": 5.98, "y": 0.95, "z": -4.22, "rotationY": 0.4 }
         },
         {
-          "id": "coffee.person-customer-4",
-          "assetId": "coffee.placeholder-person",
-          "label": "Placeholder customer 4",
-          "transform": { "x": 5.7, "y": 0, "z": 0.35, "rotationY": 3.141592653589793 }
+          "id": "coffee.mug-student",
+          "assetId": "coffee.mug",
+          "label": "Coffee mug",
+          "transform": { "x": 1.55, "y": 0.95, "z": 0.85, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.barista",
+          "assetId": "coffee.person-barista",
+          "label": "Barista",
+          "transform": { "x": -7.65, "y": 0, "z": -2.8, "rotationY": 4.71238898038469 }
+        },
+        {
+          "id": "coffee.customer-laptop",
+          "assetId": "coffee.person-laptop",
+          "label": "Laptop worker",
+          "transform": { "x": 1.8, "y": 0, "z": -5, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.customer-reader",
+          "assetId": "coffee.person-reader",
+          "label": "Newspaper reader",
+          "transform": { "x": 5.7, "y": 0, "z": -5, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.customer-student",
+          "assetId": "coffee.person-student",
+          "label": "Student",
+          "transform": { "x": 1.8, "y": 0, "z": 0.1, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.kitchen-floor",
+          "assetId": "coffee.kitchen-floor",
+          "label": "Kitchen tile floor",
+          "transform": { "x": -4.8, "y": 0, "z": -10.5, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.kitchen-wall-north",
+          "assetId": "coffee.kitchen-wall",
+          "label": "Kitchen north wall",
+          "transform": { "x": -4.8, "y": 0, "z": -14, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.kitchen-wall-south",
+          "assetId": "coffee.kitchen-wall-short",
+          "label": "Kitchen west wall",
+          "transform": { "x": -9, "y": 0, "z": -10.5, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.kitchen-wall-west",
+          "assetId": "coffee.kitchen-wall-short",
+          "label": "Kitchen east wall",
+          "transform": { "x": -0.6, "y": 0, "z": -10.5, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.kitchen-oven",
+          "assetId": "coffee.kitchen-oven",
+          "label": "Deck oven",
+          "transform": { "x": -6.5, "y": 0, "z": -13.2, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.pastry-rack-1",
+          "assetId": "coffee.pastry-rack",
+          "label": "Pastry rack",
+          "transform": { "x": -1.2, "y": 0, "z": -11.2, "rotationY": -1.5707963267948966 }
+        },
+        {
+          "id": "coffee.pastry-rack-2",
+          "assetId": "coffee.pastry-rack",
+          "label": "Pastry rack",
+          "transform": { "x": -1.2, "y": 0, "z": -10.2, "rotationY": -1.5707963267948966 }
+        },
+        {
+          "id": "coffee.kitchen-sink",
+          "assetId": "coffee.kitchen-sink",
+          "label": "Industrial sink",
+          "transform": { "x": -8.4, "y": 0, "z": -10.8, "rotationY": 1.5707963267948966 }
+        },
+        {
+          "id": "coffee.prep-table",
+          "assetId": "coffee.prep-table",
+          "label": "Bakery prep table",
+          "transform": { "x": -4.6, "y": 0, "z": -10.6, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.kitchen-shelf",
+          "assetId": "coffee.kitchen-shelf",
+          "label": "Dry goods shelf",
+          "transform": { "x": -3.2, "y": 0, "z": -13.55, "rotationY": 0 }
+        },
+        {
+          "id": "coffee.baker",
+          "assetId": "coffee.person-baker",
+          "label": "Baker",
+          "transform": { "x": -4.6, "y": 0, "z": -9.5, "rotationY": 0 }
         }
       ],
-      "controlLinks": []
+      "controlLinks": [
+        { "controllerId": "coffee.radio", "targetId": "coffee.radio" },
+        { "controllerId": "coffee.service-bell", "targetId": "coffee.service-bell" }
+      ]
     }
   ],
   "transitions": [

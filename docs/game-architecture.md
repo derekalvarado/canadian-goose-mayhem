@@ -1,9 +1,10 @@
 # Game architecture and development direction
 
 Status: foundation implemented. Old Town Square and a coffee shop interior are
-playable with a janitor, three splash-pad kids, carryable props, one objective, and a
-hand-authored follow camera. Sight/hearing-based stealth, a rigid-body physics
-engine, reactive piano, gates/shortcuts, and saved games are still future work.
+playable with a janitor, three splash-pad kids, a barista and three café customers,
+carryable props, a seven-task to-do list saved in the browser, and a hand-authored
+follow camera. Sight/hearing-based stealth, a rigid-body physics engine, reactive
+piano, gates/shortcuts, and full save games are still future work.
 
 ## Product contract
 
@@ -27,19 +28,19 @@ qualities. Do not expand the village until one small garden proves the loop.
 
 | Area | Current implementation | Remaining constraint |
 | --- | --- | --- |
-| Gameplay ownership | `Simulation` owns the goose, world entities, the janitor, splash-pad kids, durable facts, and objective progress | NPC rules are hand-written per character, not a shared perception/intent system |
+| Gameplay ownership | `Simulation` owns the goose, world entities, the janitor, splash-pad kids, the café crew (`cafeCrew.ts`), durable facts, and objective progress | NPC rules are hand-written per character, not a shared perception/intent system |
 | Timing | 60 Hz simulation, bounded catch-up, retained honk edge | No replay format or cross-platform physics determinism promise |
 | Input | Keyboard, gamepad, and touch become a world-space command: move, hurry, honk, interact, spread wings, sneak, threaten | Drag, throw, and mimic actions are not implemented |
-| Entities | Authored props with stable IDs (for example `plaza.beer-can`); the goose and janitor share grab/drop rules; litter can be held inside the trash bag; a controller (the splash faucet) toggles a target | Capabilities are limited to carry, contain, and control; no drag, throw, open, or wear |
-| People | The janitor follows an authored cleanup route, investigates the splash pad, chases and shoos the goose, fumbles when startled, and recovers his stolen tools; kids play, splash, flee a threatening goose, cry, and return | Noticing is distance-based: no field of view, line of sight, hearing, or last-seen memory yet; routes are authored waypoints, not navigation |
+| Entities | Authored props with stable IDs (for example `plaza.beer-can`) and capability tags (`drink`, `pastry`, `tip-jar`, `music`…); the goose, janitor, and café people share grab/drop rules; items set down over a table, counter, or shelf rest on it; litter can be held inside the trash bag; controllers toggle a target, and a momentary control (the café bell) only switches it on; heavy items stop the goose hurrying | Capabilities are limited to carry, contain, and control; no drag, throw, open, or wear |
+| People | The janitor follows an authored cleanup route, investigates the splash pad, chases and shoos the goose, fumbles when startled, and recovers his stolen tools; kids play, splash, flee a threatening goose, cry, and return; the barista brews and calls orders, clears cups, answers the bell, fixes the radio, wipes spills, and chases the goose off counter items and puts them back; café customers work, sip, spill when startled, collect their orders, and one guards her table; a bold customer waves the goose off instead of flinching, and frightening a timid one sends the barista to herd the goose out the front door; a kitchen baker works a loop of stations and shoos a goose underfoot | Noticing is distance-based: no field of view, line of sight, hearing, or last-seen memory yet; routes are authored waypoints (a small aisle graph in the café), not navigation; café people restart their routine on each visit |
 | Rendering | `Game` copies simulation snapshots into Three.js; `WorldView` renders an authored area; models are presentation | Views are rebuilt per area rather than streamed |
 | Camera | Presentation-only follow camera: optional per-area sky tracks with ground zones, fixed diagonal fallback, janitor framing, steady held-direction controls | Tracks are authored by hand; the builder preview shows the settled pose, not the in-game glide |
 | Collision | Renderer-independent colliders from the world asset catalog (`worldLevel.ts`); an `AuthoredPhysicsAdapter` spike offers 2D bodies, overlap, and sweep queries | No rigid-body engine, 3D bodies, or navigation mesh |
 | World content | Data-driven areas and asset catalog (`worldLayout.ts`, `worldAssets.ts`), edited in the in-game builder (`?edit`) and saved as a browser draft or exported JSON | Only two areas; the legacy forest (`bramble.ts`) and plaza-only formats remain for reference and migration |
-| Objectives | Independent predicates with stable IDs, completed once; "Sneak into the coffee shop" completes from a durable fact while the janitor is not guarding the door | Only one task; the to-do list shows every task at once |
+| Objectives | Seven independent predicates with stable IDs (`challenges.ts`), each belonging to one level whose list the HUD shows only while the goose is there; every task is checked in every area, completed once, and carried across doorways; completion shows a toast and chime, and a level's card when its list is done | The to-do list shows every task at once; no unlisted or secret tasks yet |
 | Progression | Doorway transitions move between the square and the coffee shop, carrying durable facts and each area's object state | No unlockable gates or shortcuts yet |
-| Sound | Honk and footstep sounds from a separate browser audio output with one reusable context | No music director, piano assets, or spatial sound yet |
-| Persistence | Session state survives area changes; the authored world layout persists in browser storage | Reloading resets gameplay; no save/load implementation |
+| Sound | Honk and footstep sounds, synthesized task chime, bell, and order call, and a synthesized café radio tune that stops when the radio is off, all from one reusable audio context | No music director, piano assets, or spatial sound yet |
+| Persistence | Session state survives area changes; crossed-off tasks and their durable facts are saved in browser storage (`progress.ts`) and restored silently on reload; Settings → Start over clears them; the authored world layout persists separately | Objects, people, and positions reset on reload; no versioned full save of entity state yet |
 
 `src/` is the active browser game. Godot files and `legacy/phaser-prototype/` are
 reference experiments. Do not develop the same feature in multiple runtimes.
@@ -139,7 +140,9 @@ goose cannot both acquire the same item in a tick; one interaction resolver
 arbitrates all acquisition/release operations deterministically.
 
 Areas describe geography and content placement. They do not own disposable copies
-of the world's objects. Crossing an area boundary updates location without
+of the world's objects. When an area loads, an authored object that lives in another
+area's snapshot is not rebuilt at home; only items marked essential (the janitor's
+tools) walk back home if they were left elsewhere. Crossing an area boundary updates location without
 recreating the goose or carried objects. Today one area is simulated at a time:
 the session carries durable facts and a per-area snapshot of entity state across
 each doorway so dropped and carried objects keep their identity. Move toward the
@@ -317,6 +320,6 @@ The garden gates below still apply before expanding further.
 
 These garden scenarios are future acceptance gates, not claims that Old Town
 Square passes them. Headless tests in `tests/` cover the simulation, janitor and
-kid behavior, interactions, the coffee shop, world layout and migrations, the
-camera logic, and asset metadata; browser playtesting and the garden systems
-remain to do.
+kid behavior, interactions, the coffee shop and its seven-task list (each café task
+by at least two routes), saved progress, world layout and migrations, the camera
+logic, and asset metadata; browser playtesting and the garden systems remain to do.

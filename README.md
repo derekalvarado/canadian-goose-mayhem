@@ -1,17 +1,16 @@
 # Goose Game 2 — Old Town Square
 
 The first playable slice is a browser-based 3D interpretation of Fort Collins' Old
-Town Square. You control an original, cel-shaded Canada goose among the coffee-shop
-graybox and the central plaza. The coffee shop is the temporary default start
-location while the interior is being developed; gameplay objectives will arrive with
-later mechanics.
+Town Square. You control an original, cel-shaded Canada goose in a
+coffee shop and the central plaza. The game starts in the square, next to the coffee
+shop, which holds most of the to-do list (see [Coffee shop challenges](#coffee-shop-challenges)).
 
 The intended game is an interconnected social-stealth sandbox. Read the
 [game architecture and development sequence](docs/game-architecture.md) before
 adding mechanics or neighborhoods. It specifies shared object interactions,
 recoverable human reactions, independent objectives, and awareness-driven music.
-Those systems are the next milestones; the current plaza is still a movement and
-environment slice with session-only progress.
+Those systems are the next milestones; today only the crossed-off to-do list is
+saved between visits.
 
 ## Play locally
 
@@ -34,21 +33,20 @@ cannot provide this browser guarantee.
 
 ### Dev mode and start areas
 
-The normal URL always starts in the coffee shop. Add `?dev` to turn on dev mode,
+The normal URL always starts in Old Town Square. Add `?dev` to turn on dev mode,
 which shows a "DEV START · <area>" badge and lets `start=<area>` choose where the goose
 begins:
 
 ```text
-http://localhost:5173/?dev&start=old-town-square.central-plaza
+http://localhost:5173/?dev&start=coffee-shop
 ```
 
 | Area | `start` value |
 | --- | --- |
-| Coffee shop interior (default) | `old-town-square.coffee-shop` (or the shorthand `coffee-shop`) |
-| Old Town Square plaza | `old-town-square.central-plaza` |
+| Old Town Square plaza (default) | `old-town-square.central-plaza` |
+| Coffee shop interior | `old-town-square.coffee-shop` (or the shorthand `coffee-shop`) |
 
-`start` is ignored without `?dev`, and an unknown area falls back to the coffee
-shop. Combine it with `?overview` for an orbitable view of that area, or with
+`start` is ignored without `?dev`, and an unknown area falls back to the square. Combine it with `?overview` for an orbitable view of that area, or with
 `?edit` to open the world builder there (for example,
 `?overview&dev&start=old-town-square.central-plaza`).
 
@@ -114,6 +112,9 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/controlHeading.ts` — keeps a held movement direction steady while the camera swings
 - `src/game/simulation/Simulation.ts` — fixed-step gameplay state and typed commands/events
 - `src/game/simulation/Objectives.ts` — independent outcome-based task completion
+- `src/game/simulation/cafeCrew.ts` — coffee-shop barista and customer routines, acting through the shared grab/place rules
+- `src/game/challenges.ts` — the village to-do list shown in every area
+- `src/game/progress.ts` — saving and loading crossed-off tasks in the browser
 - `src/game/simulation/plaza.ts` — active plaza movement rules
 - `src/game/GameAudio.ts` — browser audio output, separate from gameplay decisions
 - `src/game/Goose.ts` — runtime loader, layered clips, and head tracking for the rigged Canada goose
@@ -123,8 +124,10 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/splashKidMoves.ts` — kid pose builders: contact-planted skips and gallops, splashes, flee runs, and crying
 - `src/game/JanitorModel.ts` — procedural janitor mesh, rig, and exported clips
 - `src/game/janitorGaits.ts` — knob-driven walk/chase gaits with leg IK that keeps stance feet planted
+- `src/game/CafePersonModel.ts`, `src/game/cafeMoves.ts` — the four coffee-shop people on the janitor's rig, and their clips
+- `src/game/CafePropsView.ts` — counter, espresso back bar, and café props (tip jar, croissants, cups, radio, bell)
 - `src/dev/animLab/` — shared runtime for the dev-only character animation labs
-- `src/dev/janitorLab/`, `src/dev/kidLab/` — janitor and splash-kid lab variants and rig helpers
+- `src/dev/janitorLab/`, `src/dev/kidLab/`, `src/dev/cafeLab/` — janitor, splash-kid, and café-people lab variants
 - `assets/characters/goose/goose-animated.blend` — current editable Blender character and animation source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
@@ -161,19 +164,49 @@ and front views, frame stepping, and a treadmill floor that shows foot sliding. 
 builds the rig from source, so edits to `src/dev/janitorLab/variants.ts` or
 `JanitorModel.ts` reload in about a second. Use `?group=chase&zoom` to open a tab
 close up. `/assets/characters/kids/anim-lab.html` is the same lab for the splash-pad
-kids. New character animation is prototyped in a lab like this before it ships;
+kids, and `/assets/characters/cafe/anim-lab.html` for the coffee-shop people. New character animation is prototyped in a lab like this before it ships;
 see [AGENTS.md](AGENTS.md#prototyping-character-animation).
 
-## Coffee shop graybox
+## Coffee shop challenges
 
-The active browser game includes an early coffee-shop interior graybox based on the
-reference floor plan: the front door is on the south wall, the counter runs along
-the left wall, and five people are visual placeholders only. The coffee shop is now
-the default start location and is connected to the leftmost storefront on the
-south side of the plaza. Use `?dev&start=coffee-shop` or simply open the normal
-URL to start there. Use `?dev&start=old-town-square.central-plaza` to test walking
-through the plaza doorway. Use `?edit&dev&start=coffee-shop`
-to inspect and reposition the authored shop instances in the world editor.
+The coffee shop is a puzzle room with a to-do list, in the spirit of the original
+goose game. A barista works the espresso machine, calls out orders, clears cups,
+and chases the goose away from the counter; a laptop worker orders coffee, walks up
+to collect it, and is not easily scared (he waves the goose off himself); a newspaper
+reader glances up now and then to guard her croissant; a student sips her coffee.
+Frighten the reader or the student and the barista comes running to herd the goose
+all the way out the front door. Through a doorway in the back wall, beside the counter, is the bakery
+kitchen, where a baker works the prep table, oven, pastry racks, and sink, and waves
+off any goose underfoot. The room has an old plank floor, a chalk menu, and tall
+black walls that hide the town outside.
+
+Each level has its own to-do list, and the HUD shows only the list for the level the
+goose is in. A task still counts wherever it is finished, so the tip jar crosses off
+the coffee shop's list once it is out in the square. The square's list:
+
+- Sneak into the coffee shop
+
+The coffee shop's list:
+
+- Turn off the café music
+- Make someone spill their coffee
+- Steal a croissant
+- Steal someone's order
+- Have a coffee break at the empty table
+- Take the tip jar outside
+
+Each task can be solved more than one way: the radio pulls the barista across the
+room, the bell pulls her to the register, a spill sends her to wipe a table, and
+customers leave their tables to collect orders. The tip jar is heavy, so the goose
+cannot hurry while carrying it.
+
+Crossed-off tasks are saved in the browser, so a refresh keeps them. Props and people
+start fresh on every visit. **Settings → Start over** clears the list. With `?dev`,
+add `&fresh` to play with an empty list without erasing the saved one; `?dev` also
+exposes the running game as `gooseGame` in the browser console for playtesting.
+
+Use `?dev&start=old-town-square.central-plaza` to test walking through the plaza
+doorway, and `?edit&dev&start=coffee-shop` to rearrange the shop in the world editor.
 
 ## Color palette
 

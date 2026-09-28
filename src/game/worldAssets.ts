@@ -1,3 +1,5 @@
+import type { EntityCondition, EntityTag } from "./simulation/Simulation.ts";
+
 /**
  * Source-owned catalog metadata. Layout files intentionally reference these
  * stable IDs rather than serialising meshes or material recipes.
@@ -33,14 +35,22 @@ export interface WorldAssetDefinition {
   /** A simulation-owned boolean state that authored controls may target. */
   readonly activeTarget?: Readonly<{ initialActive: boolean }>;
   /** Local handle point and reach used by the common interaction resolver. */
-  readonly controller?: Readonly<{ interactionOffset: Readonly<{ x: number; y: number; z: number }>; range: number }>;
+  readonly controller?: Readonly<{ interactionOffset: Readonly<{ x: number; y: number; z: number }>; range: number; momentary?: boolean; verb?: string }>;
   /** Common grab/drop capability; the renderer never decides ownership. */
-  readonly carryable?: Readonly<{ interactionRange: number; carryHeight: number; carryDistance: number; stealableWhileHeld?: boolean }>;
+  readonly carryable?: Readonly<{ interactionRange: number; carryHeight: number; carryDistance: number; stealableWhileHeld?: boolean; maxCarrySpeed?: number }>;
+  /** Capabilities tasks and people look for (a drink, a pastry, the tip jar…). */
+  readonly tags?: readonly EntityTag[];
+  /** Starting state for drinks: a customer's mug starts full, a barista's cup starts clean. */
+  readonly initialCondition?: EntityCondition;
+  /** The world cannot run without it; it returns home rather than stay stranded in another area. */
+  readonly essential?: boolean;
+  /** A flat top that dropped or placed items rest on, relative to the instance transform. */
+  readonly placementSurface?: Readonly<{ kind: "table" | "counter" | "shelf"; height: number; halfWidth: number; halfDepth: number; x?: number; z?: number }>;
   /** Shared simulation affordance used to build deterministic janitor routes. */
   readonly cleanupRole?: "trash-can" | "litter" | "trash-bag" | "litter-picker";
   /** How close a worker gets before using this cleanup affordance. */
   readonly cleanupRange?: number;
-  readonly gameplayRole?: "janitor" | "splash-kid" | "shop-entrance";
+  readonly gameplayRole?: "janitor" | "splash-kid" | "shop-entrance" | "barista" | "cafe-customer" | "cafe-worker";
 }
 
 /** Evenly spaced circle colliders tracing a diagonal wall or fence, ends included. */
@@ -60,11 +70,53 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "coffee.wall-side", label: "Coffee shop side wall", category: "architecture", halfWidth: 0.18, halfDepth: 6.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.18, halfDepth: 6.8 }], occludesCamera: true, warnForOverlap: false },
   { assetId: "coffee.wall-door-wing", label: "Coffee shop front wall", category: "architecture", halfWidth: 3.5, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.5, halfDepth: 0.18 }], occludesCamera: true, warnForOverlap: false },
   { assetId: "coffee.front-door", label: "Coffee shop front door", category: "architecture", halfWidth: 2.1, halfDepth: 0.18, colliders: [], warnForOverlap: false },
-  { assetId: "coffee.wall-board", label: "Coffee shop menu board", category: "furniture", halfWidth: 1.7, halfDepth: 0.08, colliders: [], warnForOverlap: false },
-  { assetId: "coffee.counter", label: "Coffee shop counter", category: "furniture", halfWidth: 3.1, halfDepth: 0.75, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.1, halfDepth: 0.75 }], occludesCamera: true },
-  { assetId: "coffee.table", label: "Coffee shop table", category: "furniture", halfWidth: 0.5, halfDepth: 0.5, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.48, halfDepth: 0.48 }] },
-  { assetId: "coffee.chair", label: "Coffee shop chair", category: "furniture", halfWidth: 0.32, halfDepth: 0.32, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.28 }] },
-  { assetId: "coffee.placeholder-person", label: "Coffee shop placeholder person", category: "character", halfWidth: 0.32, halfDepth: 0.32, colliders: [], warnForOverlap: false },
+  { assetId: "coffee.wall-board", label: "Coffee shop menu board", category: "furniture", halfWidth: 1.7, halfDepth: 0.08, colliders: [], occludesCamera: true, warnForOverlap: false },
+  { assetId: "coffee.counter", label: "Coffee shop counter", category: "furniture", halfWidth: 3.1, halfDepth: 0.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.1, halfDepth: 0.68 }], occludesCamera: true,
+    placementSurface: { kind: "counter", height: 1.23, halfWidth: 3.1, halfDepth: 0.72 } },
+  { assetId: "coffee.back-bar", label: "Espresso back bar", category: "furniture", halfWidth: 3.1, halfDepth: 0.3, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.1, halfDepth: 0.3 }], occludesCamera: true, warnForOverlap: false,
+    placementSurface: { kind: "shelf", height: 1.23, halfWidth: 3.1, halfDepth: 0.32 } },
+  { assetId: "coffee.table", label: "Coffee shop table", category: "furniture", halfWidth: 0.6, halfDepth: 0.6, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.58, halfDepth: 0.58 }],
+    placementSurface: { kind: "table", height: 0.95, halfWidth: 0.6, halfDepth: 0.6 } },
+  { assetId: "coffee.chair", label: "Coffee shop chair", category: "furniture", halfWidth: 0.4, halfDepth: 0.4, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.34 }] },
+  { assetId: "coffee.radio", label: "Café radio", category: "prop", halfWidth: 0.45, halfDepth: 0.3, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.42, halfDepth: 0.26 }], warnForOverlap: false,
+    controller: { interactionOffset: { x: 0, y: 0, z: 0.75 }, range: 0.85 }, activeTarget: { initialActive: true }, tags: ["music"] },
+  { assetId: "coffee.service-bell", label: "Service bell", category: "prop", halfWidth: 0.1, halfDepth: 0.1, colliders: [], warnForOverlap: false,
+    controller: { interactionOffset: { x: 0, y: 0, z: 0.8 }, range: 0.75, momentary: true, verb: "Ring" }, activeTarget: { initialActive: false }, tags: ["bell"] },
+  { assetId: "coffee.tip-jar", label: "Tip jar", category: "prop", halfWidth: 0.12, halfDepth: 0.12, colliders: [], warnForOverlap: false,
+    carryable: { interactionRange: 1, carryHeight: 0.6, carryDistance: 0.48, maxCarrySpeed: 3.1 }, tags: ["tip-jar", "house"] },
+  { assetId: "coffee.croissant", label: "Croissant", category: "prop", halfWidth: 0.14, halfDepth: 0.1, colliders: [], warnForOverlap: false,
+    carryable: { interactionRange: 1, carryHeight: 0.66, carryDistance: 0.46 }, tags: ["pastry"] },
+  { assetId: "coffee.counter-croissant", label: "Croissant", category: "prop", halfWidth: 0.14, halfDepth: 0.1, colliders: [], warnForOverlap: false,
+    carryable: { interactionRange: 1, carryHeight: 0.66, carryDistance: 0.46 }, tags: ["pastry", "house"] },
+  { assetId: "coffee.mug", label: "Coffee mug", category: "prop", halfWidth: 0.08, halfDepth: 0.08, colliders: [], warnForOverlap: false,
+    carryable: { interactionRange: 1, carryHeight: 0.62, carryDistance: 0.44 }, tags: ["drink"], initialCondition: "full" },
+  { assetId: "coffee.order-cup", label: "Coffee order", category: "prop", halfWidth: 0.07, halfDepth: 0.07, colliders: [], warnForOverlap: false,
+    carryable: { interactionRange: 1, carryHeight: 0.62, carryDistance: 0.44, stealableWhileHeld: true }, tags: ["drink", "order-cup"], initialCondition: "clean" },
+  { assetId: "coffee.plate", label: "Plate", category: "prop", halfWidth: 0.16, halfDepth: 0.16, colliders: [], warnForOverlap: false },
+  { assetId: "coffee.laptop", label: "Laptop", category: "prop", halfWidth: 0.24, halfDepth: 0.18, colliders: [], warnForOverlap: false },
+  /** Legacy graybox person kept so older browser drafts still load before their coffee shop is upgraded. */
+  { assetId: "coffee.placeholder-person", label: "Retired graybox café person", category: "character", halfWidth: 0.32, halfDepth: 0.32, colliders: [], warnForOverlap: false },
+  { assetId: "coffee.person-barista", label: "Barista", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "barista" },
+  { assetId: "coffee.person-laptop", label: "Café customer — laptop worker", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-customer" },
+  { assetId: "coffee.person-reader", label: "Café customer — newspaper reader", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-customer" },
+  { assetId: "coffee.wall-long-doorway", label: "Coffee shop back wall with kitchen doorway", category: "architecture", halfWidth: 8.8, halfDepth: 0.18, colliders: [
+    { shape: "box", x: -8.2, z: 0, halfWidth: 0.6, halfDepth: 0.18 },
+    { shape: "box", x: 1.7, z: 0, halfWidth: 7.1, halfDepth: 0.18 },
+  ], occludesCamera: true, warnForOverlap: false },
+  /** Retired side-wall doorway; kept so drafts saved with it still load before their coffee shop is upgraded. */
+  { assetId: "coffee.wall-side-doorway", label: "Retired side wall with doorway", category: "architecture", halfWidth: 0.18, halfDepth: 6.8,
+    colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.18, halfDepth: 6.8 }], occludesCamera: true, warnForOverlap: false },
+  { assetId: "coffee.kitchen-floor", label: "Kitchen tile floor", category: "ground", halfWidth: 4.2, halfDepth: 3.5, colliders: [], warnForOverlap: false, surfaceHeight: 0, surfacePriority: 10 },
+  { assetId: "coffee.kitchen-wall", label: "Kitchen long wall", category: "architecture", halfWidth: 4.2, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 4.2, halfDepth: 0.18 }], occludesCamera: true, warnForOverlap: false },
+  { assetId: "coffee.kitchen-wall-short", label: "Kitchen short wall", category: "architecture", halfWidth: 3.68, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.68, halfDepth: 0.18 }], occludesCamera: true, warnForOverlap: false },
+  { assetId: "coffee.kitchen-oven", label: "Deck oven", category: "furniture", halfWidth: 0.95, halfDepth: 0.65, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.95, halfDepth: 0.62 }], occludesCamera: true },
+  { assetId: "coffee.pastry-rack", label: "Pastry rack", category: "furniture", halfWidth: 0.42, halfDepth: 0.34, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.42, halfDepth: 0.34 }], occludesCamera: true },
+  { assetId: "coffee.kitchen-sink", label: "Industrial sink", category: "furniture", halfWidth: 1.2, halfDepth: 0.42, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.2, halfDepth: 0.4 }], occludesCamera: true },
+  { assetId: "coffee.prep-table", label: "Bakery prep table", category: "furniture", halfWidth: 1.3, halfDepth: 0.55, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.3, halfDepth: 0.55 }], occludesCamera: true,
+    placementSurface: { kind: "counter", height: 1.15, halfWidth: 1.3, halfDepth: 0.55 } },
+  { assetId: "coffee.kitchen-shelf", label: "Dry goods shelf", category: "furniture", halfWidth: 1.0, halfDepth: 0.26, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.0, halfDepth: 0.26 }], occludesCamera: true },
+  { assetId: "coffee.person-baker", label: "Baker", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-worker" },
+  { assetId: "coffee.person-student", label: "Café customer — student", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-customer" },
   { assetId: "street.sidewalk-tile", label: "Sidewalk tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: 0, surfacePriority: 3 },
   { assetId: "street.road-tile", label: "Lowered road tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: -0.15, surfacePriority: 2 },
   { assetId: "street.curb-straight", label: "Straight curb", category: "ground", halfWidth: 4, halfDepth: 0.2, colliders: [] },
@@ -130,9 +182,9 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.splash-kid-boots", label: "Splash-pad kid — yellow boots", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
   { assetId: "plaza.splash-kid-floaties", label: "Splash-pad kid — water wings", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
   { assetId: "plaza.splash-faucet", label: "Splash-pad faucet", category: "gameplay", halfWidth: 0.4, halfDepth: 0.28, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.2 }], warnForOverlap: false, controller: { interactionOffset: { x: 0, y: 0.58, z: -0.19 }, range: 1.05 } },
-  { assetId: "prop.beer-can", label: "Little beer can", category: "prop", halfWidth: 0.09, halfDepth: 0.09, colliders: [], warnForOverlap: false, carryable: { interactionRange: 0.95, carryHeight: 0.72, carryDistance: 0.54 } },
-  { assetId: "prop.trash-bag", label: "Janitor's trash bag", category: "prop", halfWidth: 0.24, halfDepth: 0.18, colliders: [], warnForOverlap: false, cleanupRole: "trash-bag", carryable: { interactionRange: 1, carryHeight: 0.68, carryDistance: 0.48, stealableWhileHeld: true } },
-  { assetId: "prop.litter-picker", label: "Janitor's litter picker", category: "prop", halfWidth: 0.12, halfDepth: 0.78, colliders: [], warnForOverlap: false, cleanupRole: "litter-picker", carryable: { interactionRange: 1.5, carryHeight: 0.16, carryDistance: 0.45, stealableWhileHeld: true } },
+  { assetId: "prop.beer-can", label: "Little beer can", category: "prop", halfWidth: 0.09, halfDepth: 0.09, colliders: [], warnForOverlap: false, tags: ["drink"], carryable: { interactionRange: 0.95, carryHeight: 0.72, carryDistance: 0.54 } },
+  { assetId: "prop.trash-bag", label: "Janitor's trash bag", category: "prop", halfWidth: 0.24, halfDepth: 0.18, colliders: [], warnForOverlap: false, cleanupRole: "trash-bag", essential: true, carryable: { interactionRange: 1, carryHeight: 0.68, carryDistance: 0.48, stealableWhileHeld: true } },
+  { assetId: "prop.litter-picker", label: "Janitor's litter picker", category: "prop", halfWidth: 0.12, halfDepth: 0.78, colliders: [], warnForOverlap: false, cleanupRole: "litter-picker", essential: true, carryable: { interactionRange: 1.5, carryHeight: 0.16, carryDistance: 0.45, stealableWhileHeld: true } },
   { assetId: "litter.chip-bag", label: "Chip bag", category: "prop", halfWidth: 0.16, halfDepth: 0.11, colliders: [], warnForOverlap: false, cleanupRole: "litter", cleanupRange: 0.72, carryable: { interactionRange: 0.9, carryHeight: 0.7, carryDistance: 0.5 } },
   { assetId: "litter.crumpled-paper", label: "Crumpled paper", category: "prop", halfWidth: 0.12, halfDepth: 0.12, colliders: [], warnForOverlap: false, cleanupRole: "litter", cleanupRange: 0.72, carryable: { interactionRange: 0.9, carryHeight: 0.7, carryDistance: 0.5 } },
   { assetId: "litter.food-tray", label: "Paper food tray", category: "prop", halfWidth: 0.22, halfDepth: 0.16, colliders: [], warnForOverlap: false, cleanupRole: "litter", cleanupRange: 0.72, carryable: { interactionRange: 0.9, carryHeight: 0.68, carryDistance: 0.5 } },

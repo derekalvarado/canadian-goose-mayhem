@@ -1,6 +1,8 @@
 export interface ObjectiveDefinition<State> {
   readonly id: string;
   readonly description: string;
+  /** The level whose to-do list shows this task. Completion is still checked wherever the goose is. */
+  readonly areaId?: string;
   /** Observe authoritative state; never move objects or script a solution here. */
   readonly isSatisfied: (state: State) => boolean;
 }
@@ -25,6 +27,16 @@ export class Objectives<State> {
       }
     }
     return newlyCompleted;
+  }
+
+  /** Marks previously earned objectives complete without reporting them again; unknown IDs are ignored. */
+  restore(ids: Iterable<string>): void {
+    const known = new Set(this.definitions.map(({ id }) => id));
+    for (const id of ids) if (known.has(id)) this.completed.add(id);
+  }
+
+  get completedIds(): string[] {
+    return this.definitions.filter(({ id }) => this.completed.has(id)).map(({ id }) => id);
   }
 
   isComplete(id: string): boolean {
