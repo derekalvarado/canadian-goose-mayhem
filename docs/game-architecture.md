@@ -33,7 +33,7 @@ qualities. Do not expand the village until one small garden proves the loop.
 | Entities | Authored props with stable IDs (for example `plaza.beer-can`); the goose and janitor share grab/drop rules; litter can be held inside the trash bag; a controller (the splash faucet) toggles a target | Capabilities are limited to carry, contain, and control; no drag, throw, open, or wear |
 | People | The janitor follows an authored cleanup route, investigates the splash pad, chases and shoos the goose, fumbles when startled, and recovers his stolen tools; kids play, splash, flee a threatening goose, cry, and return | Noticing is distance-based: no field of view, line of sight, hearing, or last-seen memory yet; routes are authored waypoints, not navigation |
 | Rendering | `Game` copies simulation snapshots into Three.js; `WorldView` renders an authored area; models are presentation | Views are rebuilt per area rather than streamed |
-| Camera | Presentation-only follow camera: optional per-area sky track, fixed diagonal fallback, janitor framing, steady held-direction controls | Tracks are authored by hand; the builder preview shows the settled pose, not the in-game glide |
+| Camera | Presentation-only follow camera: optional per-area sky tracks with ground zones, fixed diagonal fallback, janitor framing, steady held-direction controls | Tracks are authored by hand; the builder preview shows the settled pose, not the in-game glide |
 | Collision | Renderer-independent colliders from the world asset catalog (`worldLevel.ts`); an `AuthoredPhysicsAdapter` spike offers 2D bodies, overlap, and sweep queries | No rigid-body engine, 3D bodies, or navigation mesh |
 | World content | Data-driven areas and asset catalog (`worldLayout.ts`, `worldAssets.ts`), edited in the in-game builder (`?edit`) and saved as a browser draft or exported JSON | Only two areas; the legacy forest (`bramble.ts`) and plaza-only formats remain for reference and migration |
 | Objectives | Independent predicates with stable IDs, completed once; "Sneak into the coffee shop" completes from a durable fact while the janitor is not guarding the door | Only one task; the to-do list shows every task at once |
@@ -102,11 +102,15 @@ The camera is presentation. It reads the simulation snapshot but never changes
 gameplay: framing a nearby character changes what the player sees, not what that
 character knows or does.
 
-- **Tracks.** An area may define `cameraTrack`: hand-placed points (position and
-  zoom) joined into a smooth curve. The camera slides along the curve to the spot
+- **Tracks.** An area may define `cameraTracks`: each is hand-placed points
+  (position and zoom) joined into a smooth curve. The camera slides along the curve to the spot
   nearest the goose and looks at it, so bends swing the view around corners. It
   searches only the stretch of track near where it already is, so it never jumps
   between distant stretches. Areas without a track use the fixed diagonal camera.
+- **Zones.** A track may own a zone, a shape drawn on the ground. While the goose
+  is inside it, that track is used; the track without a zone covers everywhere
+  else. The camera keeps a zone's track until the goose is a little way outside
+  it, and glides between tracks over about a second instead of cutting.
 - **Reach.** When the goose is more than a set horizontal distance from the track,
   the camera keeps the track's height and viewing direction but leans in toward
   the goose. Author tracks beside walking routes, not directly above them.
@@ -115,8 +119,9 @@ character knows or does.
 - **Controls.** Movement is camera-relative, but a held direction keeps the heading
   it started with while the view swings. Releasing the stick or clearly choosing a
   new direction adopts the current view.
-- **Authoring.** Tracks are edited in the builder's "Edit camera track" mode and saved
-  with the area. The logic lives in `cameraTrack.ts`, `cameraFraming.ts`, and
+- **Authoring.** Tracks and zones are edited in the builder's "Edit camera tracks"
+  mode and saved with the area. The logic lives in `cameraTrack.ts`,
+  `cameraDirector.ts`, `cameraFraming.ts`, and
   `controlHeading.ts` and is covered by headless tests.
 
 ### One world and stable object identity

@@ -1,7 +1,7 @@
 import canonicalWorldLayoutJson from "./content/world-layout.json" with { type: "json" };
 import { PLAZA_LAYOUT_STORAGE_KEY, type PlazaLayout, validatePlazaLayout } from "./plazaLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
-import { type CameraTrack, validateCameraTrack } from "./cameraTrack.ts";
+import { type CameraTrack, validateCameraTracks } from "./cameraTrack.ts";
 
 export const WORLD_LAYOUT_SCHEMA_VERSION = 3;
 export const WORLD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.v1";
@@ -33,7 +33,7 @@ export interface WorldPoint { x: number; y: number; z: number }
 export interface WorldInstance { id: string; assetId: string; label: string; transform: WorldTransform }
 export interface WorldChunk { x: number; z: number; playable: boolean }
 export interface WorldControlLink { controllerId: string; targetId: string }
-export interface WorldArea { id: string; label: string; chunks: WorldChunk[]; instances: WorldInstance[]; controlLinks: WorldControlLink[]; cameraTrack?: CameraTrack }
+export interface WorldArea { id: string; label: string; chunks: WorldChunk[]; instances: WorldInstance[]; controlLinks: WorldControlLink[]; cameraTracks?: CameraTrack[] }
 export interface WorldAreaTransition {
   id: string;
   fromAreaId: string;
@@ -107,8 +107,8 @@ export function validateWorldLayout(value: unknown): WorldLayout {
       return [{ controllerId, targetId }];
     });
     const chunks = sourceSchema === 1 ? legacyChunks(instances, id === CENTRAL_PLAZA_AREA_ID) : validateChunks(candidate.chunks, id);
-    const cameraTrack = validateCameraTrack(candidate.cameraTrack, `${id}.cameraTrack`);
-    return { id, label: cleanLabel(candidate.label, `${id}.label`), chunks, instances, controlLinks, ...(cameraTrack ? { cameraTrack } : {}) };
+    const cameraTracks = validateCameraTracks(candidate.cameraTracks, candidate.cameraTrack, `${id}.cameraTracks`);
+    return { id, label: cleanLabel(candidate.label, `${id}.label`), chunks, instances, controlLinks, ...(cameraTracks ? { cameraTracks } : {}) };
   });
   if (!areaIds.has(CENTRAL_PLAZA_AREA_ID)) throw new Error("World must contain the central plaza area");
   const rawTransitions = value.transitions ?? [];
@@ -508,8 +508,8 @@ function addPlazaCameraTrack(layout: WorldLayout, store?: WorldLayoutStorage): W
   if (layout.canonicalRevision >= CAMERA_TRACK_REVISION) return layout;
   const updated = cloneWorldLayout(layout);
   const plaza = getWorldArea(updated);
-  const canonicalTrack = getWorldArea(CANONICAL_WORLD_LAYOUT).cameraTrack;
-  if (!plaza.cameraTrack && canonicalTrack) plaza.cameraTrack = JSON.parse(JSON.stringify(canonicalTrack)) as CameraTrack;
+  const canonicalTracks = getWorldArea(CANONICAL_WORLD_LAYOUT).cameraTracks;
+  if (!plaza.cameraTracks && canonicalTracks) plaza.cameraTracks = JSON.parse(JSON.stringify(canonicalTracks)) as CameraTrack[];
   updated.canonicalRevision = CAMERA_TRACK_REVISION;
   const validated = validateWorldLayout(updated);
   if (store) {

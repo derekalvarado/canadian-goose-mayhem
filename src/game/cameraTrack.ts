@@ -4,7 +4,12 @@
 // view around corners. This module is renderer-independent so it can be tested.
 
 export interface CameraTrackPoint { x: number; y: number; z: number; zoom: number }
-export interface CameraTrack { points: CameraTrackPoint[] }
+export interface CameraZonePoint { x: number; z: number }
+/**
+ * A track with a zone is used while the goose stands inside that zone (drawn on
+ * the ground); a track without one covers everywhere else in the area.
+ */
+export interface CameraTrack { id: string; label: string; points: CameraTrackPoint[]; zone?: CameraZonePoint[] }
 export interface CameraTrackSample { x: number; y: number; z: number; zoom: number }
 
 export const CAMERA_BASE_FOV = 38;
@@ -29,9 +34,11 @@ export function clampCameraTrackPoint(point: CameraTrackPoint): CameraTrackPoint
 }
 
 /** Returns undefined for a missing track; throws on malformed data like the rest of the world schema. */
-export function validateCameraTrack(value: unknown, path: string): CameraTrack | undefined {
+export function validateCameraTrack(value: unknown, path: string, fallbackId = "main"): CameraTrack | undefined {
   if (value === undefined) return undefined;
   if (!record(value) || !Array.isArray(value.points)) throw new Error(`${path}.points must be an array`);
+  const id = typeof value.id === "string" && value.id.trim() ? value.id.trim() : fallbackId;
+  const label = typeof value.label === "string" && value.label.trim() ? value.label.trim().slice(0, 60) : "Main track";
   const points = value.points.map((point, index) => {
     if (!record(point)) throw new Error(`${path}.points[${index}] must be an object`);
     return clampCameraTrackPoint({
@@ -41,8 +48,34 @@ export function validateCameraTrack(value: unknown, path: string): CameraTrack |
       zoom: point.zoom === undefined ? 1 : finite(point.zoom, `${path}.points[${index}].zoom`),
     });
   });
+  let zone: CameraZonePoint[] | undefined;
+  if (value.zone !== undefined) {
+    if (!Array.isArray(value.zone)) throw new Error(`${path}.zone must be an array`);
+    zone = value.zone.map((corner, index) => {
+      if (!record(corner)) throw new Error(`${path}.zone[${index}] must be an object`);
+      return { x: finite(corner.x, `${path}.zone[${index}].x`), z: finite(corner.z, `${path}.zone[${index}].z`) };
+    });
+    // Fewer than three corners encloses nothing; treat the track as covering everywhere else.
+    if (zone.length < 3) zone = undefined;
+  }
   // A single point cannot describe a path; drop it rather than rejecting the whole world.
-  return points.length >= 2 ? { points } : undefined;
+  return points.length >= 2 ? { id, label, points, ...(zone ? { zone } : {}) } : undefined;
+}
+
+/** An area's tracks, accepting the older single `cameraTrack` field too. */
+export function validateCameraTracks(value: unknown, legacy: unknown, path: string): CameraTrack[] | undefined {
+  const list = value === undefined ? (legacy === undefined ? [] : [legacy]) : value;
+  if (!Array.isArray(list)) throw new Error(`${path} must be an array`);
+  const ids = new Set<string>();
+  const tracks = list.flatMap((entry, index) => {
+    const track = validateCameraTrack(entry, `${path}[${index}]`, `track-${index + 1}`);
+    if (!track) return [];
+    if (record(entry) && entry.label === undefined && index > 0) track.label = `Track ${index + 1}`;
+    while (ids.has(track.id)) track.id = `${track.id}-${index + 1}`;
+    ids.add(track.id);
+    return [track];
+  });
+  return tracks.length ? tracks : undefined;
 }
 
 function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): number {
@@ -55,7 +88,7 @@ export class SampledCameraTrack {
   readonly samples: CameraTrackSample[] = [];
   private readonly distances: number[] = [];
 
-  constructor(track: CameraTrack) {
+  constructor(track: { points: CameraTrackPoint[] }) {
     const points = track.points;
     for (let segment = 0; segment < points.length - 1; segment += 1) {
       const p0 = points[Math.max(0, segment - 1)]; const p1 = points[segment];
@@ -122,12 +155,6 @@ export function limitCameraReach(camera: { x: number; y: number; z: number }, fo
   if (horizontal <= maxHorizontal || horizontal === 0) return { x: camera.x, y: camera.y, z: camera.z };
   const scale = maxHorizontal / horizontal;
   return { x: focus.x + dx * scale, y: camera.y, z: focus.z + dz * scale };
-}
-
-/** Where the camera sits and how far it zooms for a goose standing at `focus`, ignoring glide smoothing. */
-export function cameraTrackPose(track: SampledCameraTrack, focus: { x: number; z: number }): CameraTrackSample {
-  const sample = track.sampleAt(track.nearestDistance(focus.x, focus.z));
-  return { ...limitCameraReach(sample, focus, CAMERA_TRACK_MAX_REACH), zoom: sample.zoom };
 }
 
 /**
