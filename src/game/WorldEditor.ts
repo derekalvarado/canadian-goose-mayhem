@@ -79,7 +79,7 @@ export class WorldEditor {
     }));
     this.shortcutToggle = this.button("Shortcuts (?)", () => this.toggleShortcuts()); this.shortcutToggle.className = "plaza-editor__shortcut-button"; this.shortcutToggle.setAttribute("aria-expanded", "false"); heading.append(this.shortcutToggle);
     this.status.className = "plaza-editor__status"; this.status.setAttribute("aria-live", "polite"); this.warnings.className = "plaza-editor__warnings"; this.warnings.setAttribute("aria-live", "polite"); const help = document.createElement("p"); help.className = "plaza-editor__help"; help.textContent = "Middle-drag rotates the world; left-click selects. Drag an item from the catalog into the world, or click it and then click the ground. Shift while dropping keeps placing, R rotates the ghost, Esc cancels. Press ? or F1 for keyboard controls.";
-    this.trackToggle = this.button("Edit camera track", () => this.setTrackMode(!this.trackEditor.active)); const trackMode = document.createElement("div"); trackMode.className = "plaza-editor__actions plaza-editor__actions--single"; trackMode.append(this.trackToggle);
+    this.trackToggle = this.button("Edit camera tracks", () => this.setTrackMode(!this.trackEditor.active)); const trackMode = document.createElement("div"); trackMode.className = "plaza-editor__actions plaza-editor__actions--single"; trackMode.append(this.trackToggle);
     this.objectTools.append(placement, instanceLabel, this.controlTargetLabel, modes, fields);
     this.buildShortcutDrawer(); this.panel.append(heading, areaLabel, areaActions, historyActions, trackMode, this.objectTools, this.trackEditor.tools, io, this.status, this.warnings, help); document.querySelector("#game-shell")?.append(this.panel, this.shortcutDrawer); this.updateHistoryButtons();
   }
@@ -140,8 +140,8 @@ export class WorldEditor {
   private setTrackMode(active: boolean): void {
     if (active && this.placing) this.stopPlacing();
     this.trackEditor.setActive(active); this.objectTools.hidden = active; this.warnings.hidden = active;
-    if (this.trackToggle) { this.trackToggle.textContent = active ? "Back to objects" : "Edit camera track"; this.trackToggle.classList.toggle("is-active", active); }
-    if (active) { this.outline.visible = false; this.setStatus("Editing this area's camera track."); }
+    if (this.trackToggle) { this.trackToggle.textContent = active ? "Back to objects" : "Edit camera tracks"; this.trackToggle.classList.toggle("is-active", active); }
+    if (active) { this.outline.visible = false; this.setStatus("Editing this area's camera tracks."); }
     else { this.setTransformMode("translate"); this.selectInstance(this.selectedId); this.setStatus(""); }
   }
   private mutate(message: string, change: () => void): void {
@@ -384,7 +384,7 @@ export class WorldEditor {
     const action = resolveEditorShortcut({ code: event.code, key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, targetIsTextEntry }, this.placing, this.selectedId !== undefined);
     if (!action) return;
     if (this.trackEditor.active) {
-      if (action.type === "delete-selected") { event.preventDefault(); this.trackEditor.deletePoint(); return; }
+      if (action.type === "delete-selected") { event.preventDefault(); this.trackEditor.deleteSelected(); return; }
       if (!["undo", "redo", "orbit-camera", "zoom-camera", "reset-view", "toggle-shortcuts", "toggle-panels"].includes(action.type)) return;
       if (this.trackEditor.looking && !["undo", "redo", "toggle-shortcuts", "toggle-panels"].includes(action.type)) return;
     }

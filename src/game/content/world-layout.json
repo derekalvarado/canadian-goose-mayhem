@@ -994,16 +994,20 @@
           "targetId": "plaza.splash-pad"
         }
       ],
-      "cameraTrack": {
-        "points": [
-          { "x": -60, "y": 14, "z": -18, "zoom": 1 },
-          { "x": -20, "y": 14, "z": -18, "zoom": 1 },
-          { "x": 12, "y": 14, "z": -18, "zoom": 1 },
-          { "x": 34, "y": 14, "z": -16, "zoom": 1 },
-          { "x": 44, "y": 14, "z": -4, "zoom": 1.1 },
-          { "x": 44, "y": 14, "z": 24, "zoom": 1.1 }
-        ]
-      }
+      "cameraTracks": [
+        {
+          "id": "main",
+          "label": "Main track",
+          "points": [
+            { "x": -60, "y": 14, "z": -18, "zoom": 1 },
+            { "x": -20, "y": 14, "z": -18, "zoom": 1 },
+            { "x": 12, "y": 14, "z": -18, "zoom": 1 },
+            { "x": 34, "y": 14, "z": -16, "zoom": 1 },
+            { "x": 44, "y": 14, "z": -4, "zoom": 1.1 },
+            { "x": 44, "y": 14, "z": 24, "zoom": 1.1 }
+          ]
+        }
+      ]
     },
     {
       "id": "old-town-square.coffee-shop",

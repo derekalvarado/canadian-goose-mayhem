@@ -14,7 +14,8 @@ import { COFFEE_SHOP_AREA_ID, getWorldArea, loadWorldLayout, resolveStartAreaId 
 import { createWorldRules } from "./worldLevel";
 import { GooseOcclusionFader } from "./GooseOcclusionFader";
 import { toonMaterial, STORYBOOK_LIGHTING } from "./toonMaterial";
-import { CAMERA_BASE_FOV, CAMERA_FOCUS_HEIGHT, CAMERA_TRACK_MAX_REACH, CameraTrackRider, limitCameraReach, SampledCameraTrack } from "./cameraTrack";
+import { CAMERA_BASE_FOV, CAMERA_FOCUS_HEIGHT, CAMERA_TRACK_MAX_REACH, limitCameraReach } from "./cameraTrack";
+import { CAMERA_TRACK_BLEND_SECONDS, CameraTrackDirector } from "./cameraDirector";
 import { SubjectFraming } from "./cameraFraming";
 import { ControlHeadingLock } from "./controlHeading";
 import { LEVEL_NAMES } from "./challenges";
@@ -93,7 +94,7 @@ export class Game {
   private readonly cameraForward = new THREE.Vector3();
   private readonly controlHeading = new ControlHeadingLock();
   private readonly framing = new SubjectFraming();
-  private cameraTrack?: CameraTrackRider;
+  private cameraTrack?: CameraTrackDirector;
   // Equal ground axes give a 45° diagonal; √2 vertical keeps a 45° downward pitch.
   private readonly cameraOffset = new THREE.Vector3();
   private readonly cameraFocus = new THREE.Vector3();
@@ -220,8 +221,8 @@ export class Game {
   }
 
   private useAreaCameraTrack(): void {
-    const track = this.worldArea.cameraTrack;
-    this.cameraTrack = track ? new CameraTrackRider(new SampledCameraTrack(track)) : undefined;
+    const tracks = this.worldArea.cameraTracks;
+    this.cameraTrack = tracks?.length ? new CameraTrackDirector(tracks) : undefined;
     if (!this.cameraTrack) this.setCameraZoom(1);
   }
 
@@ -365,7 +366,7 @@ export class Game {
     const cameraDamping = 1 - Math.exp(-(this.reducedMotion ? 12 : 6.3) * delta);
     this.cameraFocus.lerp(this.desiredCameraFocus, cameraDamping);
     if (this.cameraTrack) {
-      const sample = this.cameraTrack.update(this.cameraFocus.x, this.cameraFocus.z, delta, this.reducedMotion ? 12 : CAMERA_TRACK_RESPONSE);
+      const sample = this.cameraTrack.update(this.cameraFocus.x, this.cameraFocus.z, delta, this.reducedMotion ? 12 : CAMERA_TRACK_RESPONSE, this.reducedMotion ? 0.35 : CAMERA_TRACK_BLEND_SECONDS);
       this.placeCameraOnTrack(sample);
     } else {
       this.camera.position.copy(this.cameraFocus).add(this.getCameraOffset());

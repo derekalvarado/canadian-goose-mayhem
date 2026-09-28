@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CameraTrackRider, limitCameraReach, SampledCameraTrack, validateCameraTrack } from "../src/game/cameraTrack.ts";
+import { CameraTrackRider, limitCameraReach, SampledCameraTrack, validateCameraTrack, type CameraTrack } from "../src/game/cameraTrack.ts";
+import { CameraTrackDirector, chooseCameraTrack, distanceOutsideZone, pointInZone } from "../src/game/cameraDirector.ts";
 import { SubjectFraming } from "../src/game/cameraFraming.ts";
 import { ControlHeadingLock } from "../src/game/controlHeading.ts";
 import { CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID, cloneWorldLayout, getWorldArea, loadWorldLayout, serializeWorldLayout, validateWorldLayout, WORLD_LAYOUT_STORAGE_KEY, type WorldLayoutStorage } from "../src/game/worldLayout.ts";
 
 // An L-shaped track: east along z = -10, then north along x = 20.
-const cornerTrack = { points: [
+const cornerTrack: CameraTrack = { id: "main", label: "Main track", points: [
   { x: -20, y: 10, z: -10, zoom: 1 }, { x: 0, y: 10, z: -10, zoom: 1 },
   { x: 20, y: 10, z: -10, zoom: 1 }, { x: 20, y: 10, z: 10, zoom: 2 },
 ] };
@@ -114,28 +115,92 @@ function memoryStorage(initial: Record<string, string>): WorldLayoutStorage {
 
 test("camera tracks survive saving and loading", () => {
   const layout = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
-  getWorldArea(layout).cameraTrack = cornerTrack;
+  getWorldArea(layout).cameraTracks = [cornerTrack];
   const reloaded = validateWorldLayout(JSON.parse(serializeWorldLayout(layout)));
-  assert.deepEqual(getWorldArea(reloaded).cameraTrack, cornerTrack);
+  assert.deepEqual(getWorldArea(reloaded).cameraTracks, [cornerTrack]);
 });
 
 test("an older saved world gains the square's camera track, but an edited track is kept", () => {
   const older = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
-  delete getWorldArea(older).cameraTrack;
+  delete getWorldArea(older).cameraTracks;
   older.canonicalRevision = 19;
   const upgraded = loadWorldLayout(memoryStorage({ [WORLD_LAYOUT_STORAGE_KEY]: serializeWorldLayout(older) }));
-  assert.ok(getWorldArea(upgraded, CENTRAL_PLAZA_AREA_ID).cameraTrack);
+  assert.ok(getWorldArea(upgraded, CENTRAL_PLAZA_AREA_ID).cameraTracks?.length);
 
   const edited = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
-  getWorldArea(edited).cameraTrack = cornerTrack;
+  getWorldArea(edited).cameraTracks = [cornerTrack];
   edited.canonicalRevision = 19;
   const kept = loadWorldLayout(memoryStorage({ [WORLD_LAYOUT_STORAGE_KEY]: serializeWorldLayout(edited) }));
-  assert.deepEqual(getWorldArea(kept).cameraTrack, cornerTrack);
+  assert.deepEqual(getWorldArea(kept).cameraTracks, [cornerTrack]);
 });
 
 test("an area whose track was deleted stays without one", () => {
   const cleared = cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
-  delete getWorldArea(cleared).cameraTrack;
+  delete getWorldArea(cleared).cameraTracks;
   const reloaded = loadWorldLayout(memoryStorage({ [WORLD_LAYOUT_STORAGE_KEY]: serializeWorldLayout(cleared) }));
-  assert.equal(getWorldArea(reloaded).cameraTrack, undefined);
+  assert.equal(getWorldArea(reloaded).cameraTracks, undefined);
+});
+
+test("a world saved with a single camera track loads it as the area's main track", () => {
+  const layout = JSON.parse(serializeWorldLayout(cloneWorldLayout(CANONICAL_WORLD_LAYOUT)));
+  const plaza = layout.areas.find((area: { id: string }) => area.id === CENTRAL_PLAZA_AREA_ID);
+  delete plaza.cameraTracks;
+  plaza.cameraTrack = { points: cornerTrack.points };
+  const tracks = getWorldArea(validateWorldLayout(layout), CENTRAL_PLAZA_AREA_ID).cameraTracks;
+  assert.equal(tracks?.length, 1);
+  assert.deepEqual(tracks?.[0].points, cornerTrack.points);
+  assert.equal(tracks?.[0].zone, undefined, "it covers the whole area");
+});
+
+test("a zone needs at least three corners", () => {
+  const track = validateCameraTrack({ points: cornerTrack.points, zone: [{ x: 0, z: 0 }, { x: 5, z: 0 }] }, "track");
+  assert.equal(track?.zone, undefined);
+  assert.throws(() => validateCameraTrack({ points: cornerTrack.points, zone: [{ x: 0, z: "north" }, { x: 5, z: 0 }, { x: 5, z: 5 }] }, "track"));
+});
+
+const square = [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 10 }, { x: 0, z: 10 }];
+
+test("zones know what is inside them and how far outside a spot is", () => {
+  assert.ok(pointInZone(square, 5, 5));
+  assert.ok(!pointInZone(square, 15, 5));
+  assert.equal(distanceOutsideZone(square, 5, 5), 0);
+  assert.ok(Math.abs(distanceOutsideZone(square, 13, 5) - 3) < 1e-9);
+});
+
+// The main track covers everywhere; the alley track only its square.
+const mainTrack: CameraTrack = { id: "main", label: "Main", points: [{ x: -30, y: 10, z: -20, zoom: 1 }, { x: 30, y: 10, z: -20, zoom: 1 }] };
+const alleyTrack: CameraTrack = { id: "alley", label: "Alley", points: [{ x: 20, y: 8, z: 0, zoom: 1 }, { x: 20, y: 8, z: 10, zoom: 1 }], zone: square };
+
+test("inside a zone the camera uses that zone's track, elsewhere the track without a zone", () => {
+  assert.equal(chooseCameraTrack([mainTrack, alleyTrack], 5, 5)?.id, "alley");
+  assert.equal(chooseCameraTrack([mainTrack, alleyTrack], -20, 5)?.id, "main");
+  assert.equal(chooseCameraTrack([alleyTrack], -20, 5, "alley")?.id, "alley", "with no track covering everywhere else, the camera stays put");
+});
+
+test("stepping just over a zone's edge does not flick the camera back", () => {
+  assert.equal(chooseCameraTrack([mainTrack, alleyTrack], 10.5, 5, "alley")?.id, "alley");
+  assert.equal(chooseCameraTrack([mainTrack, alleyTrack], 10.5, 5, "main")?.id, "main");
+  assert.equal(chooseCameraTrack([mainTrack, alleyTrack], 20, 5, "alley")?.id, "main", "well outside, it lets go");
+});
+
+test("entering a zone glides the camera over to its track instead of cutting", () => {
+  const director = new CameraTrackDirector([mainTrack, alleyTrack]);
+  const before = director.snap(-5, 5);
+  assert.equal(director.activeTrackId, "main");
+  const first = director.update(5, 5, 1 / 60, 3);
+  assert.equal(director.activeTrackId, "alley");
+  assert.ok(director.blending);
+  const alley = new CameraTrackRider(new SampledCameraTrack(alleyTrack)).snap(5, 5);
+  assert.ok(Math.hypot(first.x - before.x, first.z - before.z) < Math.hypot(alley.x - before.x, alley.z - before.z) / 4, "only a little way along in the first frame");
+  let pose = first;
+  for (let frame = 0; frame < 120; frame += 1) pose = director.update(5, 5, 1 / 60, 3);
+  assert.ok(!director.blending);
+  assert.ok(Math.hypot(pose.x - alley.x, pose.z - alley.z) < 0.01, "then settles on the new track");
+});
+
+test("starting inside a zone puts the camera straight on its track", () => {
+  const director = new CameraTrackDirector([mainTrack, alleyTrack]);
+  const pose = director.snap(5, 5);
+  assert.equal(director.activeTrackId, "alley");
+  assert.equal(pose.x, 20);
 });

@@ -101,12 +101,13 @@ Home Screen icon. The included web-app manifest requests standalone landscape
 presentation; Safari's address bar cannot be removed reliably from an ordinary
 browser tab.
 
-The camera follows the goose from above. In areas with an authored camera track, it rides a hand-drawn path in the sky and swings around corners as the goose moves; other areas use a fixed diagonal angle. When the janitor comes near, the camera widens its aim to keep both in the shot. Tracks are edited in the world builder (`?edit` → **Edit camera track**).
+The camera follows the goose from above. In areas with authored camera tracks, it rides a hand-drawn path in the sky and swings around corners as the goose moves; a track can own a zone on the ground, and the camera glides over to it while the goose is inside. Other areas use a fixed diagonal angle. When the janitor comes near, the camera widens its aim to keep both in the shot. Tracks are edited in the world builder (`?edit` → **Edit camera tracks**).
 
 ## Project layout
 
 - `src/game/Game.ts` — presentation loop, camera, and input/simulation wiring
 - `src/game/cameraTrack.ts` — authored sky camera tracks: smoothing, nearest-point riding, and far-goose lean-in
+- `src/game/cameraDirector.ts` — picks which camera track to ride from the ground zones and glides between tracks
 - `src/game/cameraFraming.ts` — widens the camera's aim to fit a nearby important character in the shot
 - `src/game/controlHeading.ts` — keeps a held movement direction steady while the camera swings
 - `src/game/simulation/Simulation.ts` — fixed-step gameplay state and typed commands/events
@@ -130,7 +131,7 @@ The camera follows the goose from above. In areas with an authored camera track,
 - `assets/characters/goose/goose-animated.blend` — current editable Blender character and animation source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
-- `src/game/CameraTrackEditor.ts` — world-builder mode for drawing, tuning, and previewing an area's camera track
+- `src/game/CameraTrackEditor.ts` — world-builder mode for drawing, tuning, and previewing an area's camera tracks and their zones
 - `src/game/editorCatalog.ts` — the editor's drag-and-drop asset catalog drawer with rendered thumbnails
 - `src/game/worldAssets.ts` — source-owned catalog of render, collision, and occlusion metadata
 - `src/game/worldLayout.ts` — sparse 64 m chunk documents, playable regions, browser drafts, import/export, and plaza migration
