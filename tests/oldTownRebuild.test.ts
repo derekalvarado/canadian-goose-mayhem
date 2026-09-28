@@ -20,10 +20,10 @@ test("square upgrade archives the previous draft, preserves other areas, and can
   old.areas.push({ id: "custom-garden", label: "My garden", chunks: [], instances: [] });
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 20);
+  assert.equal(updated.canonicalRevision, 23);
   const canonicalFountain = getWorldArea(CANONICAL_WORLD_LAYOUT).instances.find(i => i.id === "plaza.goose-fountain")!;
   assert.equal(getWorldArea(updated).instances.find(i => i.id === "plaza.goose-fountain")!.transform.x, canonicalFountain.transform.x);
-  assert.deepEqual(updated.areas[1], { ...old.areas[1], controlLinks: [] });
+  assert.deepEqual(updated.areas[1], old.areas[1]);
   const backup = store.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
   assert.ok(backup);
   assert.equal(JSON.parse(backup).areas[0].instances.find((i: {id: string}) => i.id === "plaza.goose-fountain").transform.x, -7);
@@ -51,11 +51,11 @@ test("the gameplay content update preserves authored edits and is saved once", (
   saveWorldLayout(authored, store);
 
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 20);
+  assert.equal(updated.canonicalRevision, 23);
   assert.equal(getWorldArea(updated).instances.find((item) => item.id === "plaza.goose-fountain")?.transform.x, -14.25);
   assert.ok(getWorldArea(updated).instances.some((item) => item.id === "plaza.splash-faucet"));
   assert.deepEqual(getWorldArea(updated).controlLinks, [{ controllerId: "plaza.splash-faucet", targetId: "plaza.splash-pad" }]);
-  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 20);
+  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 23);
   assert.equal(getWorldArea(updated).instances.filter((item) => item.assetId.startsWith("plaza.splash-kid-")).length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => getWorldAsset(item.assetId)?.cleanupRole === "litter").length, 3);
   assert.equal(getWorldArea(updated).instances.filter((item) => ["trash-bag", "litter-picker"].includes(getWorldAsset(item.assetId)?.cleanupRole ?? "")).length, 2);
@@ -97,7 +97,7 @@ test("drafts saved before the plaza rows were renamed gain the southwest/northea
   }
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 20);
+  assert.equal(updated.canonicalRevision, 23);
   const updatedPlaza = getWorldArea(updated);
   assert.equal(updatedPlaza.instances.some((item) => item.id.includes(".north.") || item.id.includes(".south.")), false);
   assert.equal(updatedPlaza.instances.find((item) => item.id === "oldtown.southwest.shop-0")?.label, "Southwest storefront 1");
@@ -138,7 +138,7 @@ test("drafts saved before the tapered CooperSmith's pub swap the placeholder blo
   assert.deepEqual(swapped[0].transform, canonical.transform);
   assert.equal(updated.instances.some((item) => item.assetId === "oldtown.coopersmith-block"), false);
   assert.equal(updated.instances.find((item) => item.id === "plaza.goose-fountain")!.transform.x, -14.25);
-  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 20);
+  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 23);
 });
 
 test("drafts saved before the latest plaza arrangement update untouched placements and remove retired defaults", () => {
@@ -161,7 +161,7 @@ test("drafts saved before the latest plaza arrangement update untouched placemen
   const updated = loadWorldLayout(store);
   const canonical = getWorldArea(CANONICAL_WORLD_LAYOUT);
   const updatedPlaza = getWorldArea(updated);
-  assert.equal(updated.canonicalRevision, 20);
+  assert.equal(updated.canonicalRevision, 23);
   for (const id of ["plaza.paving", "plaza.pavilion-stage", "oldtown.coopersmith", "oldtown.southwest.tree-2", "plaza.splash-faucet"]) {
     assert.deepEqual(updatedPlaza.instances.find((item) => item.id === id)!.transform, canonical.instances.find((item) => item.id === id)!.transform);
   }
@@ -169,7 +169,7 @@ test("drafts saved before the latest plaza arrangement update untouched placemen
   for (const id of ["oldtown.southwest.bed-1", "oldtown.southwest.bed-2", "oldtown.southwest.tree-3"]) {
     assert.equal(updatedPlaza.instances.some((item) => item.id === id), false);
   }
-  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 20);
+  assert.equal(JSON.parse(store.getItem(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, 23);
 });
 
 test("drafts saved before Ari got water wings swap the runner model once and keep other kid edits", () => {
@@ -180,7 +180,7 @@ test("drafts saved before Ari got water wings swap the runner model once and kee
   kids.find((item) => item.id === "plaza.splash-kid-june")!.transform.x = -2.4;
   saveWorldLayout(old, store);
   const updated = loadWorldLayout(store);
-  assert.equal(updated.canonicalRevision, 20);
+  assert.equal(updated.canonicalRevision, 23);
   const plaza = getWorldArea(updated);
   assert.equal(plaza.instances.find((item) => item.id === "plaza.splash-kid-ari")?.assetId, "plaza.splash-kid-floaties");
   assert.equal(plaza.instances.find((item) => item.id === "plaza.splash-kid-milo")?.assetId, "plaza.splash-kid-runner");

@@ -106,6 +106,13 @@ export class Goose extends THREE.Group {
       if (this.grabQueued) this.playGrab();
       this.mixer.update(0);
       for (const [name, bone] of this.bones) this.baseRotations.get(name)!.copy(bone.quaternion);
+      // Held props ride just behind the bill tip and follow every head bob, honk, and peck.
+      const bill = this.bones.get("lower_bill") ?? this.bones.get("head");
+      if (bill) {
+        this.mouthSocket.position.set(0, 0.82, -0.665);
+        this.updateMatrixWorld(true);
+        bill.attach(this.mouthSocket);
+      }
     });
     void this.ready.catch((error: unknown) => console.error("Unable to load the Canada goose model", error));
   }
@@ -126,7 +133,7 @@ export class Goose extends THREE.Group {
     this.playGrab();
   }
 
-  /** Presentation-only attachment point for props held between the beak. */
+  /** Presentation-only attachment point for props held between the beak; it follows the bill once the model loads. */
   getMouthSocket(): THREE.Object3D {
     return this.mouthSocket;
   }

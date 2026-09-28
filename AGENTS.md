@@ -22,7 +22,7 @@ The owner is not a programmer and cannot debug or fix the code on their own.
 - `npm test` — run all headless gameplay tests (`node --test --experimental-strip-types tests/*.test.ts`); requires Node 22.18+
 - `node --test --experimental-strip-types tests/simulation.test.ts` — run a single test file the same way
 - `npm run assets:goose` / `assets:goose:author` — export the goose glTF from the Blender source (`--author` also regenerates authoring artifacts)
-- `npm run assets:janitor` / `assets:kids` — regenerate procedural janitor/splash-kid glTF assets from their generator scripts
+- `npm run assets:janitor` / `assets:kids` / `assets:cafe` — regenerate procedural janitor/splash-kid/coffee-shop-people glTF assets from their generator scripts
 
 There is no separate lint script; `tsc` (run via `npm run build`) is the type-checking gate.
 
@@ -45,6 +45,9 @@ future acceptance gates.
   for resolved actions. Keep presentation events separate from durable world facts.
 - Use independent outcome-based objectives with stable IDs. Do not make a linear
   mission index, end play at an area boundary, or erase progress on being caught.
+  Give every task in `src/game/challenges.ts` an `areaId`: it decides which level's
+  to-do list shows the task, while completion is still checked in every area (the
+  coffee shop's tip-jar task finishes out in the square).
 - Add objects with shared affordances and persistent identity. Humans and the goose
   must use the same interaction rules; crossing neighborhoods must preserve items.
 - Human AI acts on perception and remembered observations, not knowledge of hidden
@@ -80,6 +83,13 @@ worked example).
    mesh, colliders that match what the goose should bump into, and
    `occludesCamera` for anything tall. Characters usually set `warnForOverlap:
    false`, so the editor won't flag them standing inside furniture — check by hand.
+   Never delete or rename an asset ID that saved drafts may contain: a draft that
+   names an unknown asset fails validation and is discarded whole, including the
+   user's edits to other areas. Keep retired IDs in the catalog (label them
+   "Retired…") and let the draft upgrade in step 6 move drafts off them.
+   A new carryable also needs a `BEAK_GRIPS` entry (and, if people hold it, a
+   `HAND_GRIPS` entry) in `src/game/WorldView.ts` saying where the goose's bill
+   or a hand grips it; otherwise it hangs from a generic point.
 4. **Renderer.** Add a `case` for the ID in `createWorldAssetView` in
    `src/game/PlazaWorld.ts`.
 5. **Placement.** Insert the instance into `src/game/content/world-layout.json`
@@ -91,7 +101,10 @@ worked example).
    `src/game/worldLayout.ts` (chained outermost in `loadWorldLayout`) that adds the
    instance once to older browser drafts. The same pattern covers renaming or
    restructuring existing instances, not just additions (see
-   `renameNorthSouthRows`). A saved draft always wins over canonical, so editing
+   `renameNorthSouthRows`). When a whole room is rebuilt, a step can swap an older
+   draft's copy of that one area for the canonical area and leave every other area
+   as edited (see `replaceCoffeeShop`); tell the user their edits to that room were
+   replaced. A saved draft always wins over canonical, so editing
    the JSON alone won't change an already-open editor tab until its draft
    migrates past the new revision. Update tests that assert the latest
    revision. Parallel asset branches will collide on this number; renumber when
@@ -111,6 +124,20 @@ worked example).
    temporary close-up page that imports the builder for detail (delete it before
    committing). If the dev server redirects every page to the game, unregister the
    offline service worker in that browser first.
+
+## Playtesting in the built-in browser
+
+- The game pauses whenever the page loses focus, and in the app's browser pane it
+  can stay paused after focus returns. With `?dev`, the running game is available
+  as `gooseGame` in the page's console: call
+  `gooseGame.pauseReasons.set("hidden", false)` and
+  `gooseGame.pauseReasons.set("focus", false)`, then set `gooseGame.paused = false`.
+  `gooseGame.simulation.setPlayerTransform({ x, y: 0, z }, heading)` moves the goose.
+- Saved progress is written again when the page closes, so clearing
+  `localStorage` while the game is open does not stick. Use Settings → Start over,
+  or add `&fresh` to a `?dev` URL to play with an empty to-do list without erasing it.
+- The pane is often small; set a viewport size (e.g. 900×700) before judging
+  detail, and reload afterwards so the canvas resizes.
 
 ## Prototyping character animation
 
@@ -139,8 +166,19 @@ animation work.
    alone. Gait styles with leg IK live in `src/game/janitorGaits.ts`.
 6. **Respect the rig's joint directions.** For the humanoid rigs, forward is `-Z`:
    `+x` swings a hanging limb forward and leans the spine/neck/head back, knees bend
-   with `-x`, elbows bend with `+x`, `+y` turns toward the character's left. Probe
-   an unfamiliar rig with a one-joint test pose in the lab before authoring clips,
-   and keep a regression test like the janitor's hyperextension check.
+   with `-x`, elbows bend with `+x`, `+y` turns toward the character's left, and `+z`
+   lifts the right side, so an arm moves out from the body with `-z` on the left
+   shoulder and `+z` on the right. Probe an unfamiliar rig with a one-joint test pose
+   in the lab before authoring clips, and keep a regression test like the janitor's
+   hyperextension check.
+8. **Measure hand and prop poses; don't eyeball them.** For poses that must land a
+   hand somewhere (a cup at the lips, hands on a table, a book held in front), load
+   the model headlessly, play the clip, and read the hand socket's world position,
+   or search shoulder/elbow angles for a target point. Poses that looked right in
+   the small lab views were off by 20 cm or more. Props held in both hands are
+   easier parented to the chest than to one hand.
+9. **Hair hugs the head.** Build hair as a shell around the head trimmed to a
+   hairline (as `hairShell` in `CafePersonModel.ts` does). Tilting a sphere cap to
+   clear the forehead moves the whole cap and lets the scalp poke through on top.
 7. **Close-up checks.** Lab pages accept `?group=<tab>&zoom&paused` (plus `&only=<card name text>` and `&t=<seconds>`) so a specific
    view can be opened in a separate tab without disturbing the user's saved settings.

@@ -26,6 +26,9 @@ const COOPERSMITH_PUB_REVISION = 17;
 const OLD_TOWN_PLACEMENT_REVISION = 18;
 const ARI_FLOATIES_REVISION = 19;
 const CAMERA_TRACK_REVISION = 20;
+const CAFE_CHALLENGES_REVISION = 21;
+const CAFE_KITCHEN_REVISION = 22;
+const CAFE_KITCHEN_MOVE_REVISION = 23;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -519,6 +522,39 @@ function addPlazaCameraTrack(layout: WorldLayout, store?: WorldLayoutStorage): W
   return validated;
 }
 
+/**
+ * The coffee shop became a puzzle room: bigger furniture, a real counter and back bar,
+ * props, and people with routines. Older drafts only ever held the graybox room, so
+ * their coffee shop is replaced with the canonical one; the square is left as edited.
+ */
+function rebuildCoffeeShopForChallenges(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  return replaceCoffeeShop(layout, CAFE_CHALLENGES_REVISION, store);
+}
+
+/** The coffee shop gained tall black walls, a plank floor, and a kitchen through the back wall. */
+function addCoffeeShopKitchen(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  return replaceCoffeeShop(layout, CAFE_KITCHEN_REVISION, store);
+}
+
+/** The kitchen moved behind the back wall, with its doorway beside the counter. */
+function moveCoffeeShopKitchen(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  return replaceCoffeeShop(layout, CAFE_KITCHEN_MOVE_REVISION, store);
+}
+
+function replaceCoffeeShop(layout: WorldLayout, revision: number, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= revision) return layout;
+  const updated = cloneWorldLayout(layout);
+  const index = updated.areas.findIndex((area) => area.id === COFFEE_SHOP_AREA_ID);
+  if (index >= 0) updated.areas[index] = canonicalCoffeeShopArea();
+  updated.canonicalRevision = revision;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its coffee shop rebuild could not be saved", error); return layout; }
+  }
+  return validated;
+}
+
 export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
   try {
     const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -532,9 +568,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store), store), store);
+    if (saved) return moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);

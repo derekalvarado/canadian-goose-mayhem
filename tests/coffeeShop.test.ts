@@ -28,13 +28,14 @@ test("the coffee shop portal links the plaza entrance and the shop front door", 
   assert.equal(transitions[1]?.toAreaId, CENTRAL_PLAZA_AREA_ID);
 });
 
-test("coffee shop rules spawn the goose on playable ground and expose no placeholder AI", () => {
+test("coffee shop rules spawn the goose on playable ground and share the square's to-do list", () => {
   const area = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
+  const plaza = getWorldArea(CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID);
   const rules = createCoffeeShopRules(area);
-  assert.equal(rules.entities?.length ?? 0, 0);
   assert.equal(rules.janitor, undefined);
+  assert.ok(rules.cafe?.barista, "the coffee shop has a barista");
   assert.equal(isWorldAreaPlayable(area, rules.spawn.x, rules.spawn.z), true);
-  assert.equal(createWorldRules(area).objectives.length, 0);
+  assert.deepEqual(createWorldRules(area).objectives.map(({ id }) => id), createWorldRules(plaza).objectives.map(({ id }) => id));
 });
 
 /** A spot just outside the placed shop entrance, and the stick direction that walks into it. */

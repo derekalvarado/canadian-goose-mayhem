@@ -17,6 +17,8 @@ import { toonMaterial, STORYBOOK_LIGHTING } from "./toonMaterial";
 import { CAMERA_BASE_FOV, CAMERA_FOCUS_HEIGHT, CAMERA_TRACK_MAX_REACH, CameraTrackRider, limitCameraReach, SampledCameraTrack } from "./cameraTrack";
 import { SubjectFraming } from "./cameraFraming";
 import { ControlHeadingLock } from "./controlHeading";
+import { LEVEL_NAMES } from "./challenges";
+import { clearProgress, loadProgress, saveProgress, sessionStateFromProgress } from "./progress";
 
 // A closer follow camera keeps the smaller goose readable and makes the plaza
 // landmarks feel larger without changing their gameplay dimensions.
@@ -84,7 +86,8 @@ export class Game {
   private readonly input: InputController;
   private readonly clock = new THREE.Clock();
   private readonly velocity = new THREE.Vector3();
-  private simulation = new Simulation(this.rules);
+  // Crossed-off tasks come back after a reload; `?dev&fresh` starts a clean list without erasing it.
+  private simulation = new Simulation(this.rules, this.devMode && this.query.has("fresh") ? undefined : sessionStateFromProgress(loadProgress()));
   private readonly audio = new GameAudio();
   private readonly moveDirection = new THREE.Vector3();
   private readonly cameraForward = new THREE.Vector3();
@@ -111,6 +114,16 @@ export class Game {
   private readonly interactionPrompt = requireElement<HTMLElement>("#interaction-prompt");
   private readonly interactionKey = requireElement<HTMLElement>("#interaction-key");
   private readonly interactionLabel = requireElement<HTMLElement>("#interaction-label");
+  private readonly taskToast = requireElement<HTMLElement>("#task-toast");
+  private readonly taskToastLabel = requireElement<HTMLElement>("#task-toast-label");
+  private readonly allDone = requireElement<HTMLElement>("#all-done");
+  private readonly allDoneLevel = requireElement<HTMLElement>("#all-done-level");
+  private readonly todoList = requireElement<HTMLElement>("#todo-list");
+  private readonly todoTitle = requireElement<HTMLElement>("#todo-title");
+  private readonly startOverButton = requireElement<HTMLButtonElement>("#start-over");
+  private readonly toastQueue: string[] = [];
+  private toastTimer = 0;
+  private startOverArmed = false;
   private readonly pauseReasons = new PauseReasons();
   private touchControls: TouchControls | null = null;
   private paused = false;
@@ -143,6 +156,8 @@ export class Game {
     this.scene.background = new THREE.Color(PALETTE.atmosphere.sky);
     this.scene.add(this.world, this.goose);
     if (this.devMode) {
+      // Dev-only handle for playtesting from the browser console.
+      (window as unknown as { gooseGame?: Game }).gooseGame = this;
       const banner = document.createElement("div");
       banner.className = "dev-mode-banner";
       banner.textContent = `DEV START · ${this.worldArea.label}`;
@@ -269,7 +284,9 @@ export class Game {
         }
         if (event.type === "goose-shooed") this.goose.spook();
         if ((event.type === "entity-grabbed" || event.type === "entity-dropped") && event.actorId === "goose") this.goose.grab();
-        if (event.type === "objective-completed") this.renderObjectives();
+        if (event.type === "objective-completed") this.celebrateTask(event.objectiveId);
+        if (event.type === "device-state-changed" && event.active && this.simulation.world.entities.find((entity) => entity.id === event.targetId)?.tags.includes("bell")) this.audio.playBell();
+        if (event.type === "order-called") this.audio.playOrderCalled();
         if (event.type === "area-transition-requested") {
           this.beginAreaTransition(event);
           return;
@@ -288,6 +305,7 @@ export class Game {
       player.sneaking || player.threatening,
     );
     if (this.goose.stepped) void this.audio.playFootstep();
+    this.audio.setCafeMusic(this.simulation.world.entities.some((entity) => entity.tags.includes("music") && entity.active === true));
     this.updateInteractionPrompt(frame.device);
 
     if (performance.now() - this.lastInputTime > 6200) {
@@ -312,9 +330,11 @@ export class Game {
     this.simulation.suspend();
     this.transitionCurtain.classList.remove("area-transition-curtain--revealing");
     this.transitionCurtain.classList.add("area-transition-curtain--covered");
+    this.audio.setCafeMusic(false);
     window.setTimeout(() => {
       if (this.disposed) return;
       const sessionState = this.simulation.sessionState;
+      saveProgress(sessionState);
       this.worldArea = nextArea;
       this.rules = createWorldRules(this.worldArea, this.worldLayout.transitions);
       this.simulation = new Simulation(this.rules, sessionState);
@@ -362,10 +382,13 @@ export class Game {
   }
 
   private setDesiredCameraFocus(leadSeconds: number): void {
-    const janitor = this.simulation.world.janitor;
+    const world = this.simulation.world;
+    const janitor = world.janitor;
+    const barista = world.cafePeople.find((person) => person.role === "barista");
     const framed = this.framing.focus(
       { x: this.goose.position.x, z: this.goose.position.z },
-      janitor ? [{ id: janitor.id, x: janitor.position.x, z: janitor.position.z }] : [],
+      [...(janitor ? [{ id: janitor.id, x: janitor.position.x, z: janitor.position.z }] : []),
+        ...(barista ? [{ id: barista.id, x: barista.position.x, z: barista.position.z }] : [])],
     );
     this.desiredCameraFocus.set(
       framed.x + this.velocity.x * leadSeconds,
@@ -421,6 +444,7 @@ export class Game {
       ...(snapshot.janitor ? [{ id: snapshot.janitor.id,
         position: { ...snapshot.janitor.position, y: snapshot.janitor.position.y + 1.25 } }] : []),
       ...snapshot.splashKids.map((child) => ({ id: child.id, position: { ...child.position, y: child.position.y + 0.8 } })),
+      ...snapshot.cafePeople.map((person) => ({ id: person.id, position: { ...person.position, y: person.position.y + (person.seated ? 1.5 : 2.1) } })),
     ].map((candidate) => ({ ...candidate,
       distance: Math.hypot(candidate.position.x - player.position.x, candidate.position.z - player.position.z),
       angle: Math.atan2(-(candidate.position.x - player.position.x), -(candidate.position.z - player.position.z)) - player.heading,
@@ -463,8 +487,54 @@ export class Game {
     }
   }
 
+  private celebrateTask(objectiveId: string): void {
+    this.renderObjectives();
+    saveProgress(this.simulation.sessionState);
+    this.audio.playTaskComplete();
+    const task = this.simulation.objectiveList.find((objective) => objective.id === objectiveId);
+    if (task) this.toastQueue.push(task.description);
+    if (!this.toastTimer) this.showNextToast();
+    // Finishing a level's last task, wherever the goose happens to be, earns that level's card.
+    const level = task?.areaId;
+    const levelTasks = this.simulation.objectiveList.filter((objective) => objective.areaId === level);
+    if (level && levelTasks.every((objective) => objective.completed)) {
+      window.setTimeout(() => {
+        this.allDoneLevel.textContent = LEVEL_NAMES[level] ?? "To-do list";
+        this.allDone.hidden = false;
+        window.setTimeout(() => { this.allDone.hidden = true; }, 7000);
+      }, 1600);
+    }
+  }
+
+  private readonly showNextToast = (): void => {
+    const next = this.toastQueue.shift();
+    if (!next) { this.taskToast.hidden = true; this.toastTimer = 0; return; }
+    this.taskToastLabel.textContent = next;
+    // Re-trigger the reveal animation for back-to-back tasks.
+    this.taskToast.hidden = true; void this.taskToast.offsetWidth; this.taskToast.hidden = false;
+    this.toastTimer = window.setTimeout(this.showNextToast, 2600);
+  };
+
+  private readonly startOver = (): void => {
+    if (!this.startOverArmed) {
+      this.startOverArmed = true;
+      this.startOverButton.textContent = "Press again to clear your list";
+      window.setTimeout(() => { this.startOverArmed = false; this.startOverButton.textContent = "Start over"; }, 4000);
+      return;
+    }
+    clearProgress();
+    // Skip the pagehide save so the old list is not written straight back.
+    this.progressCleared = true;
+    window.location.reload();
+  };
+  private progressCleared = false;
+
+  /** Only the current level's tasks are listed; levels without tasks hide the list. */
   private renderObjectives(): void {
-    this.objectiveList.replaceChildren(...this.simulation.objectiveList.map((objective) => {
+    const tasks = this.simulation.objectiveList.filter((objective) => !objective.areaId || objective.areaId === this.worldArea.id);
+    this.todoList.hidden = tasks.length === 0;
+    this.todoTitle.textContent = LEVEL_NAMES[this.worldArea.id] ? `To do · ${LEVEL_NAMES[this.worldArea.id]}` : "To do";
+    this.objectiveList.replaceChildren(...tasks.map((objective) => {
       const item = document.createElement("li"); item.textContent = objective.description;
       item.dataset.objectiveId = objective.id; item.classList.toggle("is-complete", objective.completed);
       return item;
@@ -527,6 +597,7 @@ export class Game {
       },
     );
     this.settingsButton.addEventListener("click", this.openSettings);
+    this.startOverButton.addEventListener("click", this.startOver);
     this.installButton.addEventListener("click", this.openInstallHelp);
     requireElement<HTMLButtonElement>("#install-close").addEventListener("click", this.closeInstallHelp);
     requireElement<HTMLButtonElement>("#settings-close").addEventListener("click", this.closeSettings);
@@ -625,12 +696,15 @@ export class Game {
   private readonly handleFocus = (): void => { this.setPauseReason("focus", document.hidden); };
   private readonly handleVisibility = (): void => {
     this.setPauseReason("hidden", document.hidden || !document.hasFocus());
+    if (document.hidden && !this.progressCleared) saveProgress(this.simulation.sessionState);
   };
 
   /** Explicitly release the GPU context before a Play/Edit page transition. */
   private readonly dispose = (): void => {
     if (this.disposed) return;
     this.disposed = true;
+    if (!this.progressCleared && !this.editorMode && !this.overviewMode) saveProgress(this.simulation.sessionState);
+    this.audio.setCafeMusic(false);
     this.renderer.setAnimationLoop(null);
     window.removeEventListener("resize", this.resize);
     window.visualViewport?.removeEventListener("resize", this.resize);

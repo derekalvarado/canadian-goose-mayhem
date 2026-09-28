@@ -28,6 +28,12 @@ import {
 import { PALETTE } from "./palette.ts";
 import { toonMaterial } from "./toonMaterial.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
+import { createCafeBackBar, createCafeCounter, createCafeRadio, createCroissant, createLaptop, createMug, createOrderCup, createPlate, createServiceBell, createTipJar } from "./CafePropsView.ts";
+import { CafePersonView } from "./CafePersonView.ts";
+import { createKitchenOven, createKitchenShelf, createKitchenSink, createPastryRack, createPrepTable } from "./KitchenView.ts";
+import { createCafeDoorwayWall, createCafeFloor, createCafeFrontDoor, createCafeWall, createKitchenFloor, createMenuBoard } from "./CafeRoomView.ts";
+
+
 
 function finishMesh(mesh: THREE.Mesh, castShadow = true, receiveShadow = true): THREE.Mesh {
   mesh.castShadow = castShadow;
@@ -487,87 +493,19 @@ function registerCoffeeOcclusion(group: THREE.Group, groups: OcclusionFadeGroupR
   return group;
 }
 
-function createCoffeeFloor(): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop graybox floor";
-  group.add(box(18, 0.14, 14, PALETTE.coffee.floor, 0, -0.07, 0));
-  for (const z of [-5.8, -3.2, -0.6, 2, 4.6] as const) {
-    group.add(box(17.6, 0.025, 0.045, PALETTE.coffee.floorLight, 0, 0.012, z));
-  }
-  return group;
-}
-
-function createCoffeeWallLong(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop long wall";
-  group.add(
-    box(17.6, 2.8, 0.36, PALETTE.coffee.brick, 0, 1.4, 0),
-    box(17.8, 0.18, 0.42, PALETTE.coffee.brickDark, 0, 2.78, 0),
-    box(17.8, 0.18, 0.42, PALETTE.coffee.brickDark, 0, 0.18, 0),
-  );
+function createCoffeeWall(length: number, alongZ: boolean, groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
+  const wall = createCafeWall(length);
+  if (alongZ) wall.rotation.y = Math.PI / 2;
+  const group = new THREE.Group(); group.name = wall.name; group.add(wall);
   return registerCoffeeOcclusion(group, groups, instanceId);
-}
-
-function createCoffeeWallSide(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop side wall";
-  group.add(
-    box(0.36, 2.8, 13.6, PALETTE.coffee.brick, 0, 1.4, 0),
-    box(0.42, 0.18, 13.8, PALETTE.coffee.brickDark, 0, 2.78, 0),
-    box(0.42, 0.18, 13.8, PALETTE.coffee.brickDark, 0, 0.18, 0),
-  );
-  return registerCoffeeOcclusion(group, groups, instanceId);
-}
-
-function createCoffeeDoorWing(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop front wall wing";
-  group.add(
-    box(7, 2.8, 0.36, PALETTE.coffee.brick, 0, 1.4, 0),
-    box(7.2, 0.18, 0.42, PALETTE.coffee.brickDark, 0, 2.78, 0),
-    box(7.2, 0.18, 0.42, PALETTE.coffee.brickDark, 0, 0.18, 0),
-  );
-  return registerCoffeeOcclusion(group, groups, instanceId);
-}
-
-function createCoffeeFrontDoor(): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop front door graybox";
-  group.add(
-    box(0.18, 2.6, 0.18, PALETTE.coffee.metal, -1.7, 1.3, 0),
-    box(0.18, 2.6, 0.18, PALETTE.coffee.metal, 1.7, 1.3, 0),
-    box(3.55, 0.18, 0.18, PALETTE.coffee.metal, 0, 2.58, 0),
-  );
-  const glass = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(3.25, 2.2, 0.035), toonMaterial(PALETTE.plaza.window, { transparent: true, opacity: 0.35 })), false, false);
-  glass.position.set(0, 1.15, -0.01);
-  group.add(glass);
-  const threshold = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.025, 0.78), toonMaterial(PALETTE.earth.pathShade)), false, true);
-  threshold.position.y = 0.014;
-  group.add(threshold);
-  return group;
-}
-
-function createCoffeeWallBoard(): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop menu board";
-  group.add(
-    box(3.2, 1.55, 0.1, PALETTE.coffee.chalkboard, 0, 1.85, 0),
-    box(3.35, 0.08, 0.16, PALETTE.coffee.counterTop, 0, 2.67, 0),
-    box(3.35, 0.08, 0.16, PALETTE.coffee.counterTop, 0, 1.03, 0),
-    box(0.08, 1.7, 0.16, PALETTE.coffee.counterTop, -1.62, 1.85, 0),
-    box(0.08, 1.7, 0.16, PALETTE.coffee.counterTop, 1.62, 1.85, 0),
-  );
-  for (const [width, y] of [[1.45, 2.22], [1.05, 1.88], [1.28, 1.54]] as const) {
-    group.add(box(width, 0.045, 0.018, PALETTE.accent.cream, -0.2, y, -0.065));
-  }
-  return group;
 }
 
 function createCoffeeCounter(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
-  const group = new THREE.Group(); group.name = "coffee shop counter graybox";
-  group.add(
-    box(6.2, 1.05, 1.35, PALETTE.coffee.counter, 0, 0.525, 0),
-    box(6.45, 0.18, 1.55, PALETTE.coffee.counterTop, 0, 1.14, 0),
-    box(5.9, 0.08, 0.08, PALETTE.accent.cream, 0, 1.26, -0.7),
-  );
-  const register = finishMesh(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.34, 0.32), toonMaterial(PALETTE.coffee.metal)));
-  register.position.set(1.85, 1.38, -0.1);
-  group.add(register);
-  return registerCoffeeOcclusion(group, groups, instanceId);
+  return registerCoffeeOcclusion(createCafeCounter(), groups, instanceId);
+}
+
+function createCoffeeBackBar(groups: OcclusionFadeGroupRegistry, instanceId: string): THREE.Group {
+  return registerCoffeeOcclusion(createCafeBackBar(), groups, instanceId);
 }
 
 function createCoffeePlaceholderPerson(instanceId: string): THREE.Group {
@@ -1161,16 +1099,40 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.paving-base": return createOldTownPaving();
     case "plaza.paving-patch": return createOldTownPaving(4, 4);
     case "plaza.paving-patch-large": return createOldTownPaving(8, 8);
-    case "coffee.shop-floor": return createCoffeeFloor();
-    case "coffee.wall-long": return createCoffeeWallLong(groups, instanceId);
-    case "coffee.wall-side": return createCoffeeWallSide(groups, instanceId);
-    case "coffee.wall-door-wing": return createCoffeeDoorWing(groups, instanceId);
-    case "coffee.front-door": return createCoffeeFrontDoor();
-    case "coffee.wall-board": return createCoffeeWallBoard();
+    case "coffee.shop-floor": return createCafeFloor();
+    case "coffee.wall-long": return createCoffeeWall(17.6, false, groups, instanceId);
+    case "coffee.wall-side": return createCoffeeWall(13.6, true, groups, instanceId);
+    case "coffee.wall-door-wing": return createCoffeeWall(7, false, groups, instanceId);
+    case "coffee.wall-long-doorway": return registerCoffeeOcclusion(createCafeDoorwayWall(), groups, instanceId);
+    case "coffee.wall-side-doorway": return createCoffeeWall(13.6, true, groups, instanceId);
+    case "coffee.kitchen-wall": return createCoffeeWall(8.4, false, groups, instanceId);
+    case "coffee.kitchen-wall-short": return createCoffeeWall(7.36, false, groups, instanceId);
+    case "coffee.kitchen-floor": return createKitchenFloor(8.4, 7);
+    case "coffee.front-door": return createCafeFrontDoor();
+    case "coffee.wall-board": return registerCoffeeOcclusion(createMenuBoard(), groups, instanceId);
     case "coffee.counter": return createCoffeeCounter(groups, instanceId);
     case "coffee.table": return createCoffeeTable();
     case "coffee.chair": return createCoffeeChair();
     case "coffee.placeholder-person": return createCoffeePlaceholderPerson(instanceId);
+    case "coffee.back-bar": return createCoffeeBackBar(groups, instanceId);
+    case "coffee.radio": return createCafeRadio();
+    case "coffee.service-bell": return createServiceBell();
+    case "coffee.tip-jar": return createTipJar();
+    case "coffee.croissant": case "coffee.counter-croissant": return createCroissant();
+    case "coffee.mug": return createMug();
+    case "coffee.order-cup": return createOrderCup();
+    case "coffee.plate": return createPlate();
+    case "coffee.laptop": return createLaptop();
+    case "coffee.person-barista": return new CafePersonView("barista");
+    case "coffee.person-laptop": return new CafePersonView("laptop");
+    case "coffee.person-reader": return new CafePersonView("reader");
+    case "coffee.person-student": return new CafePersonView("student");
+    case "coffee.person-baker": return new CafePersonView("baker");
+    case "coffee.kitchen-oven": return registerCoffeeOcclusion(createKitchenOven(), groups, instanceId);
+    case "coffee.pastry-rack": return registerCoffeeOcclusion(createPastryRack(), groups, instanceId);
+    case "coffee.kitchen-sink": return registerCoffeeOcclusion(createKitchenSink(), groups, instanceId);
+    case "coffee.prep-table": return registerCoffeeOcclusion(createPrepTable(), groups, instanceId);
+    case "coffee.kitchen-shelf": return registerCoffeeOcclusion(createKitchenShelf(), groups, instanceId);
     case "street.sidewalk-tile": return createStreetTile(PALETTE.plaza.concrete, 0);
     case "street.road-tile": return createStreetTile(PALETTE.stone.dark, -0.15);
     case "street.curb-straight": return createStraightCurb();

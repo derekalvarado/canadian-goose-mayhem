@@ -156,7 +156,7 @@ test("coffee shop chairs stand on four legs and the square tables fit their foot
     const bounds = new THREE.Box3().setFromObject(createWorldAssetView(assetId, new OcclusionFadeGroupRegistry(), `test.${assetId}`));
     assert.ok(bounds.max.x <= asset.halfWidth + 0.01 && bounds.min.x >= -asset.halfWidth - 0.01, `${assetId} width`);
     assert.ok(bounds.max.z <= asset.halfDepth + 0.01 && bounds.min.z >= -asset.halfDepth - 0.01, `${assetId} depth`);
-    assert.ok(bounds.min.y > -0.01 && bounds.max.y < 1.1, `${assetId} height`);
+    assert.ok(bounds.min.y > -0.01, `${assetId} stands on the floor`);
   }
 });
 

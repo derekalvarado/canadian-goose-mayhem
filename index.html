@@ -64,9 +64,21 @@
         </section>
 
         <aside class="todo-list" id="todo-list" aria-label="To-do list">
-          <p>To do</p>
+          <p id="todo-title">To do</p>
           <ul id="objective-list"></ul>
         </aside>
+
+        <div class="task-toast" id="task-toast" hidden role="status" aria-live="polite">
+          <span class="task-toast__check" aria-hidden="true">✓</span><span id="task-toast-label"></span>
+        </div>
+
+        <section class="chapter-complete all-done" id="all-done" hidden aria-live="polite">
+          <div class="complete-card">
+            <p class="complete-kicker" id="all-done-level">To-do list</p>
+            <h2>Every task crossed off!</h2>
+            <p>What a horrible goose. Everyone will be talking about you.</p>
+          </div>
+        </section>
 
         <div class="interaction-prompt" id="interaction-prompt" hidden aria-live="polite">
           <kbd id="interaction-key">F</kbd><span id="interaction-label"></span>
@@ -98,6 +110,8 @@
             </select>
           </label>
           <p class="settings-help">Auto shows controls on touch-first devices. Keyboard and controllers remain available.</p>
+          <p class="settings-help">Your crossed-off tasks are saved in this browser.</p>
+          <button id="start-over" class="settings-danger" type="button">Start over</button>
           <button id="settings-close" type="button">Done</button>
         </div>
       </section>

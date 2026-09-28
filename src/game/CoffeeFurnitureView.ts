@@ -28,6 +28,13 @@ function tube(from: THREE.Vector3Tuple, to: THREE.Vector3Tuple, size = 0.03, col
 }
 
 const SEAT_Y = 0.46;
+/**
+ * The café's people are janitor-sized, so the furniture is built at real-world
+ * proportions and scaled up to their knee and hip heights.
+ */
+export const CAFE_SEAT_HEIGHT = 0.58;
+export const CAFE_TABLE_HEIGHT = 0.95;
+const CHAIR_SCALE = CAFE_SEAT_HEIGHT / SEAT_Y;
 const LEG_X = 0.225;
 const FRONT_FOOT_Z = -0.235;
 const FRONT_TOP_Z = -0.2;
@@ -83,11 +90,13 @@ export function createCoffeeChair(): THREE.Group {
       tube([offset + reach, railLow, backZ(railLow)], [offset - reach, railTop, backZ(railTop)], 0.02),
     );
   }
+  group.scale.setScalar(CHAIR_SCALE);
   return group;
 }
 
 const TABLE_TOP = 1.0;
 const TABLE_Y = 0.78;
+const TABLE_SPREAD = 1.2;
 
 export function createCoffeeTable(): THREE.Group {
   const group = new THREE.Group(); group.name = "coffee shop square bistro table";
@@ -119,5 +128,6 @@ export function createCoffeeTable(): THREE.Group {
     foot.position.set(dx * (ARM - 0.02), 0.0125, dz * (ARM - 0.02)); foot.castShadow = true;
     group.add(foot);
   }
+  group.scale.set(TABLE_SPREAD, CAFE_TABLE_HEIGHT / TABLE_Y, TABLE_SPREAD);
   return group;
 }
