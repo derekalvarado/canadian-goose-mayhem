@@ -283,7 +283,10 @@ export class Game {
           void this.audio.playHonk();
           this.lastInputTime = performance.now();
         }
-        if (event.type === "goose-shooed") this.goose.spook();
+        if (event.type === "goose-shooed") {
+          this.goose.spook();
+          this.framing.release(event.actorId);
+        }
         if ((event.type === "entity-grabbed" || event.type === "entity-dropped") && event.actorId === "goose") this.goose.grab();
         if (event.type === "objective-completed") this.celebrateTask(event.objectiveId);
         if (event.type === "device-state-changed" && event.active && this.simulation.world.entities.find((entity) => entity.id === event.targetId)?.tags.includes("bell")) this.audio.playBell();

@@ -108,6 +108,19 @@ test("framing prefers the closest of several characters", () => {
   assert.equal(framing.framedSubjectId, "near");
 });
 
+test("a character who shoos the goose is released from the shot until they are far away", () => {
+  const framing = new SubjectFraming();
+  const goose = { x: 0, z: 0 };
+  const barista = [{ id: "barista", x: 4, z: 0 }];
+  framing.focus(goose, barista);
+  framing.release("barista");
+  assert.deepEqual(framing.focus(goose, barista), goose, "the goose is centered while the barista is nearby");
+  assert.equal(framing.framedSubjectId, undefined);
+  framing.focus(goose, [{ id: "barista", x: 12, z: 0 }]);
+  const returned = framing.focus(goose, [{ id: "barista", x: 4, z: 0 }]);
+  assert.ok(returned.x > 0, "the barista can be framed again after leaving and returning");
+});
+
 function memoryStorage(initial: Record<string, string>): WorldLayoutStorage {
   const values = new Map(Object.entries(initial));
   return { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); }, removeItem: (key) => { values.delete(key); } };
