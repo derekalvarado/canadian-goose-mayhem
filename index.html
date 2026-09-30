@@ -28,11 +28,6 @@
       </div>
 
       <div class="hud" aria-label="Game information">
-        <aside class="device-pill" id="device-pill" aria-live="polite">
-          <span class="device-light"></span>
-          <span id="device-label">Keyboard ready</span>
-        </aside>
-
         <button id="settings-button" class="hud-action" type="button" aria-haspopup="dialog" aria-controls="settings-menu">Settings</button>
         <button id="install-button" class="hud-action hud-action--install" type="button" hidden aria-haspopup="dialog" aria-controls="install-menu">Install app</button>
         <button id="fullscreen-button" class="hud-action hud-action--fullscreen" type="button">Fullscreen</button>
@@ -63,14 +58,12 @@
           </div>
         </section>
 
-        <aside class="todo-list" id="todo-list" aria-label="To-do list">
+        <button id="todo-toggle" class="todo-toggle" type="button" aria-expanded="false" aria-controls="todo-list" aria-keyshortcuts="T">To Do <span id="todo-count" class="todo-count">0</span></button>
+
+        <aside class="todo-list" id="todo-list" aria-label="To-do list" aria-live="polite" hidden>
           <p id="todo-title">To do</p>
           <ul id="objective-list"></ul>
         </aside>
-
-        <div class="task-toast" id="task-toast" hidden role="status" aria-live="polite">
-          <span class="task-toast__check" aria-hidden="true">✓</span><span id="task-toast-label"></span>
-        </div>
 
         <section class="chapter-complete all-done" id="all-done" hidden aria-live="polite">
           <div class="complete-card">

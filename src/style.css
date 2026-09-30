@@ -195,33 +195,11 @@ button {
   background: rgba(246, 241, 223, 0.32);
 }
 
-.device-pill {
-  position: absolute;
-  top: max(24px, env(safe-area-inset-top));
-  right: max(24px, env(safe-area-inset-right));
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 36px;
-  padding: 8px 13px;
-  border: 1px solid rgba(246, 241, 223, 0.18);
-  border-radius: 999px;
-  background: rgba(15, 26, 18, 0.62);
-  color: rgba(246, 241, 223, 0.82);
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.025em;
-  box-shadow: 0 8px 26px rgba(5, 13, 8, 0.14);
-  backdrop-filter: blur(12px);
-  transition: opacity 240ms ease, transform 240ms ease;
-}
-
 .dev-mode-banner {
   position: fixed;
-  top: 12px;
-  left: 50%;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(18px, env(safe-area-inset-left));
   z-index: 20;
-  transform: translateX(-50%);
   padding: 6px 10px;
   border: 1px solid rgba(241, 211, 139, 0.5);
   border-radius: 999px;
@@ -251,14 +229,6 @@ button {
   opacity: 0;
 }
 
-.device-light {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #b8d67f;
-  box-shadow: 0 0 0 3px rgba(184, 214, 127, 0.13);
-}
-
 .controls-card {
   position: absolute;
   right: max(24px, env(safe-area-inset-right));
@@ -281,13 +251,18 @@ button {
   display: none;
 }
 
-.todo-list { position: absolute; top: max(22px, env(safe-area-inset-top)); left: max(24px, env(safe-area-inset-left)); width: min(300px, calc(100vw - 48px)); padding: 15px 18px; border: 1px solid rgb(246 241 223 / 22%); border-radius: 4px 18px 4px 18px; background: var(--paper); box-shadow: 0 14px 38px rgb(5 13 8 / 22%); backdrop-filter: blur(14px); }
+.todo-toggle { position: absolute; top: 0; left: 50%; z-index: 4; display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 138px; min-height: 42px; padding: 9px 16px 10px; border: 1px solid rgb(246 241 223 / 24%); border-top: 0; border-radius: 0 0 14px 14px; background: rgb(15 26 18 / 88%); color: var(--ink); font: 800 .78rem/1 system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; transform: translateX(-50%); cursor: pointer; pointer-events: auto; backdrop-filter: blur(10px); }
+.todo-toggle:hover, .todo-toggle:focus-visible { border-color: var(--sun); background: rgb(35 75 53 / 92%); }
+.todo-count { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 50%; background: var(--sun); color: rgb(15 26 18); font-size: .66rem; letter-spacing: 0; }
+.todo-list { position: absolute; top: max(38px, calc(env(safe-area-inset-top) + 16px)); left: 50%; z-index: 5; width: min(300px, calc(100vw - 48px)); padding: 15px 18px; border: 1px solid rgb(246 241 223 / 22%); border-radius: 4px 18px 4px 18px; background: var(--paper); box-shadow: 0 14px 38px rgb(5 13 8 / 22%); transform: translateX(-50%); backdrop-filter: blur(14px); }
+.todo-list--reveal { animation: todo-list-drop 420ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 .todo-list > p { margin: 0 0 9px; color: var(--sun); font: 800 .68rem/1 system-ui, sans-serif; letter-spacing: .19em; text-transform: uppercase; }
 .todo-list ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .todo-list li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: center; color: var(--ink); font: 650 .82rem/1.3 system-ui, sans-serif; }
 .todo-list li::before { content: ""; width: 13px; height: 13px; border: 1px solid rgb(246 241 223 / 55%); border-radius: 2px; transform: rotate(-2deg); }
 .todo-list li.is-complete { color: var(--ink-muted); text-decoration: line-through; }
 .todo-list li.is-complete::before { content: "✓"; display: grid; place-items: center; border-color: var(--sun); color: var(--sun); font-size: .72rem; text-decoration: none; }
+.todo-list li.is-newly-complete { margin: -4px -6px; padding: 4px 6px; border-radius: 5px; background: rgb(241 211 139 / 32%); animation: completed-task-highlight 1400ms ease-out both; }
 .interaction-prompt { position: absolute; left: 50%; bottom: max(88px, calc(env(safe-area-inset-bottom) + 68px)); display: flex; align-items: center; gap: 9px; padding: 8px 12px; border: 1px solid rgb(246 241 223 / 26%); border-radius: 999px; background: rgb(15 26 18 / 82%); color: var(--ink); font-size: .78rem; font-weight: 750; transform: translateX(-50%); backdrop-filter: blur(10px); }
 .interaction-prompt[hidden] { display: none; }
 
@@ -371,9 +346,9 @@ kbd,
 }
 
 .hud-action { position: absolute; z-index: 4; pointer-events: auto; min-height: 36px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgb(15 26 18 / 76%); color: var(--ink); font-size: .72rem; font-weight: 700; cursor: pointer; }
-#settings-button { right: max(24px, env(safe-area-inset-right)); top: max(70px, calc(env(safe-area-inset-top) + 46px)); }
-#fullscreen-button { right: max(24px, env(safe-area-inset-right)); top: max(114px, calc(env(safe-area-inset-top) + 90px)); }
-#install-button { right: max(24px, env(safe-area-inset-right)); top: max(158px, calc(env(safe-area-inset-top) + 134px)); }
+#settings-button { right: max(24px, env(safe-area-inset-right)); top: max(24px, env(safe-area-inset-top)); }
+#fullscreen-button { right: max(24px, env(safe-area-inset-right)); top: max(68px, calc(env(safe-area-inset-top) + 44px)); }
+#install-button { right: max(24px, env(safe-area-inset-right)); top: max(112px, calc(env(safe-area-inset-top) + 88px)); }
 .touch-controls { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .touch-movement-area { position: absolute; inset: 30% 45% 0 0; pointer-events: auto; touch-action: none; }
 .touch-stick { position: fixed; width: 104px; height: 104px; margin: -52px; border: 2px solid rgb(243 242 233 / 42%); border-radius: 50%; background: rgb(15 26 18 / 26%); pointer-events: none; }
@@ -881,6 +856,16 @@ kbd,
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes todo-list-drop {
+  from { opacity: 0; transform: translate(-50%, -16px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes completed-task-highlight {
+  from { background: rgb(241 211 139 / 68%); }
+  to { background: rgb(241 211 139 / 32%); }
+}
+
 @media (max-width: 780px) {
   .mission-card {
     width: min(320px, calc(100vw - 36px));
@@ -892,13 +877,6 @@ kbd,
   .mission-weather,
   .trail-progress {
     display: none;
-  }
-
-  .device-pill {
-    top: auto;
-    right: auto;
-    bottom: max(18px, env(safe-area-inset-bottom));
-    left: max(18px, env(safe-area-inset-left));
   }
 
   .controls-card {
@@ -929,10 +907,6 @@ kbd,
     display: none;
   }
 
-  .device-pill {
-    right: max(18px, env(safe-area-inset-right));
-    left: auto;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1013,9 +987,6 @@ kbd,
 .asset-drawer.is-folded > .editor-fold .editor-fold__arrow::before { content: "▸"; }
 .plaza-editor.is-folded > .editor-fold .editor-fold__arrow::before { content: "◂"; }
 
-.task-toast { position: absolute; left: 50%; top: max(22px, env(safe-area-inset-top)); z-index: 5; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: 1px solid rgb(241 211 139 / 55%); border-radius: 4px 16px 4px 16px; background: var(--paper); color: var(--ink); font: 700 .9rem/1.3 system-ui, sans-serif; box-shadow: 0 14px 38px rgb(5 13 8 / 28%); transform: translateX(-50%); animation: reveal-card 550ms cubic-bezier(0.16, 1, 0.3, 1) both; pointer-events: none; }
-.task-toast[hidden] { display: none; }
-.task-toast__check { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--sun); color: rgb(15 26 18); font-size: .8rem; font-weight: 900; }
 .all-done { bottom: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(380px, calc(100vw - 48px)); z-index: 6; }
 .all-done .complete-card p:last-child { margin: 10px 0 0; color: var(--ink-muted); font-size: .9rem; line-height: 1.45; }
 .settings-card .settings-danger { width: 100%; border-color: rgb(241 211 139 / 45%); background: rgb(158 79 67 / 82%); }

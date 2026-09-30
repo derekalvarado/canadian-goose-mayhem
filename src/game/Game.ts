@@ -102,7 +102,6 @@ export class Game {
   private readonly controlsCard = requireElement<HTMLElement>("#controls-card");
   private readonly keyboardControls = requireElement<HTMLElement>("#keyboard-controls");
   private readonly gamepadControls = requireElement<HTMLElement>("#gamepad-controls");
-  private readonly deviceLabel = requireElement<HTMLElement>("#device-label");
   private readonly touchControlsRoot = requireElement<HTMLElement>("#touch-controls");
   private readonly settingsMenu = requireElement<HTMLElement>("#settings-menu");
   private readonly rotateMessage = requireElement<HTMLElement>("#rotate-message");
@@ -111,19 +110,19 @@ export class Game {
   private readonly installMenu = requireElement<HTMLElement>("#install-menu");
   private readonly fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
   private readonly touchPreferenceSelect = requireElement<HTMLSelectElement>("#touch-controls-preference");
+  private readonly todoToggle = requireElement<HTMLButtonElement>("#todo-toggle");
+  private readonly todoCount = requireElement<HTMLElement>("#todo-count");
   private readonly objectiveList = requireElement<HTMLUListElement>("#objective-list");
   private readonly interactionPrompt = requireElement<HTMLElement>("#interaction-prompt");
   private readonly interactionKey = requireElement<HTMLElement>("#interaction-key");
   private readonly interactionLabel = requireElement<HTMLElement>("#interaction-label");
-  private readonly taskToast = requireElement<HTMLElement>("#task-toast");
-  private readonly taskToastLabel = requireElement<HTMLElement>("#task-toast-label");
   private readonly allDone = requireElement<HTMLElement>("#all-done");
   private readonly allDoneLevel = requireElement<HTMLElement>("#all-done-level");
   private readonly todoList = requireElement<HTMLElement>("#todo-list");
   private readonly todoTitle = requireElement<HTMLElement>("#todo-title");
   private readonly startOverButton = requireElement<HTMLButtonElement>("#start-over");
-  private readonly toastQueue: string[] = [];
-  private toastTimer = 0;
+  private todoTimer = 0;
+  private highlightedObjectiveId: string | undefined;
   private startOverArmed = false;
   private readonly pauseReasons = new PauseReasons();
   private touchControls: TouchControls | null = null;
@@ -492,12 +491,12 @@ export class Game {
   }
 
   private celebrateTask(objectiveId: string): void {
+    this.highlightedObjectiveId = objectiveId;
     this.renderObjectives();
     saveProgress(this.simulation.sessionState);
     this.audio.playTaskComplete();
     const task = this.simulation.objectiveList.find((objective) => objective.id === objectiveId);
-    if (task) this.toastQueue.push(task.description);
-    if (!this.toastTimer) this.showNextToast();
+    this.revealTodoList();
     // Finishing a level's last task, wherever the goose happens to be, earns that level's card.
     const level = task?.areaId;
     const levelTasks = this.simulation.objectiveList.filter((objective) => objective.areaId === level);
@@ -510,14 +509,40 @@ export class Game {
     }
   }
 
-  private readonly showNextToast = (): void => {
-    const next = this.toastQueue.shift();
-    if (!next) { this.taskToast.hidden = true; this.toastTimer = 0; return; }
-    this.taskToastLabel.textContent = next;
-    // Re-trigger the reveal animation for back-to-back tasks.
-    this.taskToast.hidden = true; void this.taskToast.offsetWidth; this.taskToast.hidden = false;
-    this.toastTimer = window.setTimeout(this.showNextToast, 2600);
+  private readonly toggleTodoList = (): void => {
+    if (this.todoList.hidden) this.openTodoList(); else this.closeTodoList();
   };
+
+  private readonly handleTodoShortcut = (event: KeyboardEvent): void => {
+    if (event.code !== "KeyT" || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.target instanceof HTMLElement && event.target.closest("button, input, textarea, select, [contenteditable]")) return;
+    event.preventDefault();
+    this.toggleTodoList();
+  };
+
+  private openTodoList(): void {
+    window.clearTimeout(this.todoTimer);
+    this.todoTimer = 0;
+    this.todoList.hidden = false;
+    this.todoToggle.setAttribute("aria-expanded", "true");
+  }
+
+  private closeTodoList(): void {
+    window.clearTimeout(this.todoTimer);
+    this.todoTimer = 0;
+    this.todoList.hidden = true;
+    this.todoList.classList.remove("todo-list--reveal");
+    this.todoToggle.setAttribute("aria-expanded", "false");
+    this.highlightedObjectiveId = undefined;
+    this.objectiveList.querySelector(".is-newly-complete")?.classList.remove("is-newly-complete");
+  }
+
+  private revealTodoList(): void {
+    this.openTodoList();
+    // Re-trigger the reveal animation for back-to-back completed tasks.
+    this.todoList.classList.remove("todo-list--reveal"); void this.todoList.offsetWidth; this.todoList.classList.add("todo-list--reveal");
+    this.todoTimer = window.setTimeout(() => this.closeTodoList(), 3600);
+  }
 
   private readonly startOver = (): void => {
     if (!this.startOverArmed) {
@@ -533,14 +558,22 @@ export class Game {
   };
   private progressCleared = false;
 
-  /** Only the current level's tasks are listed; levels without tasks hide the list. */
+  /** The normal list is local to this level; a just-finished remote task is briefly included for its completion reveal. */
   private renderObjectives(): void {
     const tasks = this.simulation.objectiveList.filter((objective) => !objective.areaId || objective.areaId === this.worldArea.id);
-    this.todoList.hidden = tasks.length === 0;
+    const highlightedTask = this.highlightedObjectiveId
+      ? this.simulation.objectiveList.find((objective) => objective.id === this.highlightedObjectiveId)
+      : undefined;
+    const visibleTasks = highlightedTask && !tasks.some((objective) => objective.id === highlightedTask.id)
+      ? [highlightedTask, ...tasks]
+      : tasks;
+    this.todoToggle.hidden = visibleTasks.length === 0;
+    if (visibleTasks.length === 0) this.closeTodoList();
+    this.todoCount.textContent = String(tasks.filter((objective) => !objective.completed).length);
     this.todoTitle.textContent = LEVEL_NAMES[this.worldArea.id] ? `To do · ${LEVEL_NAMES[this.worldArea.id]}` : "To do";
-    this.objectiveList.replaceChildren(...tasks.map((objective) => {
+    this.objectiveList.replaceChildren(...visibleTasks.map((objective) => {
       const item = document.createElement("li"); item.textContent = objective.description;
-      item.dataset.objectiveId = objective.id; item.classList.toggle("is-complete", objective.completed);
+      item.dataset.objectiveId = objective.id; item.classList.toggle("is-complete", objective.completed); item.classList.toggle("is-newly-complete", objective.id === this.highlightedObjectiveId);
       return item;
     }));
   }
@@ -553,17 +586,10 @@ export class Game {
     this.interactionLabel.textContent = hint;
   }
 
-  private readonly handleDeviceChanged = (device: InputDevice, controllerConnected: boolean): void => {
+  private readonly handleDeviceChanged = (device: InputDevice): void => {
     const usingGamepad = device === "gamepad";
     this.keyboardControls.hidden = usingGamepad;
     this.gamepadControls.hidden = !usingGamepad;
-    this.deviceLabel.textContent = device === "touch"
-      ? "Touch controls active"
-      : usingGamepad
-      ? "Controller active"
-      : controllerConnected
-        ? "Keyboard · controller ready"
-        : "Keyboard ready";
     this.lastInputTime = performance.now();
     this.controlsCard.classList.remove("controls-card--quiet");
   };
@@ -601,6 +627,8 @@ export class Game {
       },
     );
     this.settingsButton.addEventListener("click", this.openSettings);
+    this.todoToggle.addEventListener("click", this.toggleTodoList);
+    window.addEventListener("keydown", this.handleTodoShortcut);
     this.startOverButton.addEventListener("click", this.startOver);
     this.installButton.addEventListener("click", this.openInstallHelp);
     requireElement<HTMLButtonElement>("#install-close").addEventListener("click", this.closeInstallHelp);
@@ -707,6 +735,7 @@ export class Game {
   private readonly dispose = (): void => {
     if (this.disposed) return;
     this.disposed = true;
+    window.clearTimeout(this.todoTimer);
     if (!this.progressCleared && !this.editorMode && !this.overviewMode) saveProgress(this.simulation.sessionState);
     this.audio.setCafeMusic(false);
     this.renderer.setAnimationLoop(null);
@@ -717,6 +746,7 @@ export class Game {
     window.removeEventListener("focus", this.handleFocus);
     document.removeEventListener("visibilitychange", this.handleVisibility);
     document.removeEventListener("fullscreenchange", this.syncFullscreenLabel);
+    window.removeEventListener("keydown", this.handleTodoShortcut);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
   };
