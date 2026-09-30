@@ -2,7 +2,7 @@ const PRECACHE_CACHE_PREFIX = "goose-game-precache-";
 const RUNTIME_CACHE_PREFIX = "goose-game-runtime-";
 const BUILD_ID = "dev";
 const PRECACHE_CACHE_NAME = `${PRECACHE_CACHE_PREFIX}${BUILD_ID}`;
-const RUNTIME_CACHE_NAME = `${RUNTIME_CACHE_PREFIX}v1`;
+const RUNTIME_CACHE_NAME = `${RUNTIME_CACHE_PREFIX}${BUILD_ID}`;
 const PRECACHE_URLS = [];
 const HAS_PRECACHE = PRECACHE_URLS.length > 0;
 const NETWORK_TIMEOUT_MS = 1500;
@@ -78,17 +78,15 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith((async () => {
-      const cached = await findCached(request)
-        ?? (await caches.match(new URL("index.html", self.location)))
-        ?? (await caches.match(new URL("./", self.location)));
-      if (HAS_PRECACHE && cached) return cached;
-
       try {
         const response = await fetchWithTimeout(request);
         if (!response.ok) throw new Error(`Navigation failed with ${response.status}`);
         await cacheNavigation(request, response);
         return response;
       } catch {
+        const cached = await findCached(request)
+          ?? (await caches.match(new URL("index.html", self.location)))
+          ?? (await caches.match(new URL("./", self.location)));
         return cached ?? new Response("Goose Game 2 is unavailable until it has been opened online once.", {
           status: 503,
           headers: { "Content-Type": "text/plain; charset=utf-8" },
