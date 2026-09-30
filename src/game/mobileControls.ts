@@ -71,4 +71,12 @@ export class PauseReasons {
   }
 
   get paused(): boolean { return this.reasons.size > 0; }
+
+  /** Keep the browser visibility and focus signals in sync, even when they arrive in either order. */
+  syncPageActivity(hidden: boolean, focused: boolean): boolean {
+    const wasPaused = this.paused;
+    if (hidden) this.reasons.add("hidden"); else this.reasons.delete("hidden");
+    if (focused) this.reasons.delete("focus"); else this.reasons.add("focus");
+    return wasPaused !== this.paused;
+  }
 }

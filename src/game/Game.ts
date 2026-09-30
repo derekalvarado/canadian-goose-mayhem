@@ -712,6 +712,15 @@ export class Game {
 
   private setPauseReason(reason: string, active: boolean): void {
     const changed = this.pauseReasons.set(reason, active);
+    this.applyPauseState(changed);
+  }
+
+  private syncPageActivityPause(): void {
+    const changed = this.pauseReasons.syncPageActivity(document.hidden, document.hasFocus());
+    this.applyPauseState(changed);
+  }
+
+  private applyPauseState(changed: boolean): void {
     this.paused = this.pauseReasons.paused;
     if (changed) {
       this.simulation.suspend();
@@ -724,10 +733,10 @@ export class Game {
     this.updateTouchControlsVisibility();
   }
 
-  private readonly handleBlur = (): void => { this.setPauseReason("focus", true); };
-  private readonly handleFocus = (): void => { this.setPauseReason("focus", document.hidden); };
+  private readonly handleBlur = (): void => { this.syncPageActivityPause(); };
+  private readonly handleFocus = (): void => { this.syncPageActivityPause(); };
   private readonly handleVisibility = (): void => {
-    this.setPauseReason("hidden", document.hidden || !document.hasFocus());
+    this.syncPageActivityPause();
     if (document.hidden && !this.progressCleared) saveProgress(this.simulation.sessionState);
   };
 

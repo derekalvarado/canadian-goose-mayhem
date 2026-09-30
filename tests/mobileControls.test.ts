@@ -39,3 +39,15 @@ test("pause reasons compose and portrait policy excludes desktop-sized windows",
   assert.equal(shouldPauseForPortrait(false, 390, 844), false);
   assert.equal(shouldPauseForPortrait(true, 844, 390), false);
 });
+
+test("page activity pause recovers when visibility returns before focus", () => {
+  const pauses = new PauseReasons();
+  assert.equal(pauses.syncPageActivity(true, false), true);
+  assert.equal(pauses.paused, true);
+
+  // Browsers may report a visible document just before the window focus event.
+  assert.equal(pauses.syncPageActivity(false, false), false);
+  assert.equal(pauses.paused, true);
+  assert.equal(pauses.syncPageActivity(false, true), true);
+  assert.equal(pauses.paused, false);
+});
