@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 export type InputDevice = "keyboard" | "gamepad" | "touch";
+export type GamepadLayout = "standard" | "single-right-joycon";
 
 export interface InputFrame {
   move: THREE.Vector2;
@@ -11,6 +12,7 @@ export interface InputFrame {
   sneaking: boolean;
   threatening: boolean;
   device: InputDevice;
+  gamepadLayout?: GamepadLayout;
 }
 
 const MOVEMENT_KEYS = new Set([
@@ -36,6 +38,15 @@ function applyDeadzone(value: number, deadzone = 0.18): number {
   const magnitude = Math.abs(value);
   if (magnitude <= deadzone) return 0;
   return Math.sign(value) * ((magnitude - deadzone) / (1 - deadzone));
+}
+
+function gamepadLayout(gamepad: Gamepad): GamepadLayout {
+  if (gamepad.mapping !== "standard" && /Joy-Con\s*\(R\)/i.test(gamepad.id)) return "single-right-joycon";
+  return "standard";
+}
+
+function gamepadButtonDown(gamepad: Gamepad, index: number): boolean {
+  return Boolean(gamepad.buttons[index]?.pressed);
 }
 
 export class InputController {
@@ -78,18 +89,26 @@ export class InputController {
 
     const gamepads = navigator.getGamepads?.() ?? [];
     const gamepad = Array.from(gamepads).find((candidate) => candidate?.connected);
+    let activeGamepadLayout: GamepadLayout | undefined;
 
     if (gamepad) {
       this.connectedGamepad = true;
-      const stickX = applyDeadzone(gamepad.axes[0] ?? 0);
-      const stickY = -applyDeadzone(gamepad.axes[1] ?? 0);
-      const gamepadHurry = (gamepad.buttons[7]?.value ?? 0) > 0.25
-        || Boolean(gamepad.buttons[5]?.pressed);
-      const gamepadHonkDown = Boolean(gamepad.buttons[0]?.pressed);
-      const gamepadInteractDown = Boolean(gamepad.buttons[1]?.pressed);
-      const gamepadWingsSpread = Boolean(gamepad.buttons[2]?.pressed);
-      const gamepadSneaking = Boolean(gamepad.buttons[3]?.pressed);
-      const gamepadThreatening = Boolean(gamepad.buttons[4]?.pressed);
+      activeGamepadLayout = gamepadLayout(gamepad);
+      const singleRightJoyCon = activeGamepadLayout === "single-right-joycon";
+      const stickX = singleRightJoyCon
+        ? Number(gamepadButtonDown(gamepad, 15)) - Number(gamepadButtonDown(gamepad, 14))
+        : applyDeadzone(gamepad.axes[0] ?? 0);
+      const stickY = singleRightJoyCon
+        ? Number(gamepadButtonDown(gamepad, 12)) - Number(gamepadButtonDown(gamepad, 13))
+        : -applyDeadzone(gamepad.axes[1] ?? 0);
+      const gamepadHurry = singleRightJoyCon
+        ? gamepadButtonDown(gamepad, 5)
+        : (gamepad.buttons[7]?.value ?? 0) > 0.25 || gamepadButtonDown(gamepad, 5);
+      const gamepadHonkDown = gamepadButtonDown(gamepad, 0);
+      const gamepadInteractDown = gamepadButtonDown(gamepad, singleRightJoyCon ? 2 : 1);
+      const gamepadWingsSpread = gamepadButtonDown(gamepad, singleRightJoyCon ? 1 : 2);
+      const gamepadSneaking = gamepadButtonDown(gamepad, 3);
+      const gamepadThreatening = gamepadButtonDown(gamepad, 4);
       const gamepadActive = Math.hypot(stickX, stickY) > 0.03
         || gamepadHurry
         || gamepadHonkDown
@@ -143,6 +162,7 @@ export class InputController {
       sneaking: this.sneaking,
       threatening,
       device: this.lastDevice,
+      gamepadLayout: activeGamepadLayout,
     };
   }
 

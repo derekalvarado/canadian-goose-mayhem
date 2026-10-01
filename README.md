@@ -83,6 +83,10 @@ its own fold button.
 - Spread wings while held: `Q` or the controller west face button
 - Lower into a threat posture while held: `E` or the controller north face button
 
+A single right Joy-Con is supported sideways in Safari on macOS and iPadOS: the
+stick moves, `SR` hurries, `A` honks, `X` uses, `B` spreads, `Y` sneaks, and `SL`
+threatens.
+
 On touch-first devices, play in landscape with the floating left-side joystick
 (18 px dead zone, 86 px full deflection); push past 62 CSS pixels to hurry (it
 releases below 52 pixels) and use the separate right-side **Honk**, **Wings**, and
