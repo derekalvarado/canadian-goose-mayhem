@@ -1,5 +1,6 @@
 import { Objectives, type ObjectiveDefinition } from "./Objectives.ts";
 import { CafeCrew, type CafeCrewDefinition, type CafePersonState, type CafeWorld } from "./cafeCrew.ts";
+import { Townsfolk, type DogState, type TownsfolkDefinition, type TownspersonState } from "./townsfolk.ts";
 
 export interface Position { x: number; y: number; z: number }
 export interface PlayerState {
@@ -114,6 +115,9 @@ export interface WorldSnapshot {
   readonly player: PlayerState; readonly entities: readonly WorldEntityState[];
   readonly janitor?: JanitorState; readonly splashKids: readonly SplashKidState[]; readonly durableFacts: readonly string[];
   readonly cafePeople: readonly CafePersonState[];
+  /** Parents, passers-by, and their dog in the square; empty elsewhere. */
+  readonly townsfolk?: readonly TownspersonState[];
+  readonly dogs?: readonly DogState[];
 }
 export type GameplayEvent =
   | { readonly type: "goose-honked"; readonly actorId: "goose"; readonly position: Readonly<Position> }
@@ -128,6 +132,7 @@ export type GameplayEvent =
   | { readonly type: "goose-shooed"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "splash-kid-frightened"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "person-startled"; readonly actorId: string; readonly position: Readonly<Position> }
+  | { readonly type: "dog-barked"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "drink-spilled"; readonly actorId: string; readonly entityId: string; readonly position: Readonly<Position> }
   | { readonly type: "order-called"; readonly actorId: string; readonly entityId: string; readonly forActorId: string; readonly position: Readonly<Position> }
   | { readonly type: "area-transition-requested"; readonly transitionId: string; readonly toAreaId: string; readonly targetPosition: Readonly<Position>; readonly targetHeading: number }
@@ -142,6 +147,7 @@ export interface WorldRules {
   readonly transitions?: readonly AreaTransitionDefinition[];
   readonly surfaces?: readonly PlacementSurface[];
   readonly cafe?: CafeCrewDefinition;
+  readonly townsfolk?: TownsfolkDefinition;
   resolveMovement(current: Readonly<Position>, proposed: Readonly<Position>, output: Position): void;
 }
 
@@ -219,6 +225,7 @@ export class Simulation {
   private readonly surfaces: readonly PlacementSurface[];
   private janitor?: MutableJanitor;
   private readonly cafe?: CafeCrew;
+  private readonly town?: Townsfolk;
   private heading = 0; private turnAmount = 0; private wingsSpread = false; private sneaking = false; private threatening = false;
   private accumulator = 0; private honkQueued = false; private interactionQueued = false;
   private tickCount = 0; private idleSeconds = 0; private poopSequence = 0;
@@ -264,6 +271,7 @@ export class Simulation {
         activity: "playing", activitySecondsRemaining: 0, routeIndex: Math.min(1, definition.playRoute.length - 1) });
     }
     if (rules.cafe) this.cafe = new CafeCrew(rules.cafe);
+    if (rules.townsfolk) this.town = new Townsfolk(rules.townsfolk);
     this.reset();
     if (sessionState) this.restoreSessionState(sessionState);
   }
@@ -298,7 +306,8 @@ export class Simulation {
       completedTrashIdsThisLap: [...this.janitor.completedTrashIdsThisLap] } : undefined,
       splashKids: this.splashKids.map((child) => ({ id: child.definition.id, position: { ...child.position }, heading: child.heading,
         activity: child.activity, activitySecondsRemaining: child.activitySecondsRemaining })),
-      durableFacts: [...this.durableFacts], cafePeople: this.cafe?.snapshot() ?? [] };
+      durableFacts: [...this.durableFacts], cafePeople: this.cafe?.snapshot() ?? [],
+      townsfolk: this.town?.snapshot() ?? [], dogs: this.town?.dogSnapshot() ?? [] };
   }
   get objectiveList(): readonly Readonly<{ id: string; description: string; areaId?: string; completed: boolean }>[] {
     return this.rules.objectives.map((objective) => ({ id: objective.id, description: objective.description, areaId: objective.areaId,
@@ -386,6 +395,7 @@ export class Simulation {
       entity.condition = entity.definition.condition; entity.orderFor = undefined; entity.restingOn = this.surfaceAt(entity.position)?.id;
     }
     this.cafe?.reset();
+    this.town?.reset();
     if (this.janitor) {
       const janitor = this.janitor;
       Object.assign(janitor.position, janitor.definition.position); janitor.heading = janitor.definition.heading;
@@ -440,6 +450,7 @@ export class Simulation {
     this.updateSplashKids(events);
     this.updateJanitor(events, honked);
     this.cafe?.update(this.cafeWorld(events, honked), events, FIXED_STEP);
+    this.town?.update({ position: this.position, startling: honked || this.wingsSpread || this.threatening }, events, FIXED_STEP);
     this.syncOwnedEntities();
     for (const zone of this.rules.objectiveZones ?? []) {
       const guarded = zone.guardedBy === this.janitor?.definition.id

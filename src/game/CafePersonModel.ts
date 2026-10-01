@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { createPersonRig, HEAD_CENTER, HEAD_RADII, type Point, type Weight } from "./personRig.ts";
 import { PALETTE } from "./palette.ts";
 import { JANITOR_LEGS, type LegDimensions } from "./janitorGaits.ts";
 import { createCafePersonClips } from "./cafeMoves.ts";
@@ -39,9 +39,6 @@ export function cafePersonLegs(variant: CafeVariant): LegDimensions {
 }
 export function cafePersonScale(variant: CafeVariant): number { return HEIGHT_SCALE[variant]; }
 
-type Point = [number, number, number];
-type Weight = (position: THREE.Vector3) => [number, number, number];
-
 /**
  * Coffee-shop people on the janitor's 18-bone rig and proportions (he is the
  * reference for how people look in this game), with their own faces, hair, and
@@ -50,74 +47,9 @@ type Weight = (position: THREE.Vector3) => [number, number, number];
  */
 export function createCafePersonModel(variant: CafeVariant): THREE.Group {
   const k = HEIGHT_SCALE[variant];
-  const model = new THREE.Group();
-  model.name = `cafe-${variant}`;
+  const rig = createPersonRig<ColorSlot>(`cafe-${variant}`, k);
+  const { model, hips, chest, neck, head, joint, rigid, blendY, torsoWeight, add, oval, garment, tube, onFace } = rig;
   model.userData = { assetRole: "rigged-character", visualDetailTier: 3, forward: "-Z", variant };
-  const bones: THREE.Bone[] = [];
-  const bindPositions = new Map<string, THREE.Vector3>();
-  function joint(name: string, position: Point, parent?: THREE.Bone): THREE.Bone {
-    const bone = new THREE.Bone();
-    bone.name = name;
-    const absolute = new THREE.Vector3(...position).multiplyScalar(k);
-    bone.position.copy(absolute);
-    if (parent) bone.position.sub(bindPositions.get(parent.name)!);
-    (parent ?? model).add(bone);
-    bones.push(bone);
-    bindPositions.set(name, absolute);
-    return bone;
-  }
-  const root = joint("root", [0, 0, 0]);
-  const hips = joint("hips", [0, 1.02, 0], root);
-  const spine = joint("spine", [0, 1.28, 0], hips);
-  const chest = joint("chest", [0, 1.65, 0], spine);
-  const neck = joint("neck", [0, 1.92, 0], chest);
-  const head = joint("head", [0, 2.05, -0.015], neck);
-  const rigid = (bone: THREE.Bone): Weight => () => [bones.indexOf(bone), bones.indexOf(bone), 0];
-  const blendY = (lower: THREE.Bone, upper: THREE.Bone, bottom: number, top: number): Weight => (p) => [
-    bones.indexOf(lower), bones.indexOf(upper), THREE.MathUtils.smoothstep(p.y, bottom, top),
-  ];
-  const torsoWeight: Weight = (p) => p.y < 1.42 ? blendY(hips, spine, 1.08, 1.4)(p) : blendY(spine, chest, 1.42, 1.8)(p);
-  const pieces = new Map<ColorSlot, THREE.BufferGeometry[]>();
-  /** Weights are read in janitor coordinates, then the piece is scaled to this person's size. */
-  function add(geometry: THREE.BufferGeometry, slot: ColorSlot, weight: Weight): void {
-    geometry.deleteAttribute("uv");
-    const p = new THREE.Vector3();
-    const positions = geometry.getAttribute("position");
-    const indices: number[] = [], weights: number[] = [];
-    for (let i = 0; i < positions.count; i++) {
-      p.fromBufferAttribute(positions, i);
-      const [a, b, amount] = weight(p);
-      indices.push(a, b, 0, 0);
-      weights.push(1 - amount, amount, 0, 0);
-    }
-    geometry.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(indices, 4));
-    geometry.setAttribute("skinWeight", new THREE.Float32BufferAttribute(weights, 4));
-    geometry.scale(k, k, k);
-    const bucket = pieces.get(slot) ?? [];
-    bucket.push(geometry);
-    pieces.set(slot, bucket);
-  }
-  function oval(slot: ColorSlot, center: Point, radii: Point, weight: Weight, tilt: number | Point = 0): void {
-    // Small details need far fewer facets than the head and hips.
-    const segments = Math.round(THREE.MathUtils.clamp(10 + Math.max(...radii) * 50, 10, 24));
-    const geometry = new THREE.SphereGeometry(1, segments, Math.max(8, Math.round(segments * 0.66)));
-    const [rx, ry, rz] = typeof tilt === "number" ? [0, 0, tilt] : tilt;
-    geometry.scale(...radii).rotateX(rx).rotateY(ry).rotateZ(rz).translate(...center);
-    add(geometry, slot, weight);
-  }
-  function garment(slot: ColorSlot, profile: [number, number][], depth: number, center: Point, weight: Weight, phiStart = 0, phiLength = Math.PI * 2): void {
-    const curve = new THREE.SplineCurve(profile.map(([y, radius]) => new THREE.Vector2(radius, y)));
-    const geometry = new THREE.LatheGeometry(curve.getPoints(32), 32, phiStart, phiLength);
-    geometry.scale(1, 1, depth).translate(...center);
-    add(geometry, slot, weight);
-  }
-  function tube(slot: ColorSlot, from: Point, to: Point, radius: number, weight: Weight): void {
-    const start = new THREE.Vector3(...from); const end = new THREE.Vector3(...to);
-    const geometry = new THREE.CapsuleGeometry(radius, start.distanceTo(end), 8, 20);
-    geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), start.clone().sub(end).normalize()));
-    geometry.translate(...start.clone().add(end).multiplyScalar(0.5).toArray());
-    add(geometry, slot, weight);
-  }
 
   // --- Torso -------------------------------------------------------------------------------------
   const bulky = variant === "laptop" ? 0.025 : variant === "reader" || variant === "baker" ? 0.015 : 0;
@@ -157,13 +89,7 @@ export function createCafePersonModel(variant: CafeVariant): THREE.Group {
   // --- Hips and head -----------------------------------------------------------------------------
   oval("cafe-trousers", [0, 0.985, 0.012], [0.35, 0.21, 0.245], rigid(hips));
   oval("cafe-skin", [0, 1.94, -0.015], [0.13, 0.145, 0.125], blendY(chest, neck, 1.87, 1.99));
-  const headCenter: Point = [0, 2.19, -0.035];
-  const headRadii: Point = [0.27, 0.3, 0.248];
-  oval("cafe-skin", headCenter, headRadii, rigid(head));
-  const onFace = (x: number, y: number, inset = 0): Point => {
-    const u = x / headRadii[0], v = (y - headCenter[1]) / headRadii[1];
-    return [x, y, headCenter[2] - headRadii[2] * Math.sqrt(Math.max(0, 1 - u * u - v * v)) + inset];
-  };
+  oval("cafe-skin", HEAD_CENTER, HEAD_RADII, rigid(head));
   for (const side of [-1, 1]) {
     oval("cafe-skin", [side * 0.266, 2.18, -0.012], [0.058, 0.084, 0.058], rigid(head)); // ears
     const eye = onFace(side * 0.095, 2.235, 0.006);
@@ -189,36 +115,8 @@ export function createCafePersonModel(variant: CafeVariant): THREE.Group {
     tube("cafe-glasses", [-0.045, bridge[1], bridge[2]], [0.045, bridge[1], bridge[2]], 0.006, rigid(head));
   }
 
-  /**
-   * Hair: a shell hugging the scalp, cut along a hairline that sits high on the
-   * forehead and slopes down past the ears to the nape (`front`/`back` are heights
-   * above the head's centre). Then per-person styling on top.
-   */
-  const hairShell = (scale: number, front: number, back: number) => {
-    const sphere = new THREE.SphereGeometry(1, 48, 32);
-    sphere.scale(headRadii[0] * scale, headRadii[1] * scale, headRadii[2] * scale);
-    const position = sphere.getAttribute("position"); const index = sphere.getIndex()!;
-    const ry = headRadii[1] * scale; const rz = headRadii[2] * scale;
-    const above: boolean[] = [];
-    // Vertices below the hairline slide up onto it along the scalp, so the edge is a smooth curve.
-    for (let vertex = 0; vertex < position.count; vertex++) {
-      const x = position.getX(vertex); const y = position.getY(vertex); const z = position.getZ(vertex);
-      const line = front + (back - front) * (z / rz + 1) / 2;
-      above.push(y > line);
-      if (y > line) continue;
-      const ratio = Math.sqrt(Math.max(0, 1 - (line / ry) ** 2)) / Math.sqrt(Math.max(1e-6, 1 - (y / ry) ** 2));
-      position.setXYZ(vertex, x * ratio, line, z * ratio);
-    }
-    const kept: number[] = [];
-    for (let i = 0; i < index.count; i += 3) {
-      const [a, b, c] = [index.getX(i), index.getX(i + 1), index.getX(i + 2)];
-      if (above[a] || above[b] || above[c]) kept.push(a, b, c);
-    }
-    sphere.setIndex(kept);
-    sphere.computeVertexNormals();
-    sphere.translate(headCenter[0], headCenter[1] + 0.012, headCenter[2] + 0.006);
-    add(sphere, "cafe-hair", rigid(head));
-  };
+  // Hair: a shell around the scalp trimmed to a hairline, then per-person styling on top.
+  const hairShell = (scale: number, front: number, back: number) => rig.hairShell("cafe-hair", scale, front, back);
   if (variant === "barista") {
     hairShell(1.05, 0.2, -0.24);
     // A bun on the crown, and soft waves over the tops of the ears.
@@ -301,23 +199,7 @@ export function createCafePersonModel(variant: CafeVariant): THREE.Group {
     if (variant === "laptop" || variant === "student") oval("cafe-trousers", [sign * 0.22, 0.03, -0.085], [0.135, 0.03, 0.24], shoeWeight); // sneaker sole stripe
   }
 
-  model.updateMatrixWorld(true);
-  const skeleton = new THREE.Skeleton(bones);
-  const colors = CAFE_PERSON_COLORS[variant];
-  for (const [slot, geometries] of pieces) {
-    const geometry = mergeGeometries(geometries);
-    if (!geometry) throw new Error(`Unable to merge ${slot}`);
-    const material = new THREE.MeshStandardMaterial({ color: colors[slot], roughness: 1, metalness: 0 });
-    material.name = slot;
-    const mesh = new THREE.SkinnedMesh(geometry, material);
-    mesh.name = slot;
-    mesh.castShadow = true;
-    mesh.receiveShadow = false;
-    if (slot === "cafe-mouth-open") mesh.visible = false;
-    model.add(mesh);
-    mesh.bind(skeleton);
-    geometries.forEach((part) => part.dispose());
-  }
-  model.animations = createCafePersonClips(variant, new Map(bones.map((bone) => [bone.name, bone.position.clone()])));
+  rig.finish(CAFE_PERSON_COLORS[variant], ["cafe-mouth-open"]);
+  model.animations = createCafePersonClips(variant, rig.bindPose());
   return model;
 }

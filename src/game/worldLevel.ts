@@ -4,7 +4,10 @@ import { SPLASH_KID_FLEE_SPEED, SPLASH_KID_PLAY_SPEEDS, splashKidVariantOf } fro
 import { BAKER_TUNING, BARISTA_TUNING, cafeVariantOf, CUSTOMER_SHARED_TUNING, CUSTOMER_TUNING } from "./cafeTuning.ts";
 import { ENTER_SHOP_FACT_ID, ENTER_SHOP_OBJECTIVE_ID, VILLAGE_TASKS } from "./challenges.ts";
 import type { AreaTransitionDefinition, PlacementSurface, Position, WorldEntityDefinition, WorldRules } from "./simulation/Simulation.ts";
-import type { BaristaDefinition, CafeCrewDefinition, CafeRoutes, CustomerDefinition, WorkerDefinition, WorkerStation, WorkerTask } from "./simulation/cafeCrew.ts";
+import type { BaristaDefinition, CafeCrewDefinition, CafeRoutes, CustomerDefinition, PatronDefinition, PatronService, WorkerDefinition, WorkerStation, WorkerTask } from "./simulation/cafeCrew.ts";
+import type { DogDefinition, TownGraph, TownSeat, TownsfolkDefinition, TownspersonDefinition, TownSpot } from "./simulation/townsfolk.ts";
+import { BENCH_SEAT_HEIGHT, CAFE_PATRON, DOG_TUNING, TOWNSFOLK_PASTIME_SECONDS, TOWNSFOLK_PASTIMES, TOWNSFOLK_REACTIONS, TOWNSFOLK_RUNNERS, TOWNSFOLK_WALK_SPEEDS,
+  TOWNSFOLK_WALKER, townsfolkLookOf } from "./townsfolkTuning.ts";
 
 export const WORLD_GOOSE_RADIUS = 0.34;
 export const MAX_WALKABLE_STEP = 0.22;
@@ -200,9 +203,225 @@ export function createCentralPlazaRules(area: WorldArea, transitions: readonly W
     areaId: area.id,
     spawn: { ...entrance, y: getWorldGroundHeight(area, entrance.x, entrance.z)! }, spawnHeading: 0,
     resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); },
-    entities, janitor, splashKids, objectiveZones, surfaces,
+    entities, janitor, splashKids, objectiveZones, surfaces, townsfolk: createPlazaTownsfolk(area, splashPad, entranceInstance),
     objectives: VILLAGE_TASKS,
     transitions: createAreaTransitions(area, transitions),
+  };
+}
+
+// --- Townsfolk ----------------------------------------------------------------------------------
+
+/** Places people keep off while walking about: the splash pad (kids play there) and the playground. */
+const PEDESTRIAN_KEEP_OUT = new Set(["plaza.splash-pad", "plaza.play-area"]);
+const PEDESTRIAN_CLEARANCE = 0.4;
+const TOWN_GRID_SPACING = 1.25;
+
+/**
+ * Where people may stand, sampled once onto a fine grid from the same catalog data
+ * the goose's movement uses (ground surfaces, colliders, playable chunks), plus the
+ * keep-out landmarks. Open means playable, not the lowered road, and not kept out.
+ */
+export interface WalkMap {
+  open(x: number, z: number): boolean;
+  /** Open with a little elbow room all round. */
+  clear(x: number, z: number): boolean;
+  segmentClear(a: Readonly<Position>, b: Readonly<Position>): boolean;
+  /** Open all along the way, without the elbow room: fine for a single person's straight walk. */
+  segmentOpen(a: Readonly<Position>, b: Readonly<Position>): boolean;
+}
+const WALK_CELL = 0.25;
+export function createWalkMap(area: WorldArea): WalkMap {
+  const keepOut = area.instances.filter((item) => PEDESTRIAN_KEEP_OUT.has(item.assetId));
+  const grounds = area.instances.filter((item) => getWorldAsset(item.assetId)?.surfaceHeight !== undefined);
+  const extent = (item: WorldInstance) => { const asset = getWorldAsset(item.assetId)!; return Math.hypot(asset.halfWidth, asset.halfDepth); };
+  if (grounds.length === 0) return { open: () => false, clear: () => false, segmentClear: () => false, segmentOpen: () => false };
+  const minX = Math.min(...grounds.map((item) => item.transform.x - extent(item))); const maxX = Math.max(...grounds.map((item) => item.transform.x + extent(item)));
+  const minZ = Math.min(...grounds.map((item) => item.transform.z - extent(item))); const maxZ = Math.max(...grounds.map((item) => item.transform.z + extent(item)));
+  const width = Math.ceil((maxX - minX) / WALK_CELL) + 1; const depth = Math.ceil((maxZ - minZ) / WALK_CELL) + 1;
+  const priority = new Float32Array(width * depth).fill(-Infinity); const height = new Float32Array(width * depth).fill(NaN);
+  const blocked = new Uint8Array(width * depth);
+  const cellX = (i: number) => minX + i * WALK_CELL; const cellZ = (j: number) => minZ + j * WALK_CELL;
+  /** Visits every cell whose centre lies within `radius` of the instance origin. */
+  const cellsNear = (item: WorldInstance, radius: number, visit: (index: number, localX: number, localZ: number) => void) => {
+    const i0 = Math.max(0, Math.floor((item.transform.x - radius - minX) / WALK_CELL)); const i1 = Math.min(width - 1, Math.ceil((item.transform.x + radius - minX) / WALK_CELL));
+    const j0 = Math.max(0, Math.floor((item.transform.z - radius - minZ) / WALK_CELL)); const j1 = Math.min(depth - 1, Math.ceil((item.transform.z + radius - minZ) / WALK_CELL));
+    for (let j = j0; j <= j1; j += 1) for (let i = i0; i <= i1; i += 1) {
+      const point = local(item, cellX(i), cellZ(j)); visit(j * width + i, point.x, point.z);
+    }
+  };
+  for (const item of grounds) {
+    const asset = getWorldAsset(item.assetId)!; const surface = item.transform.y + asset.surfaceHeight!; const rank = asset.surfacePriority ?? 0;
+    cellsNear(item, extent(item), (index, x, z) => {
+      if (Math.abs(x) > asset.halfWidth || Math.abs(z) > asset.halfDepth) return;
+      if (rank > priority[index] || (rank === priority[index] && surface > height[index])) { priority[index] = rank; height[index] = surface; }
+    });
+  }
+  for (const item of area.instances) {
+    const asset = getWorldAsset(item.assetId); if (!asset || asset.colliders.length === 0) continue;
+    const radius = Math.max(...asset.colliders.map((collider) => Math.hypot(collider.x, collider.z)
+      + (collider.shape === "circle" ? collider.radius ?? 0 : Math.hypot(collider.halfWidth ?? 0, collider.halfDepth ?? 0)))) + WORLD_GOOSE_RADIUS;
+    cellsNear(item, radius, (index, x, z) => { if (asset.colliders.some((collider) => overlaps({ x, z }, collider))) blocked[index] = 1; });
+  }
+  for (const item of keepOut) cellsNear(item, extent(item), (index, x, z) => {
+    const asset = getWorldAsset(item.assetId)!; if (Math.abs(x) <= asset.halfWidth && Math.abs(z) <= asset.halfDepth) blocked[index] = 1;
+  });
+  const open = (x: number, z: number) => {
+    const i = Math.round((x - minX) / WALK_CELL); const j = Math.round((z - minZ) / WALK_CELL);
+    if (i < 0 || j < 0 || i >= width || j >= depth) return false;
+    const index = j * width + i;
+    return blocked[index] === 0 && height[index] >= -0.01 && isWorldChunkPlayable(area, x, z);
+  };
+  const clear = (x: number, z: number) => open(x, z)
+    && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => open(x + dx * PEDESTRIAN_CLEARANCE, z + dz * PEDESTRIAN_CLEARANCE));
+  const along = (test: (x: number, z: number) => boolean) => (a: Readonly<Position>, b: Readonly<Position>) => {
+    const length = Math.hypot(b.x - a.x, b.z - a.z); const steps = Math.max(1, Math.ceil(length / 0.25));
+    for (let step = 1; step < steps; step += 1) { const t = step / steps; if (!test(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t)) return false; }
+    return true;
+  };
+  return { open, clear, segmentClear: along(clear), segmentOpen: along(open) };
+}
+
+/**
+ * A walking graph over the square's open paving, rebuilt from the layout so it
+ * follows the editor: a grid of clear points joined where the way between them is
+ * clear, plus the extra points people head for (bench fronts, viewing spots, doors).
+ */
+export function createTownGraph(area: WorldArea, destinations: readonly Readonly<Position>[], walk = createWalkMap(area)): TownGraph {
+  const grounds = area.instances.filter((item) => getWorldAsset(item.assetId)?.surfaceHeight !== undefined);
+  if (grounds.length === 0) return { nodes: [], edges: [] };
+  const reach = (item: WorldInstance) => { const asset = getWorldAsset(item.assetId)!; return Math.max(asset.halfWidth, asset.halfDepth); };
+  const minX = Math.min(...grounds.map((item) => item.transform.x - reach(item))); const maxX = Math.max(...grounds.map((item) => item.transform.x + reach(item)));
+  const minZ = Math.min(...grounds.map((item) => item.transform.z - reach(item))); const maxZ = Math.max(...grounds.map((item) => item.transform.z + reach(item)));
+  const nodes: Position[] = []; const grid = new Map<string, number>();
+  for (let gx = Math.ceil(minX / TOWN_GRID_SPACING); gx * TOWN_GRID_SPACING <= maxX; gx += 1) {
+    for (let gz = Math.ceil(minZ / TOWN_GRID_SPACING); gz * TOWN_GRID_SPACING <= maxZ; gz += 1) {
+      const x = gx * TOWN_GRID_SPACING; const z = gz * TOWN_GRID_SPACING;
+      if (!walk.clear(x, z)) continue;
+      grid.set(`${gx},${gz}`, nodes.length); nodes.push(position(x, z));
+    }
+  }
+  const edges: [number, number][] = [];
+  for (const [key, index] of grid) {
+    const [gx, gz] = key.split(",").map(Number);
+    for (const [dx, dz] of [[1, 0], [0, 1], [1, 1], [1, -1]]) {
+      const other = grid.get(`${gx + dx},${gz + dz}`);
+      if (other !== undefined && walk.segmentOpen(nodes[index], nodes[other])) edges.push([index, other]);
+    }
+  }
+  const gridCount = nodes.length;
+  for (const destination of destinations) {
+    const index = nodes.length; nodes.push(position(destination.x, destination.z));
+    const near = nodes.slice(0, gridCount).map((node, other) => ({ other, distance: Math.hypot(node.x - destination.x, node.z - destination.z) }))
+      .filter((candidate) => candidate.distance < TOWN_GRID_SPACING * 2).sort((a, b) => a.distance - b.distance);
+    let linked = 0;
+    for (const { other } of near) {
+      if (linked >= 3) break;
+      // The last step onto a door or seat front may brush a facade or bench; only the approach must be clear.
+      if (walk.segmentClear(nodes[other], destination)) { edges.push([index, other]); linked += 1; }
+    }
+    if (linked === 0 && near[0]) edges.push([index, near[0].other]);
+  }
+  return { nodes, edges };
+}
+
+/** Whether a point joins the main walking network (not a pocket hemmed in by furniture). */
+function onMainNetwork(graph: TownGraph): (point: Readonly<Position>) => boolean {
+  const links = graph.nodes.map((): number[] => []);
+  for (const [a, b] of graph.edges) { links[a].push(b); links[b].push(a); }
+  const group = new Int32Array(graph.nodes.length).fill(-1); const sizes: number[] = [];
+  for (let seed = 0; seed < graph.nodes.length; seed += 1) {
+    if (group[seed] >= 0) continue;
+    const id = sizes.length; let size = 0; const stack = [seed]; group[seed] = id;
+    while (stack.length > 0) { const node = stack.pop()!; size += 1; for (const next of links[node]) if (group[next] < 0) { group[next] = id; stack.push(next); } }
+    sizes.push(size);
+  }
+  const main = sizes.indexOf(Math.max(...sizes));
+  return (point) => {
+    let best = -1; let bestDistance = Infinity;
+    graph.nodes.forEach((node, index) => { const d = Math.hypot(node.x - point.x, node.z - point.z); if (d < bestDistance) { bestDistance = d; best = index; } });
+    return best >= 0 && group[best] === main;
+  };
+}
+
+/** Two seats on each bench, facing out from its backrest, with a clear spot in front to stand. */
+function benchSeats(area: WorldArea, walk: WalkMap): TownSeat[] {
+  return area.instances.filter((item) => item.assetId === "oldtown.bench").flatMap((bench) => [-0.52, 0.52].flatMap((x, index) => {
+    const seatAt = worldPoint(bench, x, 0.04); const approach = worldPoint(bench, x, 0.95);
+    if (!walk.open(approach.x, approach.z)) return [];
+    return [{ id: `${bench.id}#${index}`, position: { ...seatAt, y: bench.transform.y }, heading: bench.transform.rotationY + Math.PI, approach }];
+  }));
+}
+
+function createPlazaTownsfolk(area: WorldArea, splashPad?: WorldInstance, entrance?: WorldInstance): TownsfolkDefinition | undefined {
+  const parents = area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "town-parent");
+  const walkers = area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "town-walker");
+  const dogInstances = area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "town-dog");
+  if (parents.length + walkers.length + dogInstances.length === 0) return undefined;
+  const walk = createWalkMap(area);
+  const seats = benchSeats(area, walk);
+  const distance = (a: Readonly<{ x: number; z: number }>, b: Readonly<{ x: number; z: number }>) => Math.hypot(a.x - b.x, a.z - b.z);
+  const at = (item: WorldInstance): Position => ({ x: item.transform.x, y: item.transform.y, z: item.transform.z });
+  const watch = splashPad ? at(splashPad) : undefined;
+
+  // A parent authored by a bench sits on its nearest seat; the rest stand where they were placed.
+  const people: TownspersonDefinition[] = [];
+  const parentSeats = new Map<string, TownSeat>();
+  for (const item of parents) {
+    const look = townsfolkLookOf(item.assetId); if (!look) continue;
+    const seat = seats.filter((candidate) => distance(candidate.position, item.transform) < 1.3 && ![...parentSeats.values()].includes(candidate))
+      .sort((a, b) => distance(a.position, item.transform) - distance(b.position, item.transform))[0];
+    if (seat) parentSeats.set(item.id, seat);
+    people.push({ id: item.id, look, role: "parent", position: seat ? { ...seat.position } : at(item), heading: seat ? seat.heading : item.transform.rotationY,
+      walkSpeed: TOWNSFOLK_WALK_SPEEDS[look], seat, watch, pastimes: TOWNSFOLK_PASTIMES[look] });
+  }
+  // The dog keeps the nearest parent company: on the bench beside them (to their right, where they can stroke it), or at their feet.
+  const dogs: DogDefinition[] = []; const dogSpots: Position[] = [];
+  for (const item of dogInstances) {
+    const owner = people.filter((person) => distance(person.position, item.transform) < 4)
+      .sort((a, b) => distance(a.position, item.transform) - distance(b.position, item.transform))[0];
+    let spot = at(item); let heading = item.transform.rotationY;
+    if (owner?.seat) {
+      const right = { x: Math.cos(owner.seat.heading), z: -Math.sin(owner.seat.heading) };
+      const beside = { x: owner.seat.position.x + right.x * 0.95, z: owner.seat.position.z + right.z * 0.95 };
+      const bench = area.instances.find((candidate) => candidate.assetId === "oldtown.bench" && isInsideAsset(candidate, beside.x, beside.z));
+      if (bench) { spot = { x: beside.x, y: bench.transform.y + BENCH_SEAT_HEIGHT, z: beside.z }; heading = owner.seat.heading; }
+    }
+    dogSpots.push(spot);
+    dogs.push({ id: item.id, position: spot, heading, ownerId: owner?.id, ...DOG_TUNING });
+  }
+  for (const item of walkers) {
+    const look = townsfolkLookOf(item.assetId); if (!look) continue;
+    people.push({ id: item.id, look, role: "walker", position: at(item), heading: item.transform.rotationY,
+      walkSpeed: TOWNSFOLK_WALK_SPEEDS[look], runs: TOWNSFOLK_RUNNERS.includes(look), pastimes: TOWNSFOLK_PASTIMES[look] });
+  }
+
+  // Seats free for passers-by: not a parent's, and not where the dog is.
+  const freeSeats = seats.filter((seat) => ![...parentSeats.values()].includes(seat) && !dogSpots.some((spot) => distance(spot, seat.position) < 0.6));
+  // Places worth stopping at: around the fountain and along the splash pad, facing in.
+  const sights: TownSpot[] = [];
+  const ringAround = (item: WorldInstance, radius: number, count: number) => {
+    for (let index = 0; index < count; index += 1) {
+      const angle = (index / count) * Math.PI * 2;
+      const x = item.transform.x + Math.sin(angle) * radius; const z = item.transform.z + Math.cos(angle) * radius;
+      if (walk.clear(x, z)) sights.push({ position: position(x, z), heading: Math.atan2(-(item.transform.x - x), -(item.transform.z - z)) });
+    }
+  };
+  const squares = area.instances.filter((item) => item.assetId === "plaza.paving-base");
+  const fountain = area.instances.find((item) => item.assetId === "plaza.goose-fountain");
+  if (fountain) ringAround(fountain, 4.4, 8);
+  if (splashPad) ringAround(splashPad, (getWorldAsset(splashPad.assetId)?.halfWidth ?? 4.9) + 1.1, 8);
+  const doors: TownSpot[] = entrance ? [{ position: worldPoint(entrance, 0, 0.35), heading: entrance.transform.rotationY }] : [];
+  const graph = createTownGraph(area, [...freeSeats.map((seat) => seat.approach), ...sights.map((spot) => spot.position), ...doors.map((door) => door.position),
+    ...parents.map(at), ...walkers.map(at)], walk);
+  // Only offer places people can actually get to.
+  const reachable = onMainNetwork(graph);
+  return {
+    people, dogs, graph, seats: freeSeats.filter((seat) => reachable(seat.approach)), sights: sights.filter((spot) => reachable(spot.position)),
+    doors: doors.filter((door) => reachable(door.position)),
+    reactions: TOWNSFOLK_REACTIONS, pastimeSeconds: TOWNSFOLK_PASTIME_SECONDS, walker: TOWNSFOLK_WALKER,
+    canStand: walk.open, canPass: walk.segmentOpen,
+    // Passers-by keep to the paved squares rather than the approaches behind the shops.
+    roams: (x, z) => squares.length === 0 || squares.some((item) => isInsideAsset(item, x, z)),
   };
 }
 
@@ -285,7 +504,27 @@ function createCoffeeShopCrew(area: WorldArea, surfaces: readonly PlacementSurfa
       stations, walkSpeed: BAKER_TUNING.walkSpeed, stationSeconds: BAKER_TUNING.stationSeconds, guardRadius: BAKER_TUNING.guardRadius,
       startleRadius: BAKER_TUNING.startleRadius, shooReach: BAKER_TUNING.shooReach, shooSeconds: BAKER_TUNING.shooSeconds,
     }));
-  return barista || customers.length > 0 || workers.length > 0 ? { barista, customers, workers, routes: COFFEE_SHOP_ROUTES } : undefined;
+  // Regulars share a table with a seated customer, so the empty table stays free for the goose's coffee break.
+  const customerTables = new Set(customers.map((customer) => customer.tableSurfaceId));
+  const seats = area.instances.filter((item) => item.assetId === "coffee.chair"
+    && !customers.some((customer) => Math.hypot(customer.seat.x - item.transform.x, customer.seat.z - item.transform.z) < 0.3)
+    && customerTables.has(tables.reduce<PlacementSurface | undefined>((best, surface) => !best || Math.hypot(surface.position.x - item.transform.x, surface.position.z - item.transform.z)
+      < Math.hypot(best.position.x - item.transform.x, best.position.z - item.transform.z) ? surface : best, undefined)?.id ?? ""))
+    .map((item) => ({ position: { x: item.transform.x, y: item.transform.y, z: item.transform.z }, heading: item.transform.rotationY }));
+  const patronInstances = area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "cafe-patron");
+  const patrons: PatronDefinition[] = patronInstances.flatMap((item, index) => {
+    const look = townsfolkLookOf(item.assetId); if (!look) return [];
+    // Half are already sitting when the goose walks in; the rest arrive one after another.
+    return [{ id: item.id, variant: look, walkSpeed: TOWNSFOLK_WALK_SPEEDS[look], startleRadius: TOWNSFOLK_REACTIONS.startleRadius,
+      personalRadius: TOWNSFOLK_REACTIONS.personalRadius, orderSeconds: CAFE_PATRON.orderSeconds, staySeconds: CAFE_PATRON.staySeconds,
+      awaySeconds: CAFE_PATRON.awaySeconds, firstVisitSeconds: index % 2 === 0 ? 0 : 3 + index * 6 }];
+  });
+  const patronService: PatronService | undefined = patrons.length > 0 && counter && exitPoint && seats.length > 0 ? {
+    door: { x: exitPoint.x, y: exitPoint.y, z: exitPoint.z - 0.6 }, counter: { position: worldPoint(counter, 1.8, 1.3), heading: counter.transform.rotationY },
+    seats, pastimeSeconds: TOWNSFOLK_PASTIME_SECONDS,
+  } : undefined;
+  return barista || customers.length > 0 || workers.length > 0 ? { barista, customers, workers, routes: COFFEE_SHOP_ROUTES,
+    patrons: patronService ? patrons : [], patronService } : undefined;
 }
 
 export function createCoffeeShopRules(area: WorldArea, transitions: readonly WorldAreaTransition[] = []): WorldRules {

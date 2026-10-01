@@ -3,6 +3,7 @@ import { createWorldAssetView, SplashPadView } from "./PlazaWorld.ts";
 import { JanitorView } from "./JanitorView.ts";
 import { SplashKidView } from "./SplashKidView.ts";
 import { CafePersonView } from "./CafePersonView.ts";
+import { DogView, TownspersonView } from "./TownsfolkView.ts";
 import { RiggedCharacterView } from "./RiggedCharacterView.ts";
 import type { SyncState, UpdatePresentation } from "./CafePropsView.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
@@ -42,16 +43,18 @@ const HAND_POINT = new THREE.Vector3();
 const HAND_RIGHT = new THREE.Vector3();
 const DEFAULT_BEAK_GRIP: Readonly<{ offset: THREE.Vector3Tuple; rotation?: THREE.Vector3Tuple }> = { offset: [0, -0.08, 0] };
 
+type GameplayView = SplashPadView | JanitorView | SplashKidView | CafePersonView | TownspersonView | DogView;
+
 export class WorldView extends THREE.Group {
   readonly instances = new Map<string, THREE.Group>();
   readonly occlusionFadeGroups = new OcclusionFadeGroupRegistry();
   private activeArea?: WorldArea;
   private editorFocus?: Readonly<{ x: number; z: number }>;
   private readonly playableOnly: boolean;
-  private presentationViews: (SplashPadView | JanitorView | SplashKidView | CafePersonView)[] = [];
+  private presentationViews: GameplayView[] = [];
   private presentationUpdates: UpdatePresentation[] = [];
   private readonly handHeld: { wrapper: THREE.Group; socket: THREE.Object3D; personId: string; assetId?: string; sipping: boolean }[] = [];
-  private readonly gameplayViews = new Map<string, SplashPadView | JanitorView | SplashKidView | CafePersonView>();
+  private readonly gameplayViews = new Map<string, GameplayView>();
 
   constructor(area: WorldArea, playableOnly = false) {
     super();
@@ -94,7 +97,8 @@ export class WorldView extends THREE.Group {
       instance.id,
     );
     wrapper.add(view);
-    if (view instanceof SplashPadView || view instanceof JanitorView || view instanceof SplashKidView || view instanceof CafePersonView) {
+    if (view instanceof SplashPadView || view instanceof JanitorView || view instanceof SplashKidView || view instanceof CafePersonView
+      || view instanceof TownspersonView || view instanceof DogView) {
       this.presentationViews.push(view);
       this.gameplayViews.set(instance.id, view);
     }
@@ -211,6 +215,17 @@ export class WorldView extends THREE.Group {
       const wrapper = this.instances.get(person.id); const view = this.gameplayViews.get(person.id);
       if (wrapper) { wrapper.position.set(person.position.x, person.position.y, person.position.z); wrapper.rotation.y = person.heading; }
       if (view instanceof CafePersonView) view.setState(person);
+      else if (view instanceof TownspersonView) view.setPatronState(person);
+    }
+    for (const person of snapshot.townsfolk ?? []) {
+      const wrapper = this.instances.get(person.id); const view = this.gameplayViews.get(person.id);
+      if (wrapper) { wrapper.position.set(person.position.x, person.position.y, person.position.z); wrapper.rotation.y = person.heading; }
+      if (view instanceof TownspersonView) view.setState(person);
+    }
+    for (const dog of snapshot.dogs ?? []) {
+      const wrapper = this.instances.get(dog.id); const view = this.gameplayViews.get(dog.id);
+      if (wrapper) { wrapper.position.set(dog.position.x, dog.position.y, dog.position.z); wrapper.rotation.y = dog.heading; }
+      if (view instanceof DogView) view.setState(dog);
     }
   }
 

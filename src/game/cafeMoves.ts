@@ -13,15 +13,15 @@ import { CAFE_SEAT_HEIGHT } from "./CoffeeFurnitureView.ts";
 const BONES: readonly BoneName[] = ["hips", "spine", "chest", "neck", "head",
   "left_shoulder", "left_elbow", "left_wrist", "right_shoulder", "right_elbow", "right_wrist",
   "left_hip", "left_knee", "left_ankle", "right_hip", "right_knee", "right_ankle"];
-type Rotations = Partial<Record<BoneName, Vec3>>;
+export type Rotations = Partial<Record<BoneName, Vec3>>;
 
-function full(rot: Rotations, hips: Vec3 = [0, 0, 0]): Pose {
+export function full(rot: Rotations, hips: Vec3 = [0, 0, 0]): Pose {
   const complete: Rotations = {};
   for (const bone of BONES) complete[bone] = rot[bone] ?? [0, 0, 0];
   return { rot: complete, move: { hips } };
 }
 /** 0 → 1 over the first `rise` of the loop, hold, then back to 0 over the last `fall`. */
-function envelope(p: number, rise: number, fall: number): number {
+export function envelope(p: number, rise: number, fall: number): number {
   const up = Math.min(1, p / rise); const down = Math.min(1, (1 - p) / fall);
   const value = Math.min(up, down);
   return value * value * (3 - 2 * value);
@@ -31,18 +31,18 @@ function envelope(p: number, rise: number, fall: number): number {
  * (negative brings it across the front), `twist` turns it about its length.
  * Hand targets for the poses below were solved against the rig, then rounded.
  */
-function arm(side: "left" | "right", forward: number, out: number, elbow: number, wrist: Vec3 = [0, 0, 0], twist = 0): Rotations {
+export function arm(side: "left" | "right", forward: number, out: number, elbow: number, wrist: Vec3 = [0, 0, 0], twist = 0): Rotations {
   const sign = side === "left" ? -1 : 1;
   return { [`${side}_shoulder`]: [forward, sign * twist, sign * out], [`${side}_elbow`]: [elbow, 0, 0], [`${side}_wrist`]: [wrist[0], sign * wrist[1], sign * wrist[2]] } as Rotations;
 }
-const both = (forward: number, out: number, elbow: number, wrist: Vec3 = [0, 0, 0], twist = 0): Rotations =>
+export const both = (forward: number, out: number, elbow: number, wrist: Vec3 = [0, 0, 0], twist = 0): Rotations =>
   ({ ...arm("left", forward, out, elbow, wrist, twist), ...arm("right", forward, out, elbow, wrist, twist) });
 
 // --- Sitting -------------------------------------------------------------------------------------
 
-interface Seat { hips: Vec3; legs: Rotations }
+export interface Seat { hips: Vec3; legs: Rotations }
 /** Hips lowered onto the seat and pushed back over it, feet planted a little in front. */
-function seat(legs: LegDimensions, k: number): Seat {
+export function seat(legs: LegDimensions, k: number): Seat {
   const hipsDrop = CAFE_SEAT_HEIGHT + 0.255 * k - 1.02 * k;
   const back = 0.06 * k;
   const [hip, knee] = legAngles(legs.ankleY - (legs.hipJointY + hipsDrop), -0.42 * k, legs);
@@ -55,9 +55,9 @@ function seat(legs: LegDimensions, k: number): Seat {
   return { hips: [0, hipsDrop, back], legs: rot };
 }
 /** Hands resting on the thighs. */
-const lap = (): Rotations => both(0.25, -0.5, 0.35, [-0.1, 0, 0], 0.1);
+export const lap = (): Rotations => both(0.25, -0.5, 0.35, [-0.1, 0, 0], 0.1);
 
-function seatedClips(s: Seat, bind: ReadonlyMap<string, THREE.Vector3>, sipSeconds: number): THREE.AnimationClip[] {
+export function seatedClips(s: Seat, bind: ReadonlyMap<string, THREE.Vector3>, sipSeconds: number): THREE.AnimationClip[] {
   const pose = (upper: Rotations) => full({ ...s.legs, ...upper }, s.hips);
   return [
     cycleClip("sit", 4, (p) => pose({ ...lap(), chest: [0.015 * wave(p), 0, 0], head: [-0.04, 0.08 * wave(p, 0.1), 0] }), bind),
@@ -107,19 +107,21 @@ function seatedClips(s: Seat, bind: ReadonlyMap<string, THREE.Vector3>, sipSecon
 
 // --- Standing ------------------------------------------------------------------------------------
 
-const hang = (): Rotations => ({ ...arm("left", 0.05, 0, 0.15), ...arm("right", 0.05, 0, 0.15) });
+export const hang = (): Rotations => ({ ...arm("left", 0.05, 0, 0.15), ...arm("right", 0.05, 0, 0.15) });
 /** Walking with a cup held out in front at chest height. */
-function carryPose(style: WalkStyle, p: number): Pose {
+export function carryPose(style: WalkStyle, p: number): Pose {
   const walk = walkPose(style, p);
   return { rot: { ...walk.rot, ...arm("right", 0.1, -0.7, 1.1, [-0.2, 0, 0], 0.1) }, move: walk.move };
 }
-function withHips(pose: Pose): Pose { return full(pose.rot ?? {}, pose.move?.hips ?? [0, 0, 0]); }
+export function withHips(pose: Pose): Pose { return full(pose.rot ?? {}, pose.move?.hips ?? [0, 0, 0]); }
 
-function standingClips(legs: LegDimensions, walkSpeed: number, bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationClip[] {
-  // A calmer, less bouncy take on the janitor's walk, sized to this person's legs.
-  const base: WalkStyle = { duration: 0.62, speed: 2.2, stance: 0.56, stepHeight: 0.09, crouch: 0.11, bob: 0.035, bounce: 0.45,
-    sway: 0.025, roll: 0.04, twist: 0.1, lean: 0.05, headSteady: 0.55, nod: 0.05,
-    armSwing: 0.36, armOut: 0.12, elbowBend: 0.3, elbowPump: 0.25, armLag: 0.05, heelStrike: 0.22, legs };
+/** A calmer, less bouncy take on the janitor's walk; add the person's `legs` before use. */
+export const CAFE_WALK: Omit<WalkStyle, "legs"> = { duration: 0.62, speed: 2.2, stance: 0.56, stepHeight: 0.09, crouch: 0.11, bob: 0.035, bounce: 0.45,
+  sway: 0.025, roll: 0.04, twist: 0.1, lean: 0.05, headSteady: 0.55, nod: 0.05,
+  armSwing: 0.36, armOut: 0.12, elbowBend: 0.3, elbowPump: 0.25, armLag: 0.05, heelStrike: 0.22 };
+
+export function standingClips(legs: LegDimensions, walkSpeed: number, bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationClip[] {
+  const base: WalkStyle = { ...CAFE_WALK, legs };
   const walk = paced(base, walkSpeed / base.speed);
   const jog = paced({ ...JANITOR_FURIOUS_STOMP, legs, lean: 0.18, elbowBend: 0.8 }, BARISTA_JOG_SPEED / JANITOR_FURIOUS_STOMP.speed);
   const upright = (rot: Rotations, hipsY = 0) => full(rot, [0, hipsY, 0]);

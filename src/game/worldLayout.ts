@@ -29,6 +29,7 @@ const CAMERA_TRACK_REVISION = 20;
 const CAFE_CHALLENGES_REVISION = 21;
 const CAFE_KITCHEN_REVISION = 22;
 const CAFE_KITCHEN_MOVE_REVISION = 23;
+const TOWNSFOLK_REVISION = 24;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -555,6 +556,31 @@ function replaceCoffeeShop(layout: WorldLayout, revision: number, store?: WorldL
   return validated;
 }
 
+/**
+ * Splash-pad parents, a small white dog, passers-by in the square, and café regulars
+ * who come and go: added once to drafts saved before they existed, leaving every
+ * other edit alone.
+ */
+function addTownsfolkContent(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= TOWNSFOLK_REVISION) return layout;
+  const updated = cloneWorldLayout(layout);
+  const roles = new Set(["town-parent", "town-walker", "town-dog", "cafe-patron"]);
+  for (const canonical of CANONICAL_WORLD_LAYOUT.areas) {
+    const area = updated.areas.find((candidate) => candidate.id === canonical.id); if (!area) continue;
+    for (const item of canonical.instances) {
+      if (!roles.has(getWorldAsset(item.assetId)?.gameplayRole ?? "") || area.instances.some((existing) => existing.id === item.id)) continue;
+      area.instances.push(JSON.parse(JSON.stringify(item)) as WorldInstance);
+    }
+  }
+  updated.canonicalRevision = TOWNSFOLK_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its townsfolk could not be saved", error); return layout; }
+  }
+  return validated;
+}
+
 export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
   try {
     const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -568,9 +594,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store);
+    if (saved) return addTownsfolkContent(moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? addTownsfolkContent(moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
