@@ -109,6 +109,12 @@ the Worker and provisions its Durable Object from the checked-in configuration.
 The deployed service is currently
 `https://goose-game-signaling.goose-game-2.workers.dev`.
 
+The public Worker requires an approved browser origin, limits room connection
+attempts per network, closes a signaling socket that sends more than the small
+offer/answer budget, deletes rooms after 20 minutes, and redacts room keys from
+persisted request logs. The invitation itself is still the room's password: share
+it only with Player 2 and create a new room if it goes somewhere unintended.
+
 ### Multiplayer troubleshooting
 
 | What you see | What to do |
@@ -116,6 +122,7 @@ The deployed service is currently
 | The iPad cannot open a Mac development link | Start the game with `npm run dev:lan`, keep the Mac awake, and put both devices on the same Wi-Fi. The invitation should begin with the Mac's LAN address, such as `http://192.168…`, not `localhost`. Check the macOS firewall if the page itself will not load. |
 | The invitation opens, but the geese never connect | Keep the host tab open and in the foreground. Refresh both devices, create a new room, and use only its newest link. Make sure both devices are on the same normal Wi-Fi, not a guest network or VPN. |
 | The game says it cannot reach the private room | Open the Worker's `/health` URL or run the signaling smoke test described in `cloudflare/signaling/README.md`. The game page's public origin must also appear in `ALLOWED_ORIGINS` in `wrangler.jsonc`; private LAN origins are accepted automatically. |
+| Repeated room attempts temporarily stop connecting | Wait one minute, close old game tabs, and try one newly created room. This safety limit is deliberately much higher than one family session needs. |
 | **Host this game** says manual setup or asks for a response link | That build did not receive `VITE_SIGNALING_URL`. Check `.env.production` or `.env.local`, then restart Vite or rebuild the site. The normal Cloudflare flow needs only one link. |
 | Share / AirDrop is missing | Apple's share sheet depends on browser and security support. Use the QR code or **Copy link** instead. |
 | Goose 2 looks jerky | Refresh both devices and create a new room so both are running the current movement-smoothing build. Keep them near a strong Wi-Fi access point and close older game tabs. |

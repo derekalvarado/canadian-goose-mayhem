@@ -11,6 +11,10 @@ import {
   encodeRoomSignal,
   MAX_ROOM_SIGNAL_BYTES,
 } from "../src/game/multiplayer/roomSignalingProtocol.ts";
+import {
+  allowedSignalingOrigin,
+  nextSignalingMessageCount,
+} from "../cloudflare/signaling/src/security.ts";
 
 const invitation: RoomInvitation = {
   roomId: "room_1234567890abcdefghijklmnop",
@@ -46,4 +50,25 @@ test("room invitation rejects incomplete or unsafe fragments", () => {
   assert.equal(roomInvitationFromUrl("https://example.com/#unrelated=1"), undefined);
   assert.throws(() => roomInvitationFromUrl(`https://example.com/#room=${invitation.roomId}`), /room key/);
   assert.throws(() => roomInvitationFromUrl("https://example.com/#room=short&key=also-short"), /room ID/);
+});
+
+test("signaling requires an approved browser origin", () => {
+  const configured = "https://derekalvarado.github.io";
+  assert.equal(allowedSignalingOrigin(configured, configured), configured);
+  assert.equal(allowedSignalingOrigin("http://192.168.86.35:5173", configured), "http://192.168.86.35:5173");
+  assert.equal(allowedSignalingOrigin(null, configured), undefined);
+  assert.equal(allowedSignalingOrigin("https://attacker.example", configured), undefined);
+  assert.equal(allowedSignalingOrigin("http://192.168.86.35:5173/extra", configured), undefined);
+});
+
+test("each signaling socket has a small finite message budget", () => {
+  let count: number | undefined = 0;
+  let accepted = 0;
+  while (count !== undefined) {
+    count = nextSignalingMessageCount(count);
+    if (count !== undefined) accepted += 1;
+  }
+  assert.ok(accepted > 1);
+  assert.ok(accepted < 20);
+  assert.equal(nextSignalingMessageCount(undefined), undefined);
 });

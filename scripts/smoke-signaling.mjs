@@ -1,14 +1,19 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
+import WebSocket from "ws";
 
 const serviceUrl = new URL(process.argv[2] ?? "http://127.0.0.1:8787");
+const browserOrigin = process.argv[3] ?? (serviceUrl.hostname === "127.0.0.1" || serviceUrl.hostname === "localhost"
+  ? "http://localhost:5173"
+  : "https://derekalvarado.github.io");
 serviceUrl.protocol = serviceUrl.protocol === "https:" ? "wss:" : "ws:";
-const roomId = "smoke_room_1234567890abcdefghijkl";
-const key = "smoke_key_1234567890abcdefghijklmn";
+const roomId = randomBytes(16).toString("hex");
+const key = randomBytes(16).toString("hex");
 
 function connect(role) {
   const url = new URL(`/rooms/${roomId}`, serviceUrl);
   url.search = new URLSearchParams({ role, key }).toString();
-  const socket = new WebSocket(url);
+  const socket = new WebSocket(url, { origin: browserOrigin });
   const messages = [];
   socket.addEventListener("message", (event) => {
     if (typeof event.data === "string") messages.push(JSON.parse(event.data));

@@ -7,6 +7,16 @@
   "vars": {
     "ALLOWED_ORIGINS": "https://derekalvarado.github.io"
   },
+  "ratelimits": [
+    {
+      "name": "ROOM_HANDSHAKES",
+      "namespace_id": "20261001",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
@@ -22,6 +32,7 @@
     }
   ],
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "redact_query_string": true
   }
 }

@@ -5,14 +5,17 @@ import {
   type RoomRole,
   type RoomSignalMessage,
 } from "../../../src/game/multiplayer/roomSignalingProtocol.ts";
+import { allowedSignalingOrigin, nextSignalingMessageCount } from "./security.ts";
 
 interface Env {
   readonly ROOMS: DurableObjectNamespace<SignalingRoom>;
+  readonly ROOM_HANDSHAKES: RateLimit;
   readonly ALLOWED_ORIGINS: string;
 }
 
 interface SocketAttachment {
   readonly role: RoomRole;
+  readonly messages: number;
 }
 
 const ROOM_PATTERN = /^[A-Za-z0-9_-]{24,128}$/u;
@@ -24,37 +27,26 @@ function textResponse(message: string, status: number, origin?: string): Respons
   return new Response(message, { status, headers });
 }
 
-function isPrivateDevelopmentOrigin(origin: string): boolean {
-  try {
-    const url = new URL(origin);
-    if (url.protocol !== "http:") return false;
-    return url.hostname === "localhost" || url.hostname === "127.0.0.1"
-      || /^192\.168\./u.test(url.hostname)
-      || /^10\./u.test(url.hostname)
-      || /^172\.(?:1[6-9]|2\d|3[01])\./u.test(url.hostname);
-  } catch { return false; }
-}
-
-function allowedOrigin(request: Request, env: Env): string | undefined {
-  const origin = request.headers.get("origin");
-  if (!origin) return undefined;
-  const configured = env.ALLOWED_ORIGINS.split(",").map((value) => value.trim()).filter(Boolean);
-  return configured.includes(origin) || isPrivateDevelopmentOrigin(origin) ? origin : undefined;
-}
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ ok: true, service: "goose-game-signaling", version: 1 });
 
     const origin = request.headers.get("origin");
-    const acceptedOrigin = allowedOrigin(request, env);
-    if (origin && !acceptedOrigin) return textResponse("Origin is not allowed.", 403);
+    const acceptedOrigin = allowedSignalingOrigin(origin, env.ALLOWED_ORIGINS);
+    if (!acceptedOrigin) return textResponse("Origin is not allowed.", 403);
 
     const match = /^\/rooms\/([^/]+)$/u.exec(url.pathname);
     if (!match || !ROOM_PATTERN.test(match[1])) return textResponse("Room not found.", 404, acceptedOrigin);
     if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
       return textResponse("Expected a WebSocket connection.", 426, acceptedOrigin);
+    }
+    const rateLimitKey = request.headers.get("cf-connecting-ip") ?? acceptedOrigin;
+    const rateLimit = await env.ROOM_HANDSHAKES.limit({ key: rateLimitKey });
+    if (!rateLimit.success) {
+      const response = textResponse("Too many room connection attempts. Try again in a minute.", 429, acceptedOrigin);
+      response.headers.set("retry-after", "60");
+      return response;
     }
 
     const id = env.ROOMS.idFromName(match[1]);
@@ -86,7 +78,7 @@ export class SignalingRoom extends DurableObject<Env> {
     for (const existing of this.ctx.getWebSockets(role)) existing.close(4001, "Replaced by a newer connection.");
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
-    server.serializeAttachment({ role } satisfies SocketAttachment);
+    server.serializeAttachment({ role, messages: 0 } satisfies SocketAttachment);
     this.ctx.acceptWebSocket(server, [role]);
     await this.ctx.storage.setAlarm(Date.now() + ROOM_LIFETIME_MS);
 
@@ -101,7 +93,13 @@ export class SignalingRoom extends DurableObject<Env> {
 
   async webSocketMessage(socket: WebSocket, data: string | ArrayBuffer): Promise<void> {
     const attachment = socket.deserializeAttachment() as SocketAttachment | null;
-    if (!attachment || typeof data !== "string") {
+    const messageCount = nextSignalingMessageCount(attachment?.messages);
+    if (!attachment || messageCount === undefined) {
+      socket.close(1008, "Signaling message limit exceeded.");
+      return;
+    }
+    socket.serializeAttachment({ ...attachment, messages: messageCount } satisfies SocketAttachment);
+    if (typeof data !== "string") {
       socket.send(encodeRoomSignal({ type: "error", version: 1, message: "Unsupported room message." }));
       return;
     }
