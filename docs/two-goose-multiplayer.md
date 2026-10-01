@@ -107,8 +107,9 @@ Every checkpoint must keep single-player working and pass `npm test` and
 - Latest automated checkpoint: all 215 tests pass; the game and Worker TypeScript
   builds are clean. The local Worker passed a two-WebSocket offer/answer smoke test.
 - Deployment checkpoint: Worker version `0729add4-ba27-4a01-8173-71c2da7f5901`
-  is uploaded. The account's first `workers.dev` subdomain confirmation and live
-  endpoint verification are still pending.
+  is live at `https://goose-game-signaling.goose-game-2.workers.dev`. Its health
+  check and a production two-WebSocket offer/answer relay test both pass. The
+  endpoint is included in `.env.production` for GitHub Pages builds.
 
 ## Restart note
 

@@ -24,8 +24,9 @@ normally to exercise one-link rooms against the local Worker.
 1. Run `npx wrangler login` once for the Cloudflare account.
 2. Run `npm run signaling:deploy`.
 3. Put the printed HTTPS endpoint in `.env.local` for local builds.
-4. Add the same endpoint as the GitHub Actions repository variable
-   `VITE_SIGNALING_URL` so the GitHub Pages build enables one-link rooms.
+4. Put the public endpoint in the tracked `.env.production` file so GitHub Pages
+   builds enable one-link rooms. `VITE_SIGNALING_URL` can still override it when
+   deploying a different environment.
 
 The first deployment may ask the account owner to choose a `workers.dev`
 subdomain in the Cloudflare dashboard. Production browser origins are listed in

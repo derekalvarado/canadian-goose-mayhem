@@ -24,8 +24,6 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
-        env:
-          VITE_SIGNALING_URL: ${{ vars.VITE_SIGNALING_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
