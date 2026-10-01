@@ -1,6 +1,13 @@
 import { toCanvas } from "qrcode";
 import { WebRtcPeer, type WebRtcPeerStatus } from "./WebRtcPeer.ts";
 import {
+  RoomSignalingClient,
+  roomInvitationFromUrl,
+  roomInvitationUrl,
+  type RoomInvitation,
+} from "./RoomSignalingClient.ts";
+import type { RoomSignalMessage } from "./roomSignalingProtocol.ts";
+import {
   createPairingToken,
   decodeManualSignal,
   pairingUrl,
@@ -12,6 +19,8 @@ import {
 
 export type MultiplayerRole = "host" | "guest";
 export interface MultiplayerConnectionIdentity { readonly sessionId: string; readonly reconnectToken: string }
+
+const ROOM_SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL?.trim() as string | undefined;
 
 export interface MultiplayerMenuOptions {
   readonly onOpenChange?: (open: boolean) => void;
@@ -31,6 +40,8 @@ export class MultiplayerMenu {
   private readonly menu = required<HTMLElement>("#multiplayer-menu");
   private readonly status = required<HTMLElement>("#multiplayer-status");
   private readonly hostButton = required<HTMLButtonElement>("#multiplayer-host");
+  private readonly manualHostButton = required<HTMLButtonElement>("#multiplayer-manual-host");
+  private readonly manualFallback = required<HTMLDetailsElement>("#multiplayer-manual-fallback");
   private readonly localButton = required<HTMLButtonElement>("#multiplayer-local");
   private readonly useLinkButton = required<HTMLButtonElement>("#multiplayer-use-link");
   private readonly input = required<HTMLTextAreaElement>("#multiplayer-link-input");
@@ -48,11 +59,14 @@ export class MultiplayerMenu {
   private reconnectToken?: string;
   private pendingJoin?: ManualSignal;
   private answerChannel?: BroadcastChannel;
+  private roomSignaling?: RoomSignalingClient;
+  private peerConnected = false;
 
   constructor(private readonly options: MultiplayerMenuOptions = {}) {
     this.openButton.addEventListener("click", this.open);
     this.closeButton.addEventListener("click", this.close);
-    this.hostButton.addEventListener("click", () => { void this.startHost(); });
+    this.hostButton.addEventListener("click", () => { void (ROOM_SIGNALING_URL ? this.startRoomHost() : this.startManualHost()); });
+    this.manualHostButton.addEventListener("click", () => { void this.startManualHost(); });
     this.localButton.addEventListener("click", () => { this.options.onLocalStart?.(); this.close(); });
     this.useLinkButton.addEventListener("click", () => { void this.usePairingLink(); });
     this.shareButton.addEventListener("click", () => { void this.shareCurrentLink(); });
@@ -61,19 +75,31 @@ export class MultiplayerMenu {
     this.input.addEventListener("input", () => { this.pendingJoin = undefined; this.useLinkButton.textContent = "Use pairing link"; });
 
     try {
+      const roomInvitation = roomInvitationFromUrl(window.location.href);
+      if (roomInvitation) {
+        this.prepareGuestMenu("Joining the host as Goose 2…");
+        if (!ROOM_SIGNALING_URL) throw new Error("Online rooms are not configured in this build.");
+        void this.joinRoom(roomInvitation);
+        return;
+      }
       const inbound = signalFromUrl(window.location.href);
       if (inbound?.mode === "join") {
         this.pendingJoin = inbound.signal;
         this.hostButton.hidden = true;
         this.localButton.hidden = true;
-        this.input.hidden = true;
-        this.useLinkButton.textContent = "Join host game";
         this.status.textContent = "Ready to join the nearby host as Goose 2.";
         this.open();
+        this.manualFallback.open = true;
+        this.useLinkButton.textContent = "Join host game";
       }
     } catch (error) {
       this.status.textContent = error instanceof Error ? error.message : "This pairing link is damaged.";
       this.open();
+    }
+    if (!ROOM_SIGNALING_URL) {
+      this.hostButton.textContent = "Host this game (manual setup)";
+      this.manualHostButton.hidden = true;
+      this.manualFallback.open = true;
     }
   }
 
@@ -92,7 +118,93 @@ export class MultiplayerMenu {
     this.openButton.focus({ preventScroll: true });
   };
 
-  private async startHost(): Promise<void> {
+  private async startRoomHost(): Promise<void> {
+    this.closePeer();
+    this.role = "host";
+    const invitation: RoomInvitation = {
+      roomId: createPairingToken(16),
+      reconnectToken: createPairingToken(16),
+    };
+    this.sessionId = invitation.roomId;
+    this.reconnectToken = invitation.reconnectToken;
+    this.status.textContent = "Opening a private room…";
+    this.hostButton.disabled = true;
+    try {
+      this.roomSignaling = this.createRoomSignaling("host", invitation);
+      await this.roomSignaling.connect();
+      await this.showShareLink(
+        roomInvitationUrl(window.location.href, invitation),
+        "Player 2 only needs to open this link. Keep this game open.",
+      );
+      this.peer = this.createPeer("host");
+      const description = await this.peer.createHostOffer();
+      if (description.type !== "offer" || !description.sdp) throw new Error("WebRTC did not create a host offer.");
+      this.roomSignaling.sendDescription({ type: "offer", sdp: description.sdp });
+      this.status.textContent = "Waiting for Goose 2 to open the link…";
+      this.hostButton.textContent = "Create a new room";
+    } catch (error) {
+      this.fail(error);
+      this.roomSignaling?.close();
+      this.roomSignaling = undefined;
+    } finally {
+      this.hostButton.disabled = false;
+    }
+  }
+
+  private async joinRoom(invitation: RoomInvitation): Promise<void> {
+    this.closePeer();
+    this.role = "guest";
+    this.sessionId = invitation.roomId;
+    this.reconnectToken = invitation.reconnectToken;
+    this.status.textContent = "Joining the private room…";
+    try {
+      this.roomSignaling = this.createRoomSignaling("guest", invitation);
+      await this.roomSignaling.connect();
+      this.status.textContent = "Found the room. Waiting for the host…";
+    } catch (error) { this.fail(error); }
+  }
+
+  private createRoomSignaling(role: MultiplayerRole, invitation: RoomInvitation): RoomSignalingClient {
+    return new RoomSignalingClient({
+      serviceUrl: ROOM_SIGNALING_URL!,
+      invitation,
+      role,
+      onMessage: (message) => { void this.handleRoomSignal(role, message); },
+      onClose: () => {
+        if (!this.peerConnected) this.status.textContent = "The private room closed before the geese connected.";
+      },
+    });
+  }
+
+  private async handleRoomSignal(role: MultiplayerRole, message: RoomSignalMessage): Promise<void> {
+    try {
+      if (message.type === "error") throw new Error(message.message);
+      if (role === "guest" && message.type === "offer") {
+        this.peer?.close();
+        this.peer = this.createPeer("guest");
+        this.status.textContent = "Connecting to the host…";
+        const description = await this.peer.acceptOfferAndCreateAnswer(message.description);
+        if (description.type !== "answer" || !description.sdp) throw new Error("WebRTC did not create a guest answer.");
+        this.roomSignaling?.sendDescription({ type: "answer", sdp: description.sdp });
+      } else if (role === "host" && message.type === "answer") {
+        if (!this.peer) throw new Error("The host connection is no longer open.");
+        this.status.textContent = "Goose 2 found the room. Connecting…";
+        await this.peer.acceptGuestAnswer(message.description);
+      } else if (message.type === "peer-left" && !this.peerConnected) {
+        this.status.textContent = message.role === "host" ? "The host left the room." : "Goose 2 left before connecting.";
+      }
+    } catch (error) { this.fail(error); }
+  }
+
+  private prepareGuestMenu(status: string): void {
+    this.hostButton.hidden = true;
+    this.localButton.hidden = true;
+    this.manualFallback.hidden = true;
+    this.status.textContent = status;
+    this.open();
+  }
+
+  private async startManualHost(): Promise<void> {
     this.closePeer();
     this.role = "host";
     this.sessionId ??= createPairingToken(12);
@@ -159,12 +271,15 @@ export class MultiplayerMenu {
 
   private handlePeerStatus(role: MultiplayerRole, status: WebRtcPeerStatus): void {
     if (status === "connected") {
+      this.peerConnected = true;
       this.status.textContent = role === "host" ? "Goose 2 connected." : "Connected to the host as Goose 2.";
       this.sharePanel.hidden = true;
       if (this.sessionId && this.reconnectToken) {
         this.options.onConnected?.(role, this.peer!, { sessionId: this.sessionId, reconnectToken: this.reconnectToken });
       }
+      this.close();
     } else if (status === "disconnected" || status === "failed") {
+      this.peerConnected = false;
       this.status.textContent = role === "host"
         ? "Goose 2 disconnected. They will stand still; create a reconnect link when ready."
         : "Connection to the host was lost.";
@@ -235,6 +350,9 @@ export class MultiplayerMenu {
   private closePeer(): void {
     this.peer?.close();
     this.peer = undefined;
+    this.roomSignaling?.close();
+    this.roomSignaling = undefined;
+    this.peerConnected = false;
     this.answerChannel?.close();
     this.answerChannel = undefined;
   }

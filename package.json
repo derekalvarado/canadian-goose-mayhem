@@ -11,9 +11,13 @@
     "assets:janitor": "node scripts/generate-janitor-glb.mjs",
     "assets:kids": "node scripts/generate-splash-kids-glb.mjs",
     "assets:cafe": "node scripts/generate-cafe-people-glb.mjs",
-    "build": "tsc && vite build && node scripts/inject-offline-precache.mjs",
+    "build": "tsc && npm run typecheck:signaling && vite build && node scripts/inject-offline-precache.mjs",
     "preview": "vite preview",
-    "test": "node --test --experimental-strip-types tests/*.test.ts"
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "typecheck:signaling": "tsc -p cloudflare/signaling/tsconfig.json",
+    "signaling:dev": "wrangler dev --config cloudflare/signaling/wrangler.jsonc",
+    "signaling:deploy": "wrangler deploy --config cloudflare/signaling/wrangler.jsonc",
+    "signaling:smoke": "node scripts/smoke-signaling.mjs"
   },
   "dependencies": {
     "lz-string": "^1.5.0",
@@ -21,9 +25,11 @@
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261001.1",
     "@types/qrcode": "^1.5.6",
     "@types/three": "^0.180.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.6"
+    "vite": "^7.3.6",
+    "wrangler": "^4.146.0"
   }
 }

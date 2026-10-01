@@ -139,6 +139,8 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/PlazaWorld.ts` — procedural asset-view factories retained by the world catalog
 - `src/game/ForestWorld.ts` — earlier forest presentation retained as a reference
 - `src/game/InputController.ts` — keyboard and standard gamepad input
+- `src/game/multiplayer/` — two-goose protocol, WebRTC transport, controller-independent room signaling, and manual fallback
+- `cloudflare/signaling/` — short-lived one-host/one-guest signaling rooms deployed independently with Wrangler
 - `src/game/plazaLevel.ts` — shared plaza bounds, landmark placement, and collision
 - `src/game/plazaLayout.ts` — legacy PlazaEditor document validation used for automatic migration
 - `src/game/content/plaza-layout.json` — legacy canonical plaza arrangement migrated into the world document

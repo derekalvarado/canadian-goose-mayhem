@@ -122,10 +122,15 @@
           <p id="multiplayer-status" class="settings-help" aria-live="polite">One iPad hosts the village. The other joins as Goose 2.</p>
           <button id="multiplayer-local" type="button">Two controllers on this iPad</button>
           <button id="multiplayer-host" type="button">Host this game</button>
-          <label class="multiplayer-paste" for="multiplayer-link-input">Or paste a pairing link
-            <textarea id="multiplayer-link-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-          </label>
-          <button id="multiplayer-use-link" type="button">Use pairing link</button>
+          <details id="multiplayer-manual-fallback" class="multiplayer-fallback">
+            <summary>Manual connection fallback</summary>
+            <button id="multiplayer-manual-host" type="button">Create a two-step pairing link</button>
+            <label class="multiplayer-paste" for="multiplayer-link-input">Or paste a pairing link
+              <textarea id="multiplayer-link-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+            </label>
+            <button id="multiplayer-use-link" type="button">Use pairing link</button>
+            <p class="settings-help">Use this only if the one-link room service is unavailable. It requires sending a response link back to the host.</p>
+          </details>
           <div id="multiplayer-share-panel" class="multiplayer-share" hidden>
             <p id="multiplayer-share-instruction" class="settings-help"></p>
             <canvas id="multiplayer-qr" aria-label="Pairing QR code"></canvas>
@@ -135,7 +140,7 @@
               <button id="multiplayer-copy" type="button">Copy link</button>
             </div>
           </div>
-          <p class="settings-help">The exchange has two steps and works without a game server. Keep both games open. Nearby devices on the same Wi-Fi work best.</p>
+          <p class="settings-help">Player 2 normally joins by opening one link. Keep both games open. Nearby devices on the same Wi-Fi work best.</p>
           <button id="multiplayer-close" type="button">Back to game</button>
         </div>
       </section>

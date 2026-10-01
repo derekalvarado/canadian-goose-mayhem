@@ -15,14 +15,15 @@ small, tested checkpoints on `codex/two-goose-multiplayer`.
   for Goose 2.
 - Online geese may visit different authored areas. The host keeps every occupied
   area active and sends the guest the authoritative snapshots it needs.
-- GitHub Pages remains the only deployment target for the first version. WebRTC
-  setup therefore uses a two-step offer/answer exchange rather than matchmaking.
+- GitHub Pages remains the game deployment target. A small Cloudflare Worker and
+  Durable Object provide short-lived signaling rooms so Player 2 only opens one
+  link; gameplay still travels peer-to-peer over WebRTC.
 - Nearby sharing should offer the native iPad share sheet (including AirDrop), QR
   codes, and copy/paste as fallbacks.
-- If the guest disconnects, Goose 2 stands still and drops nothing. The same guest
-  can reconnect while the host session remains open. Closing the host ends the
-  online session; accounts, cloud saves, host migration, and later reconnection
-  require a future server.
+- If the guest disconnects, Goose 2 stands still and drops nothing. Closing the
+  host still ends the authoritative session. Host migration and durable shared
+  saves remain future work, but signaling-room reconnects no longer require a
+  second manual link exchange.
 
 ## Architectural boundaries
 
@@ -46,12 +47,15 @@ small, tested checkpoints on `codex/two-goose-multiplayer`.
 - [x] Multiplayer protocol: bounded command/snapshot messages with protocol tests.
 - [x] Manual WebRTC signaling: host offer, guest answer, reconnect token, native
   sharing, copy fallback, and a QR adapter.
-- [ ] Two-player simulation: stable `goose-1`/`goose-2` actors, deterministic
+- [x] Two-player simulation: stable `goose-1`/`goose-2` actors, deterministic
   movement and interaction arbitration, actor-aware NPC reactions and events.
-- [ ] Local presentation: second goose view, shared-camera framing, two-controller
+- [x] Local presentation: second goose view, shared-camera framing, two-controller
   lobby, disconnect behavior, and same-area transitions.
 - [ ] Online host/guest presentation: host-authoritative snapshots, independent
   area views, guest input, latency handling, and Goose 2 standing on disconnect.
+- [x] One-link signaling foundation: Cloudflare room service, automatic
+  offer/answer relay, short-lived authenticated rooms, QR/AirDrop invitation,
+  and the two-step exchange retained as a hidden fallback.
 - [ ] PWA and device verification: GitHub Pages subpath links, two iPads, AirDrop,
   QR exchange, sideways Joy-Cons, reconnect while host is open, offline fallback.
 
@@ -78,10 +82,11 @@ Every checkpoint must keep single-player working and pass `npm test` and
 - Controller profiles, sideways Joy-Con transforms, right-axis fallback,
   press-to-join assignment, and the iPad diagnostics readout are implemented.
 - The versioned network protocol rejects oversized, malformed, replayed, and
-  rate-flooded guest commands. Manual WebRTC transport and compressed URL-fragment
-  signaling are implemented with Share/AirDrop, QR, copy/paste, and response relay
-  to the original host tab. Same-network play is the current connectivity target;
-  no unapproved third-party STUN/TURN service is silently used.
+  rate-flooded guest commands. The preferred flow uses a Cloudflare signaling room:
+  the host shares one short invitation and the guest joins automatically. Manual
+  compressed URL-fragment signaling remains available as a fallback. Same-network
+  play is the current connectivity target; no third-party STUN/TURN service is
+  silently used.
 - `Simulation` can now run two geese in the same fixed tick. They move, honk,
   interact, hold separate items, arbitrate simultaneous grabs deterministically,
   and leave Goose 2 standing with her item when commands stop.
@@ -96,8 +101,14 @@ Every checkpoint must keep single-player working and pass `npm test` and
 - Still required: support independently occupied areas online, replicate
   one-shot presentation events and the guest to-do UI, add smoothing for remote
   snapshots, and perform real iPad/Joy-Con/WebRTC playtests.
-- Latest automated checkpoint: all 211 tests pass; production TypeScript build is
-  clean. Browser/device smoke testing has not yet been performed.
+- The signaling Worker is configured under `cloudflare/signaling`; Wrangler owns
+  provisioning and deployment. Rooms accept one host and one guest, expire after
+  twenty minutes, restrict browser origins, and retain only WebRTC setup messages.
+- Latest automated checkpoint: all 215 tests pass; the game and Worker TypeScript
+  builds are clean. The local Worker passed a two-WebSocket offer/answer smoke test.
+- Deployment checkpoint: Worker version `0729add4-ba27-4a01-8173-71c2da7f5901`
+  is uploaded. The account's first `workers.dev` subdomain confirmation and live
+  endpoint verification are still pending.
 
 ## Restart note
 
