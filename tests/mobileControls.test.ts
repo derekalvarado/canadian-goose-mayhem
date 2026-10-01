@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   FloatingJoystick, HURRY_ENTER_DISTANCE, HURRY_EXIT_DISTANCE, PauseReasons,
-  parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls,
+  parseTouchControlsPreference, shouldShowTouchControls,
 } from "../src/game/mobileControls.ts";
 
 test("floating joystick has a dead zone and hurry hysteresis", () => {
@@ -27,7 +27,7 @@ test("touch preferences validate safely and respect device capability", () => {
   assert.equal(shouldShowTouchControls("hide", true), false);
 });
 
-test("pause reasons compose and portrait policy excludes desktop-sized windows", () => {
+test("pause reasons compose", () => {
   const pauses = new PauseReasons();
   assert.equal(pauses.set("settings", true), true);
   assert.equal(pauses.set("hidden", true), false);
@@ -35,9 +35,6 @@ test("pause reasons compose and portrait policy excludes desktop-sized windows",
   assert.equal(pauses.paused, true);
   assert.equal(pauses.set("hidden", false), true);
   assert.equal(pauses.paused, false);
-  assert.equal(shouldPauseForPortrait(true, 390, 844), true);
-  assert.equal(shouldPauseForPortrait(false, 390, 844), false);
-  assert.equal(shouldPauseForPortrait(true, 844, 390), false);
 });
 
 test("page activity pause recovers when visibility returns before focus", () => {

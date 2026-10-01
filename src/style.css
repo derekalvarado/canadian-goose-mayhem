@@ -363,14 +363,14 @@ kbd,
 .pose-button--wings { grid-area: wings; }
 .pose-button--sneak { grid-area: sneak; }
 .pose-button--threat { grid-area: threat; border-color: rgb(241 211 139 / 78%); background: rgb(158 79 67 / 90%); }
-.settings-menu, .rotate-message { position: absolute; inset: 0; z-index: 15; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: rgb(15 26 18 / 68%); }
-.settings-menu[hidden], .rotate-message[hidden] { display: none; }
+.settings-menu { position: absolute; inset: 0; z-index: 15; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: rgb(15 26 18 / 68%); }
+.settings-menu[hidden] { display: none; }
 .settings-card { width: min(360px, 100%); padding: 22px; border: 1px solid var(--line); border-radius: 8px 22px 8px 22px; background: var(--paper); box-shadow: 0 18px 48px rgb(5 13 8 / 32%); }
 .settings-card h2 { margin: 0 0 18px; font-family: Georgia, serif; font-weight: 500; }
 .settings-card label { display: grid; gap: 7px; color: var(--ink-muted); font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .settings-card select, .settings-card button { min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--goose-white); background: rgb(13 34 24 / 72%); font: inherit; }
 .settings-card button { margin-top: 16px; cursor: pointer; }
-.settings-help, .rotate-message p { color: var(--ink-muted); font-size: .86rem; line-height: 1.45; }
+.settings-help { color: var(--ink-muted); font-size: .86rem; line-height: 1.45; }
 .controller-diagnostics {
   margin: .8rem 0;
   border: 1px solid var(--line);
