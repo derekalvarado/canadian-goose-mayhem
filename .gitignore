@@ -3,3 +3,6 @@ dist
 .DS_Store
 .godot/
 .import/
+.env.local
+.dev.vars
+.wrangler/

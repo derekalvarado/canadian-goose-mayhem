@@ -17,7 +17,8 @@ export interface CafeEntity {
   readonly tags: readonly EntityTag[]; readonly active?: boolean; readonly interactionPoint?: Readonly<Position>;
 }
 export interface CafeWorld {
-  readonly goose: Readonly<{ position: Readonly<Position>; heldEntityId?: string; startling: boolean }>;
+  readonly goose: Readonly<{ id?: "goose" | "goose-2"; position: Readonly<Position>; heldEntityId?: string; startling: boolean }>;
+  readonly geese?: readonly Readonly<{ id?: "goose" | "goose-2"; position: Readonly<Position>; heldEntityId?: string; startling: boolean }>[];
   entity(id: string): CafeEntity | undefined;
   entities(): readonly CafeEntity[];
   surface(id: string): PlacementSurface | undefined;
@@ -25,7 +26,7 @@ export interface CafeWorld {
   place(entityId: string, actorId: string, at: Readonly<Position>, heading: number): boolean;
   setCondition(entityId: string, condition: EntityCondition | undefined, orderFor?: string): void;
   setActive(entityId: string, active: boolean, actorId: string): void;
-  pushGoose(actorId: string, from: Readonly<Position>): void;
+  pushGoose(actorId: string, from: Readonly<Position>, playerId?: "goose" | "goose-2"): void;
   recordFact(factId: string): void;
   emit(event: GameplayEvent): void;
 }
@@ -223,17 +224,22 @@ export class CafeCrew {
     return this.customers.find((customer) => customer.definition.id === id) ?? this.workers.find((worker) => worker.definition.id === id);
   }
 
+  private nearestGoose(world: CafeWorld, position: Readonly<Position>): CafeWorld["goose"] {
+    return [...(world.geese ?? [world.goose])].sort((left, right) => distance2d(left.position, position) - distance2d(right.position, position)
+      || (left.id ?? "goose").localeCompare(right.id ?? "goose"))[0] ?? world.goose;
+  }
+
   // --- Kitchen workers ---------------------------------------------------------------------------
 
   /** Station to station around the kitchen; a goose underfoot gets waved off, then work resumes. */
   private updateWorker(worker: MutableWorker, world: CafeWorld, dt: number): void {
-    const definition = worker.definition; const goose = world.goose;
+    const definition = worker.definition; const goose = this.nearestGoose(world, worker.position);
     worker.shooCooldown = Math.max(0, worker.shooCooldown - dt);
     const gooseDistance = distance2d(worker.position, goose.position);
     const bothered = gooseDistance <= definition.guardRadius || (goose.startling && gooseDistance <= definition.startleRadius);
     if (bothered && worker.shooCooldown <= 0 && worker.activity !== "shooing") {
       this.face(worker, goose.position);
-      if (gooseDistance <= definition.shooReach) world.pushGoose(definition.id, worker.position);
+      if (gooseDistance <= definition.shooReach) world.pushGoose(definition.id, worker.position, goose.id);
       worker.activity = "shooing"; worker.timer = definition.shooSeconds; worker.shooCooldown = definition.shooSeconds + 0.8;
       worker.path = [];
       return;
@@ -284,7 +290,7 @@ export class CafeCrew {
     barista.chaseCooldown = Math.max(0, barista.chaseCooldown - dt);
     barista.startleCooldown = Math.max(0, barista.startleCooldown - dt);
     if (barista.heldEntityId && world.entity(barista.heldEntityId)?.holderId !== definition.id) barista.heldEntityId = undefined;
-    const goose = world.goose;
+    const goose = this.nearestGoose(world, barista.position);
     const gooseDistance = distance2d(barista.position, goose.position);
 
     // A fright makes her fumble a full drink she is carrying.
@@ -320,7 +326,7 @@ export class CafeCrew {
         if (barista.timer <= 0 || !stillWanted || gooseDistance > definition.noticeRadius * 1.6) { this.finishJob(barista); break; }
         if (gooseDistance <= definition.shooReach) {
           barista.heading = Math.atan2(-(goose.position.x - barista.position.x), -(goose.position.z - barista.position.z));
-          world.pushGoose(definition.id, barista.position);
+          world.pushGoose(definition.id, barista.position, goose.id);
           barista.job = { kind: "shoo" }; barista.timer = definition.shooSeconds; barista.path = [];
           break;
         }
@@ -335,7 +341,7 @@ export class CafeCrew {
           const toward = this.exitStep(goose.position, barista);
           const dx = toward.x - goose.position.x; const dz = toward.z - goose.position.z; const length = Math.hypot(dx, dz) || 1;
           this.face(barista, goose.position);
-          world.pushGoose(definition.id, { x: goose.position.x - dx / length, y: goose.position.y, z: goose.position.z - dz / length });
+          world.pushGoose(definition.id, { x: goose.position.x - dx / length, y: goose.position.y, z: goose.position.z - dz / length }, goose.id);
           barista.shoveCooldown = 0.8; barista.evictSeconds = Math.max(barista.evictSeconds, definition.evictSeconds);
           barista.path = [];
         } else if (barista.shoveCooldown <= 0.4) this.walkTo(barista, goose.position, definition.jogSpeed, dt, definition.shooReach * 0.8);
@@ -562,7 +568,7 @@ export class CafeCrew {
   }
 
   private updateCustomer(customer: MutableCustomer, world: CafeWorld, events: GameplayEvent[], dt: number): void {
-    const definition = customer.definition; const goose = world.goose;
+    const definition = customer.definition; const goose = this.nearestGoose(world, customer.position);
     customer.startleCooldown = Math.max(0, customer.startleCooldown - dt);
     if (customer.heldEntityId && world.entity(customer.heldEntityId)?.holderId !== definition.id) customer.heldEntityId = undefined;
     const gooseDistance = distance2d(customer.position, goose.position);
@@ -573,7 +579,7 @@ export class CafeCrew {
       if (definition.temperament === "bold") {
         // Not scared: they turn and wave the goose off, shoving it if it is close enough.
         this.face(customer, goose.position);
-        if (gooseDistance <= definition.shooReach) world.pushGoose(definition.id, customer.position);
+        if (gooseDistance <= definition.shooReach) world.pushGoose(definition.id, customer.position, goose.id);
         customer.resumeActivity = customer.activity === "sipping" || customer.activity === "looking-up" ? "working" : customer.activity;
         customer.activity = "shooing"; customer.timer = 0.9;
         return;
@@ -673,9 +679,10 @@ export class CafeCrew {
     const definition = customer.definition;
     if (!definition.guardsTable || customer.activity === "working") return false;
     const table = world.surface(definition.tableSurfaceId); if (!table) return false;
-    if (distance2d(world.goose.position, table.position) > definition.guardRadius) return false;
-    this.face(customer, world.goose.position);
-    world.pushGoose(definition.id, table.position);
+    const goose = this.nearestGoose(world, table.position);
+    if (distance2d(goose.position, table.position) > definition.guardRadius) return false;
+    this.face(customer, goose.position);
+    world.pushGoose(definition.id, table.position, goose.id);
     customer.resumeActivity = "working"; customer.activity = "shooing"; customer.timer = 0.9;
     return true;
   }

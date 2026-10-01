@@ -29,6 +29,7 @@
 
       <div class="hud" aria-label="Game information">
         <button id="settings-button" class="hud-action" type="button" aria-haspopup="dialog" aria-controls="settings-menu">Settings</button>
+        <button id="multiplayer-button" class="hud-action hud-action--multiplayer" type="button" aria-haspopup="dialog" aria-controls="multiplayer-menu">Play together</button>
         <button id="install-button" class="hud-action hud-action--install" type="button" hidden aria-haspopup="dialog" aria-controls="install-menu">Install app</button>
         <button id="fullscreen-button" class="hud-action hud-action--fullscreen" type="button">Fullscreen</button>
 
@@ -103,10 +104,50 @@
             </select>
           </label>
           <p class="settings-help">Auto shows controls on touch-first devices. Keyboard and controllers remain available.</p>
+          <details id="controller-diagnostics" class="controller-diagnostics">
+            <summary>Controller diagnostics</summary>
+            <p class="settings-help">Press each stick direction and button. This raw readout works without an iPad console.</p>
+            <pre id="controller-diagnostics-output">No controller visible yet. Press a button on each Joy-Con.</pre>
+          </details>
           <p class="settings-help">Your crossed-off tasks are saved in this browser.</p>
           <button id="start-over" class="settings-danger" type="button">Start over</button>
           <button id="settings-close" type="button">Done</button>
         </div>
+      </section>
+
+      <section id="multiplayer-menu" class="settings-menu multiplayer-menu" hidden role="dialog" aria-modal="true" aria-labelledby="multiplayer-title">
+        <div class="settings-card multiplayer-card">
+          <p class="complete-kicker">Two nearby iPads</p>
+          <h2 id="multiplayer-title">Play together</h2>
+          <p id="multiplayer-status" class="settings-help" aria-live="polite">One iPad hosts the village. The other joins as Goose 2.</p>
+          <button id="multiplayer-local" type="button">Two controllers on this iPad</button>
+          <button id="multiplayer-host" type="button">Host this game</button>
+          <details id="multiplayer-manual-fallback" class="multiplayer-fallback">
+            <summary>Manual connection fallback</summary>
+            <button id="multiplayer-manual-host" type="button">Create a two-step pairing link</button>
+            <label class="multiplayer-paste" for="multiplayer-link-input">Or paste a pairing link
+              <textarea id="multiplayer-link-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+            </label>
+            <button id="multiplayer-use-link" type="button">Use pairing link</button>
+            <p class="settings-help">Use this only if the one-link room service is unavailable. It requires sending a response link back to the host.</p>
+          </details>
+          <div id="multiplayer-share-panel" class="multiplayer-share" hidden>
+            <p id="multiplayer-share-instruction" class="settings-help"></p>
+            <canvas id="multiplayer-qr" aria-label="Pairing QR code"></canvas>
+            <textarea id="multiplayer-share-link" rows="3" readonly aria-label="Pairing link"></textarea>
+            <div class="multiplayer-share-actions">
+              <button id="multiplayer-share" type="button">Share / AirDrop</button>
+              <button id="multiplayer-copy" type="button">Copy link</button>
+            </div>
+          </div>
+          <p class="settings-help">Player 2 normally joins by opening one link. Keep both games open. Nearby devices on the same Wi-Fi work best.</p>
+          <button id="multiplayer-close" type="button">Back to game</button>
+        </div>
+      </section>
+
+      <section id="controller-lobby" class="controller-lobby" hidden aria-live="polite">
+        <strong>Two-goose local play</strong>
+        <span id="controller-lobby-status">Press any button on the first sideways Joy-Con.</span>
       </section>
 
       <section id="rotate-message" class="rotate-message" hidden role="status" aria-live="polite">
@@ -127,6 +168,12 @@
         <span id="startup-error-detail">Try again. If the problem persists, check hardware acceleration and the startup details.</span>
         <button id="startup-retry" type="button">Try again</button>
       </div>
+
+      <section id="pairing-delivered" class="webgl-error pairing-delivered" hidden role="status">
+        <strong>Response delivered to the host game.</strong>
+        <span>Return to the Goose Game Two window you already had open.</span>
+        <button id="pairing-delivered-close" type="button">Close this page</button>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

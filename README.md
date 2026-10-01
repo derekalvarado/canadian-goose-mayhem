@@ -1,16 +1,20 @@
 # Goose Game 2 — Old Town Square
 
-The first playable slice is a browser-based 3D interpretation of Fort Collins' Old
-Town Square. You control an original, cel-shaded Canada goose in a
-coffee shop and the central plaza. The game starts in the square, next to the coffee
-shop, which holds most of the to-do list (see [Coffee shop challenges](#coffee-shop-challenges)).
+This is a browser-based 3D interpretation of Fort Collins' Old Town Square. You
+control an original, cel-shaded Canada goose in the central plaza and a coffee
+shop. The game starts in the square, next to the shop, which holds most of the
+to-do list (see [Coffee shop challenges](#coffee-shop-challenges)).
 
-The intended game is an interconnected social-stealth sandbox. Read the
-[game architecture and development sequence](docs/game-architecture.md) before
-adding mechanics or neighborhoods. It specifies shared object interactions,
-recoverable human reactions, independent objectives, and awareness-driven music.
-Those systems are the next milestones; today only the crossed-off to-do list is
-saved between visits.
+The current game has shared object interactions, independent tasks, a janitor,
+splash-pad kids, a working café crew, two-goose local play, and host-authoritative
+online play. People react to nearby goose mischief and recover without ending the
+game. Crossed-off tasks are saved in the host browser; loose objects, people, and
+their positions still reset after a reload.
+
+Read the [game architecture and development sequence](docs/game-architecture.md)
+before adding mechanics or neighborhoods. It separates the systems already in
+the game from later work such as sight and hearing, richer physics, and full world
+saves.
 
 ## Play locally
 
@@ -29,7 +33,107 @@ audio, and public assets. After opening the game once while online, it can launc
 and keep running without a network connection; the development origin also
 caches files as they load so it can fall back when Vite becomes unreachable. A
 phone must use HTTPS (or localhost) for service workers; plain HTTP LAN IPs
-cannot provide this browser guarantee.
+cannot provide this browser guarantee. Offline play is single-player only;
+creating an online room needs the Cloudflare service, and the two devices need a
+working network connection while they play.
+
+## Play together: two geese
+
+### The explain-it-like-I-am-five version
+
+The host is the device holding the real storybook. It decides where both geese
+are, what every person is doing, and which tasks are crossed off. Player 2's
+device is another window into that same storybook. It sends Goose 2's buttons to
+the host and receives the host's latest picture of the game.
+
+Cloudflare is the friend who introduces the two devices. It passes the WebRTC
+hello and reply between them, then the actual game traffic travels directly
+between the host and Player 2. Cloudflare does not run the village or store the
+save. Both devices currently need to be on the same Wi-Fi because the game does
+not yet use an internet relay.
+
+There are never more than two geese.
+
+### Mac host and iPad Player 2
+
+1. Open the game on the Mac and choose **Play together**. During local
+   development, run `npm run dev:lan` and open Vite's **Network** URL on the Mac
+   before hosting; an invitation made from `localhost` will not work on the iPad.
+2. Choose **Host this game** and leave that game tab open.
+3. Send the invitation to the iPad. Use **Share / AirDrop**, **Copy link**, or let
+   the iPad scan the QR code with its Camera app.
+4. Open the invitation in Safari on the iPad. The normal one-link room joins
+   automatically; Player 2 does not need to find another Join button or send a
+   response link back.
+5. Wait for both devices to say they are connected. The Mac controls Goose 1 and
+   the iPad controls Goose 2.
+
+The host owns the saved to-do list. If Player 2 disconnects, Goose 2 stands still
+and the host can keep playing. To reconnect while the host game is still open,
+make a new room and share its new invitation. If the host closes or reloads the
+game, that live multiplayer session is over.
+
+Online area changes are not finished yet. Keep both geese in the current area
+during device testing rather than trying to leave one goose in the square and
+the other in the coffee shop.
+
+### Two controllers on one iPad
+
+1. Pair both individual Joy-Cons in iPad Settings first.
+2. In the game, choose **Play together** → **Two controllers on this iPad**.
+3. Press any button on the first sideways Joy-Con to claim Goose 1.
+4. Press any button on the second sideways Joy-Con to claim Goose 2.
+
+Both geese share one screen, one area, and one camera. The game remembers which
+physical controller claimed each goose until local multiplayer is restarted.
+
+### Where the Cloudflare parts live
+
+- `cloudflare/signaling/src/index.ts` — the small Worker and its temporary,
+  one-host/one-guest Durable Object room
+- `cloudflare/signaling/wrangler.jsonc` — the Worker name, allowed production
+  browser origin, Durable Object binding, and deployment settings
+- `cloudflare/signaling/README.md` — local testing, deployment, health checks,
+  and service-specific troubleshooting
+- `.env.production` — the public Worker address included in GitHub Pages builds
+- `.env.local` — an ignored local override for development
+- `src/game/multiplayer/MultiplayerMenu.ts` — Host button, automatic joining,
+  AirDrop/share sheet, copy button, QR code, and manual fallback
+- `src/game/multiplayer/RoomSignalingClient.ts` — the short conversation with
+  the Cloudflare room
+- `src/game/multiplayer/WebRtcPeer.ts` — the direct browser-to-browser data
+  channel used after the introduction
+
+Wrangler is Cloudflare's command-line tool. `npm run signaling:deploy` deploys
+the Worker and provisions its Durable Object from the checked-in configuration.
+The deployed service is currently
+`https://goose-game-signaling.goose-game-2.workers.dev`.
+
+The public Worker requires an approved browser origin, limits room connection
+attempts per network, closes a signaling socket that sends more than the small
+offer/answer budget, deletes rooms after 20 minutes, and redacts room keys from
+persisted request logs. The invitation itself is still the room's password: share
+it only with Player 2 and create a new room if it goes somewhere unintended.
+
+### Multiplayer troubleshooting
+
+| What you see | What to do |
+| --- | --- |
+| The iPad cannot open a Mac development link | Start the game with `npm run dev:lan`, keep the Mac awake, and put both devices on the same Wi-Fi. The invitation should begin with the Mac's LAN address, such as `http://192.168…`, not `localhost`. Check the macOS firewall if the page itself will not load. |
+| The invitation opens, but the geese never connect | Keep the host tab open and in the foreground. Refresh both devices, create a new room, and use only its newest link. Make sure both devices are on the same normal Wi-Fi, not a guest network or VPN. |
+| The game says it cannot reach the private room | Open the Worker's `/health` URL or run the signaling smoke test described in `cloudflare/signaling/README.md`. The game page's public origin must also appear in `ALLOWED_ORIGINS` in `wrangler.jsonc`; private LAN origins are accepted automatically. |
+| Repeated room attempts temporarily stop connecting | Wait one minute, close old game tabs, and try one newly created room. This safety limit is deliberately much higher than one family session needs. |
+| **Host this game** says manual setup or asks for a response link | That build did not receive `VITE_SIGNALING_URL`. Check `.env.production` or `.env.local`, then restart Vite or rebuild the site. The normal Cloudflare flow needs only one link. |
+| Share / AirDrop is missing | Apple's share sheet depends on browser and security support. Use the QR code or **Copy link** instead. |
+| Goose 2 looks jerky | Refresh both devices and create a new room so both are running the current movement-smoothing build. Keep them near a strong Wi-Fi access point and close older game tabs. |
+| A Joy-Con is paired but does nothing | Press one of its buttons so Safari exposes it, then open **Settings** → **Controller diagnostics**. The readout shows every axis and button without needing an iPad console. Switch controllers require iPadOS 16 or newer. |
+| The game pauses on an iPad | Keep Safari or the Home Screen app in the foreground and rotate the iPad to landscape. |
+| Player 2 disconnected | Goose 2 remains standing. On the still-running host, create a new room and send the new link. There is no host migration if the host closes. |
+
+The Cloudflare invitation room expires after 20 minutes. It is needed only for
+the introduction, so that timer does not end a WebRTC game that already connected.
+The hidden two-step pairing flow remains available under **Connection help &
+manual fallback** if the room service itself is unavailable.
 
 ### Dev mode and start areas
 
@@ -50,20 +154,21 @@ http://localhost:5173/?dev&start=coffee-shop
 `?edit` to open the world builder there (for example,
 `?overview&dev&start=old-town-square.central-plaza`).
 
-## Arrange the plaza
+## Build and arrange the world
 
 Open the same local URL with `?edit` at the end (for example,
-`http://localhost:5173/?edit`) to enter the in-game world builder. The fountain,
-splash pad, play area, pavilion stage, and each complete table-and-chair set can be
-moved or rotated. Changes snap to a grid and save automatically in this browser;
-normal play mode uses the saved arrangement too.
+`http://localhost:5173/?edit`) to enter the in-game world builder. It can switch
+between areas, move or rotate existing objects, place reusable catalog assets,
+edit playable chunks, and draw camera tracks and zones. Changes snap to a grid
+and save automatically in this browser; normal play mode uses the saved world too.
 
-Use **Export layout** to download the complete, versioned plaza definition. That
-file contains every editable group's stable ID, label, position in meters, and Y
-rotation, so it can be attached to a future Codex request and made permanent by
-replacing `src/game/content/plaza-layout.json`. **Import layout** restores an
-exported arrangement, and **Reset defaults** clears the browser draft and returns
-to the checked-in canonical layout.
+Use **Export world** to download the complete, versioned multi-area document.
+That file contains the areas, playable chunks, asset instances, stable IDs,
+positions, rotations, and camera tracks. It can be attached to a future Codex
+request and made permanent in `src/game/content/world-layout.json`. **Import
+world** restores an exported world, and **Reset defaults** clears the browser
+draft and returns to the checked-in canonical world. The older
+`src/game/content/plaza-layout.json` is retained only to migrate old drafts.
 
 The editor also supports laptop-friendly keyboard controls. Press **?** or **F1**
 to open the shortcut drawer. Hold `WASD` to fly the camera, use `Space`/`Shift`
@@ -80,8 +185,10 @@ its own fold button.
 - Move: `WASD`, arrow keys, or the controller left stick
 - Hurry: `Shift` or the right trigger
 - Honk: `Space` or the controller south face button
-- Spread wings while held: `Q` or the controller west face button
-- Lower into a threat posture while held: `E` or the controller north face button
+- Use, grab, or drop: `F` or the controller east face button
+- Toggle spread wings: `Q` or the controller west face button
+- Toggle sneak: `E` or the controller north face button
+- Threaten while held: `Control` or the controller left shoulder button
 
 A single right Joy-Con is supported sideways in Safari on macOS and iPadOS: the
 stick moves, `SR` hurries, `A` honks, `X` uses, `B` spreads, `Y` sneaks, and `SL`
@@ -89,13 +196,14 @@ threatens.
 
 On touch-first devices, play in landscape with the floating left-side joystick
 (18 px dead zone, 86 px full deflection); push past 62 CSS pixels to hurry (it
-releases below 52 pixels) and use the separate right-side **Honk**, **Wings**, and
-**Threat** buttons. Wings and Threat remain posed only while their buttons are
-held. The Settings button offers touch controls Auto, Show, or Hide; this
-preference is local to the browser, not a game save. Portrait pauses
-only on coarse-pointer touch devices, so a narrow desktop window remains playable.
-Fullscreen is offered where the browser permits it; mobile browsers may require the
-Fullscreen button's direct tap and may decline the request.
+releases below 52 pixels) and use the separate right-side **Honk**, **Use**,
+**Spread**, **Sneak**, and **Threat** buttons. Spread and Sneak toggle on and off;
+Threat remains active only while held. The Settings button offers touch controls
+Auto, Show, or Hide; this preference is local to the browser, not a game save.
+Portrait pauses only on coarse-pointer touch devices, so a narrow desktop window
+remains playable. Fullscreen is offered where the browser permits it; mobile
+browsers may require the Fullscreen button's direct tap and may decline the
+request.
 
 ## Install on iPhone or iPad
 
@@ -109,7 +217,7 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 
 ## Project layout
 
-- `src/game/Game.ts` — presentation loop, camera, and input/simulation wiring
+- `src/game/Game.ts` — presentation loop, camera, local/online input, and simulation wiring
 - `src/game/cameraTrack.ts` — authored sky camera tracks: smoothing, nearest-point riding, and far-goose lean-in
 - `src/game/cameraDirector.ts` — picks which camera track to ride from the ground zones and glides between tracks
 - `src/game/cameraFraming.ts` — widens the camera's aim to fit a nearby important character in the shot
@@ -117,9 +225,9 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/simulation/Simulation.ts` — fixed-step gameplay state and typed commands/events
 - `src/game/simulation/Objectives.ts` — independent outcome-based task completion
 - `src/game/simulation/cafeCrew.ts` — coffee-shop barista and customer routines, acting through the shared grab/place rules
-- `src/game/challenges.ts` — the village to-do list shown in every area
+- `src/game/challenges.ts` — stable village tasks and the area whose HUD list shows each one
 - `src/game/progress.ts` — saving and loading crossed-off tasks in the browser
-- `src/game/simulation/plaza.ts` — active plaza movement rules
+- `src/game/simulation/plaza.ts` — legacy plaza-only rules retained for reference
 - `src/game/GameAudio.ts` — browser audio output, separate from gameplay decisions
 - `src/game/Goose.ts` — runtime loader, layered clips, and head tracking for the rigged Canada goose
 - `src/game/GooseAnimation.ts` — presentation-only gait phase and blend state
@@ -128,7 +236,7 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/splashKidMoves.ts` — kid pose builders: contact-planted skips and gallops, splashes, flee runs, and crying
 - `src/game/JanitorModel.ts` — procedural janitor mesh, rig, and exported clips
 - `src/game/janitorGaits.ts` — knob-driven walk/chase gaits with leg IK that keeps stance feet planted
-- `src/game/CafePersonModel.ts`, `src/game/cafeMoves.ts` — the four coffee-shop people on the janitor's rig, and their clips
+- `src/game/CafePersonModel.ts`, `src/game/cafeMoves.ts` — the five coffee-shop people on the janitor's rig, and their clips
 - `src/game/CafePropsView.ts` — counter, espresso back bar, and café props (tip jar, croissants, cups, radio, bell)
 - `src/dev/animLab/` — shared runtime for the dev-only character animation labs
 - `src/dev/janitorLab/`, `src/dev/kidLab/`, `src/dev/cafeLab/` — janitor, splash-kid, and café-people lab variants
@@ -138,12 +246,19 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/CameraTrackEditor.ts` — world-builder mode for drawing, tuning, and previewing an area's camera tracks and their zones
 - `src/game/editorCatalog.ts` — the editor's drag-and-drop asset catalog drawer with rendered thumbnails
 - `src/game/worldAssets.ts` — source-owned catalog of render, collision, and occlusion metadata
-- `src/game/worldLayout.ts` — sparse 64 m chunk documents, playable regions, browser drafts, import/export, and plaza migration
+- `src/game/worldLayout.ts` — sparse 64 m chunk documents, playable regions, area transitions, browser drafts, import/export, and old-draft upgrades
+- `src/game/content/world-layout.json` — canonical multi-area square and coffee-shop world
 - `src/game/worldLevel.ts` — renderer-independent collision, chunk, and stepped-surface queries for placed catalog assets
 - `src/game/PlazaWorld.ts` — procedural asset-view factories retained by the world catalog
 - `src/game/ForestWorld.ts` — earlier forest presentation retained as a reference
-- `src/game/InputController.ts` — keyboard and standard gamepad input
-- `src/game/plazaLevel.ts` — shared plaza bounds, landmark placement, and collision
+- `src/game/InputController.ts` — keyboard, touch, standard-controller, and two-controller assignment input
+- `src/game/multiplayer/protocol.ts` — bounded, versioned Goose 2 commands and authoritative host snapshots
+- `src/game/multiplayer/WebRtcPeer.ts` — direct peer-to-peer data-channel transport
+- `src/game/multiplayer/RoomSignalingClient.ts` — automatic Cloudflare room client
+- `src/game/multiplayer/networkMotion.ts` — smooth guest prediction and host correction without changing gameplay authority
+- `src/game/multiplayer/MultiplayerMenu.ts` — local play, hosting, one-link joining, sharing, QR, and manual fallback UI
+- `cloudflare/signaling/` — short-lived one-host/one-guest signaling rooms deployed independently with Wrangler
+- `src/game/plazaLevel.ts` — legacy plaza-only bounds and collision retained for tests and migration
 - `src/game/plazaLayout.ts` — legacy PlazaEditor document validation used for automatic migration
 - `src/game/content/plaza-layout.json` — legacy canonical plaza arrangement migrated into the world document
 - `src/game/level.ts` — earlier forest bounds and collision helpers
@@ -151,7 +266,8 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/palette.ts` — canonical named colors shared by the 3D scene
 - `tests/plazaLevel.test.ts` — active plaza boundary and landmark tests
 - `tests/level.test.ts` — retained forest boundary and trail tests
-- `tests/simulation.test.ts` — timing, input edges, independent objectives, pause/reset, and backtracking
+- `tests/simulation.test.ts` — timing, two-goose rules, input edges, objectives, pause/reset, and backtracking
+- `tests/multiplayerProtocol.test.ts`, `tests/roomSignaling.test.ts`, `tests/networkMotion.test.ts` — network trust boundaries, one-link rooms, and smooth guest presentation
 
 Run `npm test` for headless gameplay checks and `npm run build` for TypeScript and
 the production bundle. The headless tests use Node's TypeScript stripping; use
@@ -204,8 +320,9 @@ room, the bell pulls her to the register, a spill sends her to wipe a table, and
 customers leave their tables to collect orders. The tip jar is heavy, so the goose
 cannot hurry while carrying it.
 
-Crossed-off tasks are saved in the browser, so a refresh keeps them. Props and people
-start fresh on every visit. **Settings → Start over** clears the list. With `?dev`,
+Crossed-off tasks are saved in the browser, so a refresh keeps them. Props and
+people keep their state while moving between areas but start fresh after a reload.
+**Settings → Start over** clears the list. With `?dev`,
 add `&fresh` to play with an empty list without erasing the saved one; `?dev` also
 exposes the running game as `gooseGame` in the browser console for playtesting.
 
