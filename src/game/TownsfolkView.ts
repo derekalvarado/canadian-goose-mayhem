@@ -5,6 +5,7 @@ import { PALETTE } from "./palette.ts";
 import { RiggedCharacterView, type CharacterLoader } from "./RiggedCharacterView.ts";
 import { toonMaterial } from "./toonMaterial.ts";
 import { createTownsfolkModel, TOWNSFOLK_COLORS, type TownsfolkLook } from "./TownsfolkModel.ts";
+import { TOWNSFOLK_RUNNERS } from "./townsfolkTuning.ts";
 import type { CafePersonState } from "./simulation/cafeCrew.ts";
 import type { DogState, TownActivity, TownspersonState } from "./simulation/townsfolk.ts";
 
@@ -133,7 +134,9 @@ export class TownspersonView extends RiggedCharacterView {
 
   setState(person: TownspersonState): void {
     this.userData.gameplayState = person.activity;
-    const clip = townClipFor(person);
+    const walked = townClipFor(person);
+    // Runners stay at a run when they swerve round the goose.
+    const clip = walked === "walk" && TOWNSFOLK_RUNNERS.includes(this.look) ? "run" : walked;
     this.present(clip, /startle|shoo|call|clap/.test(clip), person.hidden);
   }
 

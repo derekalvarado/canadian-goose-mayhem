@@ -57,7 +57,7 @@ export const BENCH_SEAT_HEIGHT = 0.555;
  * together; the routine picks from whichever fit. Repeats make a pastime likelier.
  */
 export const TOWNSFOLK_PASTIMES: Readonly<Record<TownsfolkLook, readonly TownActivity[]>> = {
-  "sunhat-mom": ["watching", "watching", "waving", "calling", "sit-looking", "sit-looking", "sit-petting", "sit-petting", "sitting", "sit-relaxing"],
+  "sunhat-mom": ["watching", "watching", "waving", "calling", "sit-looking", "sit-looking", "sit-petting", "sit-petting", "sitting", "sit-phoning"],
   "cap-dad": ["watching", "clapping", "calling", "waving", "idle", "sit-looking", "sitting", "sit-phoning"],
   "phone-mom": ["filming", "filming", "phoning", "watching", "waving", "sit-phoning", "sit-looking", "sitting"],
   "beard-dad": ["watching", "phoning", "clapping", "sit-sipping", "sit-sipping", "sit-looking", "sitting", "sit-phoning"],
