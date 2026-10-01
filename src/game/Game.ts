@@ -7,7 +7,7 @@ import { InputController, type InputDevice, type InputFrame } from "./InputContr
 import { TouchControls } from "./TouchControls";
 import { PauseReasons, parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
-import { Simulation, HURRY_SPEED, type GameplayEvent, type PlayerCommand } from "./simulation/Simulation";
+import { Simulation, FIXED_STEP, HURRY_SPEED, type GameplayEvent, type PlayerCommand } from "./simulation/Simulation";
 import { PALETTE } from "./palette";
 import { WorldEditor } from "./WorldEditor";
 import { COFFEE_SHOP_AREA_ID, getWorldArea, loadWorldLayout, resolveStartAreaId } from "./worldLayout";
@@ -21,7 +21,18 @@ import { ControlHeadingLock } from "./controlHeading";
 import { LEVEL_NAMES } from "./challenges";
 import { clearProgress, loadProgress, saveProgress, sessionStateFromProgress } from "./progress";
 import { formatGamepadDiagnostics, type GamepadLike } from "./gamepads";
-import { MultiplayerMenu } from "./multiplayer/MultiplayerMenu.ts";
+import { MultiplayerMenu, type MultiplayerConnectionIdentity, type MultiplayerRole } from "./multiplayer/MultiplayerMenu.ts";
+import type { WebRtcPeer } from "./multiplayer/WebRtcPeer.ts";
+import {
+  decodeGuestMessage,
+  decodeHostMessage,
+  encodeGuestMessage,
+  encodeHostMessage,
+  GuestCommandGate,
+  MULTIPLAYER_PROTOCOL_VERSION,
+  type AuthoritativeGameSnapshot,
+  type NetworkPlayerCommand,
+} from "./multiplayer/protocol.ts";
 
 // A closer follow camera keeps the smaller goose readable and makes the plaza
 // landmarks feel larger without changing their gameplay dimensions.
@@ -153,6 +164,16 @@ export class Game {
   private readonly canvasResizeObserver: ResizeObserver;
   private controllerDiagnosticsRefresh = 0;
   private localMultiplayer = false;
+  private onlineRole?: MultiplayerRole;
+  private onlinePeer?: WebRtcPeer;
+  private onlineIdentity?: MultiplayerConnectionIdentity;
+  private onlineAuthenticated = false;
+  private guestCommandGate = new GuestCommandGate();
+  private remoteCommand?: NetworkPlayerCommand;
+  private remoteCommandReceivedAt = 0;
+  private remoteSnapshot?: AuthoritativeGameSnapshot;
+  private networkSequence = 0;
+  private snapshotSendAccumulator = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -213,6 +234,9 @@ export class Game {
       new MultiplayerMenu({
         onOpenChange: (open) => this.setPauseReason("multiplayer", open),
         onLocalStart: this.startLocalMultiplayer,
+        onConnected: this.handleOnlineConnected,
+        onDisconnected: this.handleOnlineDisconnected,
+        onMessage: this.handleOnlineMessage,
       });
     }
     this.canvasResizeObserver = new ResizeObserver(this.resize);
@@ -275,6 +299,10 @@ export class Game {
     const secondFrame = localInput?.player2;
     this.updateControllerDiagnostics(delta);
     this.touchControls?.syncPoseState(frame.wingsSpread, frame.sneaking, frame.threatening);
+    if (this.onlineRole === "guest" && this.onlinePeer) {
+      this.animateOnlineGuest(delta, frame);
+      return;
+    }
     if (delta > 0) {
       if (frame.move.lengthSq() > 0.001 || frame.hurry || frame.interactPressed || frame.wingsSpread || frame.sneaking || frame.threatening) {
         this.lastInputTime = performance.now();
@@ -282,7 +310,8 @@ export class Game {
       }
 
       const command = this.commandForFrame(frame, this.controlHeading, this.moveDirection, delta);
-      const secondCommand = secondFrame ? this.commandForFrame(secondFrame, this.controlHeading2, this.moveDirection2, delta) : undefined;
+      const localSecondCommand = secondFrame ? this.commandForFrame(secondFrame, this.controlHeading2, this.moveDirection2, delta) : undefined;
+      const secondCommand = localSecondCommand ?? this.consumeRemoteCommand();
       const events = this.simulation.advancePlayers(delta, command, secondCommand);
       this.syncPlayerView();
       this.syncPoopViews();
@@ -294,7 +323,7 @@ export class Game {
           this.lastInputTime = performance.now();
         }
         if (event.type === "goose-shooed") {
-          this.goose.spook();
+          (event.targetId === "goose-2" ? this.goose2 : this.goose).spook();
           this.framing.release(event.actorId);
         }
         if ((event.type === "entity-grabbed" || event.type === "entity-dropped")
@@ -309,6 +338,7 @@ export class Game {
           return;
         }
       }
+      if (this.onlineRole === "host" && this.onlineAuthenticated) this.sendHostSnapshot(delta);
     }
 
     const player = this.simulation.player;
@@ -358,6 +388,134 @@ export class Game {
     return { moveX: output.x, moveZ: output.z, hurry: frame.hurry, honkPressed: frame.honkPressed,
       interactPressed: frame.interactPressed, wingsSpread: frame.wingsSpread, sneaking: frame.sneaking,
       threatening: frame.threatening };
+  }
+
+  private readonly handleOnlineConnected = (role: MultiplayerRole, peer: WebRtcPeer, identity: MultiplayerConnectionIdentity): void => {
+    this.onlineRole = role;
+    this.onlinePeer = peer;
+    this.onlineIdentity = identity;
+    this.onlineAuthenticated = false;
+    this.remoteCommand = undefined;
+    this.guestCommandGate = new GuestCommandGate();
+    if (role === "host") {
+      this.localMultiplayer = false;
+      this.controllerLobby.hidden = true;
+      this.simulation.enableSecondPlayer();
+      this.goose2.visible = true;
+      this.syncPlayerView();
+    } else {
+      peer.send(encodeGuestMessage({ type: "hello", version: MULTIPLAYER_PROTOCOL_VERSION,
+        sessionId: identity.sessionId, reconnectToken: identity.reconnectToken }));
+      this.goose2.visible = true;
+    }
+    this.updateTouchControlsVisibility();
+  };
+
+  private readonly handleOnlineDisconnected = (role: MultiplayerRole): void => {
+    this.onlineAuthenticated = false;
+    this.remoteCommand = undefined;
+    if (role === "guest") this.onlinePeer = undefined;
+  };
+
+  private readonly handleOnlineMessage = (role: MultiplayerRole, raw: string): void => {
+    try {
+      if (role === "host") {
+        const message = decodeGuestMessage(raw);
+        if (message.type === "hello") {
+          const valid = message.sessionId === this.onlineIdentity?.sessionId
+            && message.reconnectToken === this.onlineIdentity?.reconnectToken;
+          if (!valid) {
+            this.onlinePeer?.send(encodeHostMessage({ type: "error", version: 1, code: "session", message: "This invitation is no longer active." }));
+            return;
+          }
+          this.onlineAuthenticated = true;
+          this.onlinePeer?.send(encodeHostMessage({ type: "welcome", version: 1, sessionId: message.sessionId, playerId: "goose-2" }));
+        } else if (message.type === "command" && this.onlineAuthenticated) {
+          const command = this.guestCommandGate.accept(message, performance.now());
+          if (command) { this.remoteCommand = command; this.remoteCommandReceivedAt = performance.now(); }
+        } else if (message.type === "pong") {
+          // Reserved for latency display; the ordered channel is already alive.
+        }
+        return;
+      }
+
+      const message = decodeHostMessage(raw);
+      if (message.type === "welcome") {
+        this.onlineAuthenticated = message.sessionId === this.onlineIdentity?.sessionId;
+      } else if (message.type === "snapshot" && this.onlineAuthenticated) {
+        if (!this.remoteSnapshot || message.sequence > this.remoteSnapshot.tick) this.remoteSnapshot = message.snapshot;
+      } else if (message.type === "ping") {
+        this.onlinePeer?.send(encodeGuestMessage({ type: "pong", version: 1, nonce: message.nonce }));
+      }
+    } catch (error) {
+      console.warn("Ignored an invalid multiplayer message.", error);
+    }
+  };
+
+  private consumeRemoteCommand(): PlayerCommand | undefined {
+    if (this.onlineRole !== "host" || !this.onlineAuthenticated || !this.remoteCommand
+      || performance.now() - this.remoteCommandReceivedAt > 500) return undefined;
+    const command = this.remoteCommand;
+    this.remoteCommand = { ...command, honkPressed: false, interactPressed: false };
+    return command;
+  }
+
+  private sendHostSnapshot(delta: number): void {
+    this.snapshotSendAccumulator += delta;
+    if (this.snapshotSendAccumulator < 1 / 15) return;
+    this.snapshotSendAccumulator %= 1 / 15;
+    const players = this.simulation.players.map((state) => ({
+      id: state.id === "goose" ? "goose-1" as const : "goose-2" as const,
+      areaId: this.worldArea.id,
+      state,
+    }));
+    const snapshot: AuthoritativeGameSnapshot = {
+      tick: Math.round(this.simulation.elapsed / FIXED_STEP),
+      players,
+      areas: [{ areaId: this.worldArea.id, world: this.simulation.world }],
+      objectiveList: this.simulation.objectiveList,
+    };
+    this.onlinePeer?.send(encodeHostMessage({ type: "snapshot", version: 1, sequence: snapshot.tick,
+      sentAt: performance.now(), snapshot }));
+  }
+
+  private animateOnlineGuest(delta: number, frame: InputFrame): void {
+    if (delta > 0 && this.onlineAuthenticated) {
+      const command = this.commandForFrame(frame, this.controlHeading2, this.moveDirection2, delta);
+      this.onlinePeer?.send(encodeGuestMessage({ type: "command", version: 1, playerId: "goose-2",
+        command: { ...command, sequence: this.networkSequence++ } }));
+    }
+    const snapshot = this.remoteSnapshot;
+    const guest = snapshot?.players.find((player) => player.id === "goose-2");
+    const area = guest ? snapshot?.areas.find((candidate) => candidate.areaId === guest.areaId) : undefined;
+    if (snapshot && guest && area) {
+      if (area.areaId !== this.worldArea.id) {
+        this.worldArea = getWorldArea(this.worldLayout, area.areaId);
+        this.world.applyArea(this.worldArea);
+        this.useAreaCameraTrack();
+        this.controlHeading2.reset();
+      }
+      this.goose2.visible = true;
+      this.goose2.position.copy(guest.state.position);
+      this.goose2.rotation.y = guest.state.heading;
+      this.velocity2.copy(guest.state.velocity);
+      const host = snapshot.players.find((player) => player.id === "goose-1" && player.areaId === area.areaId);
+      this.goose.visible = Boolean(host);
+      if (host) { this.goose.position.copy(host.state.position); this.goose.rotation.y = host.state.heading; this.velocity.copy(host.state.velocity); }
+      this.goose2.update(delta, snapshot.tick * FIXED_STEP, guest.state.speed / HURRY_SPEED, guest.state.turnAmount,
+        guest.state.wingsSpread || guest.state.threatening, guest.state.sneaking || guest.state.threatening);
+      if (host) this.goose.update(delta, snapshot.tick * FIXED_STEP, host.state.speed / HURRY_SPEED, host.state.turnAmount,
+        host.state.wingsSpread || host.state.threatening, host.state.sneaking || host.state.threatening);
+      this.world.syncGameplay(area.world, this.goose.getMouthSocket(), this.goose2.getMouthSocket());
+      this.audio.setCafeMusic(area.world.entities.some((entity) => entity.tags.includes("music") && entity.active === true));
+    }
+    this.interactionPrompt.hidden = true;
+    this.updateCamera(delta);
+    this.world.updatePresentation(delta);
+    if (this.goose.visible) this.gooseOcclusionFader.update(this.world, this.camera, this.goose, delta);
+    this.goose2OcclusionFader.update(this.world, this.camera, this.goose2, delta);
+    this.sunShadow.update(this.camera);
+    this.renderer.render(this.scene, this.camera);
   }
 
   private readonly startLocalMultiplayer = (): void => {
@@ -459,7 +617,10 @@ export class Game {
     const janitor = world.janitor;
     const barista = world.cafePeople.find((person) => person.role === "barista");
     const second = this.localMultiplayer ? this.simulation.secondaryPlayer : undefined;
-    const playerFocus = second
+    const guestView = this.onlineRole === "guest";
+    const playerFocus = guestView
+      ? { x: this.goose2.position.x, z: this.goose2.position.z }
+      : second
       ? { x: (this.goose.position.x + this.goose2.position.x) * 0.5, z: (this.goose.position.z + this.goose2.position.z) * 0.5 }
       : { x: this.goose.position.x, z: this.goose.position.z };
     const framed = this.framing.focus(
@@ -467,10 +628,10 @@ export class Game {
       [...(janitor ? [{ id: janitor.id, x: janitor.position.x, z: janitor.position.z }] : []),
         ...(barista ? [{ id: barista.id, x: barista.position.x, z: barista.position.z }] : [])],
     );
-    const leadVelocity = second ? this.velocity.clone().add(this.velocity2).multiplyScalar(0.5) : this.velocity;
+    const leadVelocity = guestView ? this.velocity2 : second ? this.velocity.clone().add(this.velocity2).multiplyScalar(0.5) : this.velocity;
     this.desiredCameraFocus.set(
       framed.x + leadVelocity.x * leadSeconds,
-      (second ? (this.goose.position.y + this.goose2.position.y) * 0.5 : this.goose.position.y) + CAMERA_FOCUS_HEIGHT,
+      (guestView ? this.goose2.position.y : second ? (this.goose.position.y + this.goose2.position.y) * 0.5 : this.goose.position.y) + CAMERA_FOCUS_HEIGHT,
       framed.z + leadVelocity.z * leadSeconds,
     );
   }
@@ -673,9 +834,10 @@ export class Game {
 
   private updateControllerDiagnostics(delta: number): void {
     if (!this.controllerDiagnostics.open) return;
-    this.controllerDiagnosticsRefresh -= delta;
-    if (this.controllerDiagnosticsRefresh > 0) return;
-    this.controllerDiagnosticsRefresh = 0.12;
+    void delta;
+    const now = performance.now();
+    if (now < this.controllerDiagnosticsRefresh) return;
+    this.controllerDiagnosticsRefresh = now + 120;
     this.controllerDiagnosticsOutput.textContent = formatGamepadDiagnostics(
       Array.from(navigator.getGamepads?.() ?? []) as readonly (GamepadLike | null)[],
     );
@@ -832,7 +994,7 @@ export class Game {
   private readonly handleFocus = (): void => { this.syncPageActivityPause(); };
   private readonly handleVisibility = (): void => {
     this.syncPageActivityPause();
-    if (document.hidden && !this.progressCleared) saveProgress(this.simulation.sessionState);
+    if (document.hidden && !this.progressCleared && this.onlineRole !== "guest") saveProgress(this.simulation.sessionState);
   };
 
   /** Explicitly release the GPU context before a Play/Edit page transition. */
@@ -840,7 +1002,7 @@ export class Game {
     if (this.disposed) return;
     this.disposed = true;
     window.clearTimeout(this.todoTimer);
-    if (!this.progressCleared && !this.editorMode && !this.overviewMode) saveProgress(this.simulation.sessionState);
+    if (!this.progressCleared && !this.editorMode && !this.overviewMode && this.onlineRole !== "guest") saveProgress(this.simulation.sessionState);
     this.audio.setCafeMusic(false);
     this.renderer.setAnimationLoop(null);
     window.removeEventListener("resize", this.resize);

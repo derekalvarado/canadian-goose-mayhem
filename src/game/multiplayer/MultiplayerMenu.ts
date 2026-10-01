@@ -11,11 +11,12 @@ import {
 } from "./signaling.ts";
 
 export type MultiplayerRole = "host" | "guest";
+export interface MultiplayerConnectionIdentity { readonly sessionId: string; readonly reconnectToken: string }
 
 export interface MultiplayerMenuOptions {
   readonly onOpenChange?: (open: boolean) => void;
   readonly onLocalStart?: () => void;
-  readonly onConnected?: (role: MultiplayerRole, peer: WebRtcPeer) => void;
+  readonly onConnected?: (role: MultiplayerRole, peer: WebRtcPeer, identity: MultiplayerConnectionIdentity) => void;
   readonly onDisconnected?: (role: MultiplayerRole) => void;
   readonly onMessage?: (role: MultiplayerRole, message: string) => void;
 }
@@ -160,7 +161,9 @@ export class MultiplayerMenu {
     if (status === "connected") {
       this.status.textContent = role === "host" ? "Goose 2 connected." : "Connected to the host as Goose 2.";
       this.sharePanel.hidden = true;
-      this.options.onConnected?.(role, this.peer!);
+      if (this.sessionId && this.reconnectToken) {
+        this.options.onConnected?.(role, this.peer!, { sessionId: this.sessionId, reconnectToken: this.reconnectToken });
+      }
     } else if (status === "disconnected" || status === "failed") {
       this.status.textContent = role === "host"
         ? "Goose 2 disconnected. They will stand still; create a reconnect link when ready."

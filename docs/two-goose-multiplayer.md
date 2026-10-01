@@ -85,11 +85,17 @@ Every checkpoint must keep single-player working and pass `npm test` and
 - `Simulation` can now run two geese in the same fixed tick. They move, honk,
   interact, hold separate items, arbitrate simultaneous grabs deterministically,
   and leave Goose 2 standing with her item when commands stop.
+- The janitor, splash-pad kids, barista, café customers, and kitchen worker now
+  choose and react to the relevant nearby goose instead of always targeting
+  Goose 1. Shoo events retain the affected goose identity.
 - Local presentation renders and animates Goose 2, assigns two controllers, uses
   a shared midpoint camera, and moves both geese through an area doorway together.
-- Still required: make all NPC attention/shoo behavior select either goose, wire
-  protocol messages into the host and guest game loops, support independently
-  occupied areas online, and perform real iPad/Joy-Con/WebRTC playtests.
+- The WebRTC data channel is wired into the game loop for same-area play: Goose 2
+  commands are authenticated and rate-limited at the host; the guest renders
+  bounded-rate authoritative host snapshots and never writes local progress.
+- Still required: support independently occupied areas online, replicate
+  one-shot presentation events and the guest to-do UI, add smoothing for remote
+  snapshots, and perform real iPad/Joy-Con/WebRTC playtests.
 - Latest automated checkpoint: all 211 tests pass; production TypeScript build is
   clean. Browser/device smoke testing has not yet been performed.
 

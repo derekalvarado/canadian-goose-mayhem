@@ -127,7 +127,7 @@ export type GameplayEvent =
   | { readonly type: "trash-can-emptied"; readonly actorId: string; readonly entityId: string }
   | { readonly type: "litter-picked-up"; readonly actorId: string; readonly entityId: string; readonly containerId: string }
   | { readonly type: "janitor-fumbled"; readonly actorId: string; readonly entityId: string }
-  | { readonly type: "goose-shooed"; readonly actorId: string; readonly position: Readonly<Position> }
+  | { readonly type: "goose-shooed"; readonly actorId: string; readonly targetId?: PlayerId; readonly position: Readonly<Position> }
   | { readonly type: "splash-kid-frightened"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "person-startled"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "drink-spilled"; readonly actorId: string; readonly entityId: string; readonly position: Readonly<Position> }
@@ -184,6 +184,7 @@ interface MutableJanitor {
   trashIndex: number; litterIndex: number; targetEntityId?: string; resume?: JanitorResume;
   routeEntityId?: string; routeWaypointIndex: number;
   stolenToolId?: string; toolSearchSecondsRemaining: number; reactionReason?: "fumble" | "theft";
+  targetPlayerId?: PlayerId;
   shooCooldownRemaining: number; completedTrashIdsThisLap: string[];
 }
 interface MutableSplashKid {
@@ -205,6 +206,14 @@ interface MutableSecondPlayer {
   heldEntityId?: string;
   honkQueued: boolean;
   interactionQueued: boolean;
+}
+interface PlayerActorView {
+  readonly id: PlayerId;
+  readonly position: Position;
+  readonly velocity: Position;
+  readonly heldEntityId?: string;
+  readonly wingsSpread: boolean;
+  readonly threatening: boolean;
 }
 
 export const FIXED_STEP = 1 / 60;
@@ -495,6 +504,7 @@ export class Simulation {
       janitor.trashIndex = 0; janitor.litterIndex = 0; janitor.targetEntityId = undefined; janitor.resume = undefined;
       janitor.routeEntityId = undefined; janitor.routeWaypointIndex = 0;
       janitor.stolenToolId = undefined; janitor.toolSearchSecondsRemaining = 0; janitor.reactionReason = undefined;
+      janitor.targetPlayerId = undefined;
       janitor.shooCooldownRemaining = 0; janitor.completedTrashIdsThisLap = [];
       if (janitor.definition.cleanup) this.beginPass("trash");
     }
@@ -551,8 +561,8 @@ export class Simulation {
       this.secondPlayer.honkQueued = false;
     }
     this.updateSplashKids(events);
-    this.updateJanitor(events, honked);
-    this.cafe?.update(this.cafeWorld(events, honked), events, FIXED_STEP);
+    this.updateJanitor(events, honked || secondHonked);
+    this.cafe?.update(this.cafeWorld(events, honked || secondHonked), events, FIXED_STEP);
     this.syncOwnedEntities();
     for (const zone of this.rules.objectiveZones ?? []) {
       const guarded = zone.guardedBy === this.janitor?.definition.id
@@ -854,6 +864,18 @@ export class Simulation {
       this.startCurrentCleanupTarget();
     } else janitor.activity = "walking-to-litter";
   }
+  private playerActor(id: PlayerId): PlayerActorView | undefined {
+    if (id === "goose") return { id, position: this.position, velocity: this.velocity, heldEntityId: this.heldEntityId,
+      wingsSpread: this.wingsSpread, threatening: this.threatening };
+    const player = this.secondPlayer;
+    return player ? { id, position: player.position, velocity: player.velocity, heldEntityId: player.heldEntityId,
+      wingsSpread: player.wingsSpread, threatening: player.threatening } : undefined;
+  }
+  private nearestPlayer(from: Readonly<Position>, predicate: (player: PlayerActorView) => boolean = () => true): PlayerActorView | undefined {
+    return ([this.playerActor("goose"), this.playerActor("goose-2")].filter((player): player is PlayerActorView => Boolean(player))
+      .filter(predicate).sort((left, right) => distance2d(from, left.position) - distance2d(from, right.position)
+        || left.id.localeCompare(right.id)))[0];
+  }
   private onJanitorToolStolen(entity: MutableEntity): void {
     const janitor = this.janitor; const cleanup = janitor?.definition.cleanup;
     if (!janitor || !cleanup || (entity.definition.cleanup?.role !== "trash-bag" && entity.definition.cleanup?.role !== "litter-picker")) return;
@@ -865,7 +887,7 @@ export class Simulation {
   private recoverStolenTool(events: GameplayEvent[]): void {
     const janitor = this.janitor!; const tool = janitor.stolenToolId ? this.entitiesById.get(janitor.stolenToolId) : undefined;
     if (!tool) return;
-    if (tool.holderId === "goose") this.releaseEntity(tool, false);
+    if (tool.holderId === "goose" || tool.holderId === "goose-2") this.releaseEntity(tool, false);
     tool.containedBy = undefined; this.releaseEntity(tool, true);
     janitor.stolenToolId = undefined;
     events.push({ type: "entity-recovered", actorId: janitor.definition.id, entityId: tool.definition.id, position: { ...tool.position } });
@@ -882,9 +904,14 @@ export class Simulation {
       janitor.toolSearchSecondsRemaining = Math.max(0, janitor.toolSearchSecondsRemaining - FIXED_STEP);
       if (janitor.toolSearchSecondsRemaining <= 0) { this.recoverStolenTool(events); return true; }
     }
-    if (tool.holderId === "goose") {
+    if (tool.holderId === "goose" || tool.holderId === "goose-2") {
+      const player = this.playerActor(tool.holderId);
+      if (!player) return false;
+      janitor.targetPlayerId = player.id;
       janitor.activity = "pursuing-tool";
-      if (this.moveJanitorToward(this.position, cleanup.jogSpeed) || distance2d(janitor.position, this.position) <= cleanup.shooReach) this.shooGoose(events, true);
+      if (this.moveJanitorToward(player.position, cleanup.jogSpeed) || distance2d(janitor.position, player.position) <= cleanup.shooReach) {
+        this.shooGoose(events, true, player.id);
+      }
       return true;
     }
     janitor.activity = "retrieving-tool";
@@ -926,11 +953,15 @@ export class Simulation {
       if (this.updateToolRecovery(events)) return;
     }
     if (janitor.activity === "chasing-goose") {
-      if (this.moveJanitorToward(this.position, cleanup.jogSpeed) || distance2d(janitor.position, this.position) <= cleanup.shooReach) this.shooGoose(events, false);
+      const player = this.playerActor(janitor.targetPlayerId ?? "goose") ?? this.nearestPlayer(janitor.position);
+      if (player && (this.moveJanitorToward(player.position, cleanup.jogSpeed) || distance2d(janitor.position, player.position) <= cleanup.shooReach)) {
+        this.shooGoose(events, false, player.id);
+      }
       return;
     }
-    if (janitor.activity === "picking-litter" && (honked || this.wingsSpread || this.threatening)
-      && distance2d(janitor.position, this.position) <= cleanup.fumbleRadius) {
+    const startlingPlayer = this.nearestPlayer(janitor.position, (player) => honked || player.wingsSpread || player.threatening);
+    if (janitor.activity === "picking-litter" && startlingPlayer
+      && distance2d(janitor.position, startlingPlayer.position) <= cleanup.fumbleRadius) {
       const entityId = janitor.targetEntityId; if (!entityId) return;
       this.rememberCleanupTask(); janitor.activity = "reacting"; janitor.reactionReason = "fumble";
       janitor.activitySecondsRemaining = cleanup.reactionSeconds;
@@ -938,8 +969,9 @@ export class Simulation {
     }
     const working = janitor.activity === "walking-to-trash" || janitor.activity === "emptying-trash"
       || janitor.activity === "walking-to-litter" || janitor.activity === "picking-litter" || janitor.activity === "returning";
-    if (working && janitor.shooCooldownRemaining <= 0 && distance2d(janitor.position, this.position) <= cleanup.shooRadius) {
-      this.rememberCleanupTask(); janitor.activity = "chasing-goose"; return;
+    const nearbyPlayer = this.nearestPlayer(janitor.position);
+    if (working && nearbyPlayer && janitor.shooCooldownRemaining <= 0 && distance2d(janitor.position, nearbyPlayer.position) <= cleanup.shooRadius) {
+      this.rememberCleanupTask(); janitor.targetPlayerId = nearbyPlayer.id; janitor.activity = "chasing-goose"; return;
     }
     if (!observedTarget.active && working && !janitor.resume
       && distance2d(janitor.position, definition.investigationPosition) <= definition.noticeRadius) {
@@ -1044,7 +1076,11 @@ export class Simulation {
         janitor.activitySecondsRemaining = Math.max(0, janitor.activitySecondsRemaining - FIXED_STEP);
         if (janitor.activitySecondsRemaining <= 0) janitor.activity = "guarding";
         break;
-      case "guarding": if (distance2d(this.position, definition.guardPosition) <= definition.guardRadius) this.shooGoose(events, false); break;
+      case "guarding": {
+        const player = this.nearestPlayer(definition.guardPosition);
+        if (player && distance2d(player.position, definition.guardPosition) <= definition.guardRadius) this.shooGoose(events, false, player.id);
+        break;
+      }
       default: break;
     }
   }
@@ -1052,10 +1088,11 @@ export class Simulation {
     for (const child of this.splashKids) {
       const definition = child.definition; const target = this.entitiesById.get(definition.observedTargetId);
       if (!target || target.active === undefined) continue;
-      const threatened = (this.threatening || this.wingsSpread) && distance2d(child.position, this.position) <= definition.threatRadius;
+      const threat = this.nearestPlayer(child.position, (player) => player.threatening || player.wingsSpread);
+      const threatened = Boolean(threat && distance2d(child.position, threat.position) <= definition.threatRadius);
       if (threatened && child.activity !== "frightened" && child.activity !== "crying") {
         child.activity = "frightened"; child.activitySecondsRemaining = 0;
-        child.destination = this.chooseSplashKidRetreat(child, this.position);
+        child.destination = this.chooseSplashKidRetreat(child, threat?.position);
         events.push({ type: "splash-kid-frightened", actorId: definition.id, position: { ...child.position } });
       }
       if (child.activity === "frightened") {
@@ -1172,20 +1209,26 @@ export class Simulation {
     if (range > 0) return this.moveJanitorIntoCleanupRange(target);
     return this.moveJanitorToward(target.position);
   }
-  private shooGoose(events: GameplayEvent[], retrievingTool: boolean): void {
+  private shooGoose(events: GameplayEvent[], retrievingTool: boolean, playerId: PlayerId = "goose"): void {
     const janitor = this.janitor!;
-    janitor.heading = Math.atan2(-(this.position.x - janitor.position.x), -(this.position.z - janitor.position.z));
+    const player = this.playerActor(playerId); if (!player) return;
+    janitor.heading = Math.atan2(-(player.position.x - janitor.position.x), -(player.position.z - janitor.position.z));
     if (!retrievingTool && janitor.definition.cleanup) this.rememberCleanupTask();
     janitor.activity = "shooing"; janitor.activitySecondsRemaining = janitor.definition.shooSeconds; janitor.shooCooldownRemaining = SHOO_COOLDOWN_SECONDS;
-    this.pushGooseAway(janitor.definition.id, janitor.position, events);
+    this.pushGooseAway(janitor.definition.id, janitor.position, events, playerId);
   }
   /** The shared non-violent setback: a short push away from someone, which makes the goose let go. */
-  private pushGooseAway(actorId: string, from: Readonly<Position>, events: GameplayEvent[]): void {
-    const dx = this.position.x - from.x; const dz = this.position.z - from.z;
-    const length = Math.max(0.0001, Math.hypot(dx, dz)); this.pushDirection.x = dx / length; this.pushDirection.z = dz / length;
-    this.spookedSeconds = SHOO_PUSH_SECONDS; this.velocity.x = 0; this.velocity.z = 0;
-    this.dropHeldEntity(events);
-    events.push({ type: "goose-shooed", actorId, position: { ...this.position } });
+  private pushGooseAway(actorId: string, from: Readonly<Position>, events: GameplayEvent[], playerId: PlayerId = "goose"): void {
+    const player = this.playerActor(playerId); if (!player) return;
+    const dx = player.position.x - from.x; const dz = player.position.z - from.z;
+    const length = Math.max(0.0001, Math.hypot(dx, dz));
+    if (playerId === "goose") {
+      this.pushDirection.x = dx / length; this.pushDirection.z = dz / length;
+      this.spookedSeconds = SHOO_PUSH_SECONDS;
+    }
+    player.velocity.x = 0; player.velocity.z = 0;
+    this.dropHeldEntity(events, playerId);
+    events.push({ type: "goose-shooed", actorId, targetId: playerId, position: { ...player.position } });
   }
   /** The narrow view of the world café people act through; every grab and release uses the goose's rules. */
   private cafeWorld(events: GameplayEvent[], honked: boolean): CafeWorld {
@@ -1195,9 +1238,11 @@ export class Simulation {
       restingOn: entity.restingOn, restingKind: entity.restingOn ? this.surface(entity.restingOn)?.kind : undefined,
       tags: entity.definition.tags ?? [], active: entity.active, interactionPoint: entity.definition.controller?.interactionPoint,
     });
+    const geese = ([this.playerActor("goose"), this.playerActor("goose-2")].filter((player): player is PlayerActorView => Boolean(player)))
+      .map((player) => ({ id: player.id, position: { ...player.position }, heldEntityId: player.heldEntityId,
+        startling: honked || player.wingsSpread || player.threatening }));
     return {
-      goose: { position: { ...this.position }, heldEntityId: this.heldEntityId,
-        startling: honked || this.wingsSpread || this.threatening },
+      goose: geese[0], geese,
       entity: (id) => { const entity = this.entitiesById.get(id); return entity ? view(entity) : undefined; },
       entities: () => [...this.entitiesById.values()].map(view),
       surface: (id) => this.surface(id),
@@ -1222,7 +1267,7 @@ export class Simulation {
         entity.active = active;
         events.push({ type: "device-state-changed", actorId, targetId: entityId, active });
       },
-      pushGoose: (actorId, from) => this.pushGooseAway(actorId, from, events),
+      pushGoose: (actorId, from, playerId) => this.pushGooseAway(actorId, from, events, playerId ?? "goose"),
       recordFact: (factId) => { this.durableFacts.add(factId); },
       emit: (event) => { events.push(event); },
     };
