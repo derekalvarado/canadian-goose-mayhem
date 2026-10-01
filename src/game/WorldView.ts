@@ -133,7 +133,7 @@ export class WorldView extends THREE.Group {
     }
   }
 
-  syncGameplay(snapshot: WorldSnapshot, gooseMouthSocket?: THREE.Object3D): void {
+  syncGameplay(snapshot: WorldSnapshot, gooseMouthSocket?: THREE.Object3D, secondGooseMouthSocket?: THREE.Object3D): void {
     this.handHeld.length = 0;
     const janitor = snapshot.janitor;
     const janitorView = janitor ? this.gameplayViews.get(janitor.id) : undefined;
@@ -169,7 +169,8 @@ export class WorldView extends THREE.Group {
       if (typeof sync === "function") (sync as SyncState)(entity);
       const socket = entity.holderId === janitor?.id && janitorView instanceof JanitorView
         ? janitorView.getHandSocket("right") : undefined;
-      const personId = entity.holderId && entity.holderId !== "goose" && entity.holderId !== janitor?.id ? entity.holderId : sipping.get(entity.id);
+      const personId = entity.holderId && entity.holderId !== "goose" && entity.holderId !== "goose-2" && entity.holderId !== janitor?.id
+        ? entity.holderId : sipping.get(entity.id);
       const personView = personId ? this.gameplayViews.get(personId) : undefined;
       const personSocket = personView instanceof RiggedCharacterView ? personView.getHandSocket("right") : undefined;
       if (socket && (assetId === "prop.trash-bag" || assetId === "prop.litter-picker")) {
@@ -182,6 +183,11 @@ export class WorldView extends THREE.Group {
         this.handHeld.push({ wrapper, socket: personSocket, personId, assetId, sipping: sipping.has(entity.id) });
       } else if (entity.holderId === "goose" && gooseMouthSocket) {
         if (wrapper.parent !== gooseMouthSocket) gooseMouthSocket.add(wrapper);
+        const grip = (assetId ? BEAK_GRIPS[assetId] : undefined) ?? DEFAULT_BEAK_GRIP;
+        wrapper.position.set(...grip.offset);
+        wrapper.rotation.set(...(grip.rotation ?? [0, 0, 0]));
+      } else if (entity.holderId === "goose-2" && secondGooseMouthSocket) {
+        if (wrapper.parent !== secondGooseMouthSocket) secondGooseMouthSocket.add(wrapper);
         const grip = (assetId ? BEAK_GRIPS[assetId] : undefined) ?? DEFAULT_BEAK_GRIP;
         wrapper.position.set(...grip.offset);
         wrapper.rotation.set(...(grip.rotation ?? [0, 0, 0]));

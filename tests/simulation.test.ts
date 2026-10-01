@@ -185,3 +185,49 @@ test("only the ten newest durable goose poops remain and reset clears them", () 
   simulation.reset();
   assert.deepEqual(simulation.goosePoops, []);
 });
+
+test("a second goose moves in the same fixed-step simulation and stops when its command source disconnects", () => {
+  const simulation = new Simulation(openWorld);
+  simulation.enableSecondPlayer({ x: 1, y: 0.02, z: 0 }, Math.PI);
+  for (let tick = 0; tick < 60; tick += 1) {
+    simulation.advancePlayers(FIXED_STEP, { ...idle, moveX: -1 }, { ...idle, moveX: 1 });
+  }
+  assert.ok(simulation.player.position.x < 0);
+  assert.ok((simulation.secondaryPlayer?.position.x ?? 0) > 1);
+  const standingAt = simulation.secondaryPlayer!.position;
+  simulation.advancePlayers(FIXED_STEP, idle);
+  assert.deepEqual(simulation.secondaryPlayer!.position, standingAt);
+  assert.equal(simulation.secondaryPlayer!.speed, 0);
+});
+
+test("both geese honk with stable actor identity", () => {
+  const simulation = new Simulation(openWorld);
+  simulation.enableSecondPlayer({ x: 1, y: 0.02, z: 0 });
+  const events = simulation.advancePlayers(FIXED_STEP,
+    { ...idle, honkPressed: true }, { ...idle, honkPressed: true });
+  assert.deepEqual(events.filter((event) => event.type === "goose-honked").map((event) => event.actorId), ["goose", "goose-2"]);
+});
+
+test("simultaneous grabs are deterministic and an item can have only one goose holder", () => {
+  const rules: WorldRules = {
+    ...openWorld,
+    entities: [{ id: "test.apple", label: "apple", position: { x: 0.5, y: 0, z: 0 },
+      carryable: { interactionRange: 2, carryHeight: 0.5, carryDistance: 0.4 } }],
+  };
+  const simulation = new Simulation(rules);
+  simulation.enableSecondPlayer({ x: 1, y: 0.02, z: 0 });
+  const events = simulation.advancePlayers(FIXED_STEP,
+    { ...idle, interactPressed: true }, { ...idle, interactPressed: true });
+  assert.equal(simulation.world.entities[0]?.holderId, "goose");
+  assert.deepEqual(events.filter((event) => event.type === "entity-grabbed").map((event) => event.actorId), ["goose"]);
+
+  const secondOnly = new Simulation(rules);
+  secondOnly.enableSecondPlayer({ x: 1, y: 0.02, z: 0 });
+  secondOnly.advancePlayers(FIXED_STEP, idle, { ...idle, interactPressed: true });
+  assert.equal(secondOnly.world.entities[0]?.holderId, "goose-2");
+  assert.equal(secondOnly.secondaryPlayer?.heldEntityId, "test.apple");
+  const heldPosition = secondOnly.world.entities[0]!.position;
+  secondOnly.advancePlayers(FIXED_STEP, idle);
+  assert.equal(secondOnly.world.entities[0]?.holderId, "goose-2", "disconnect must not drop Goose 2's item");
+  assert.deepEqual(secondOnly.world.entities[0]?.position, heldPosition);
+});

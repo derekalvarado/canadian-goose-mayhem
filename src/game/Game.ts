@@ -3,11 +3,11 @@ import { ViewSunShadow } from "./ViewSunShadow.ts";
 import * as THREE from "three";
 import { WorldView } from "./WorldView";
 import { Goose } from "./Goose";
-import { InputController, type InputDevice } from "./InputController";
+import { InputController, type InputDevice, type InputFrame } from "./InputController";
 import { TouchControls } from "./TouchControls";
 import { PauseReasons, parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
-import { Simulation, HURRY_SPEED, type GameplayEvent } from "./simulation/Simulation";
+import { Simulation, HURRY_SPEED, type GameplayEvent, type PlayerCommand } from "./simulation/Simulation";
 import { PALETTE } from "./palette";
 import { WorldEditor } from "./WorldEditor";
 import { COFFEE_SHOP_AREA_ID, getWorldArea, loadWorldLayout, resolveStartAreaId } from "./worldLayout";
@@ -20,6 +20,8 @@ import { SubjectFraming } from "./cameraFraming";
 import { ControlHeadingLock } from "./controlHeading";
 import { LEVEL_NAMES } from "./challenges";
 import { clearProgress, loadProgress, saveProgress, sessionStateFromProgress } from "./progress";
+import { formatGamepadDiagnostics, type GamepadLike } from "./gamepads";
+import { MultiplayerMenu } from "./multiplayer/MultiplayerMenu.ts";
 
 // A closer follow camera keeps the smaller goose readable and makes the plaza
 // landmarks feel larger without changing their gameplay dimensions.
@@ -62,6 +64,11 @@ function requireElement<T extends HTMLElement>(selector: string): T {
   return element;
 }
 
+function idleInputFrame(): InputFrame {
+  return { move: new THREE.Vector2(), hurry: false, honkPressed: false, interactPressed: false,
+    wingsSpread: false, sneaking: false, threatening: false, device: "gamepad" };
+}
+
 export class Game {
   private readonly canvas: HTMLCanvasElement;
   private readonly renderer: THREE.WebGLRenderer;
@@ -78,21 +85,26 @@ export class Game {
   private rules = createWorldRules(this.worldArea, this.worldLayout.transitions);
   private readonly world = new WorldView(this.worldArea, !this.editorMode && !this.overviewMode);
   private readonly goose = new Goose();
+  private readonly goose2 = new Goose();
   private readonly gazeRay = new THREE.Raycaster();
   private readonly gazeOrigin = new THREE.Vector3();
   private readonly gazeDirection = new THREE.Vector3();
   private gazeRefresh = 0;
   private readonly poopViews = new Map<string, THREE.Group>();
   private readonly gooseOcclusionFader = new GooseOcclusionFader(this.world.occlusionFadeGroups);
+  private readonly goose2OcclusionFader = new GooseOcclusionFader(this.world.occlusionFadeGroups);
   private readonly input: InputController;
   private readonly clock = new THREE.Clock();
   private readonly velocity = new THREE.Vector3();
+  private readonly velocity2 = new THREE.Vector3();
   // Crossed-off tasks come back after a reload; `?dev&fresh` starts a clean list without erasing it.
   private simulation = new Simulation(this.rules, this.devMode && this.query.has("fresh") ? undefined : sessionStateFromProgress(loadProgress()));
   private readonly audio = new GameAudio();
   private readonly moveDirection = new THREE.Vector3();
+  private readonly moveDirection2 = new THREE.Vector3();
   private readonly cameraForward = new THREE.Vector3();
   private readonly controlHeading = new ControlHeadingLock();
+  private readonly controlHeading2 = new ControlHeadingLock();
   private readonly framing = new SubjectFraming();
   private cameraTrack?: CameraTrackDirector;
   // Equal ground axes give a 45° diagonal; √2 vertical keeps a 45° downward pitch.
@@ -110,6 +122,10 @@ export class Game {
   private readonly installMenu = requireElement<HTMLElement>("#install-menu");
   private readonly fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
   private readonly touchPreferenceSelect = requireElement<HTMLSelectElement>("#touch-controls-preference");
+  private readonly controllerDiagnostics = requireElement<HTMLDetailsElement>("#controller-diagnostics");
+  private readonly controllerDiagnosticsOutput = requireElement<HTMLPreElement>("#controller-diagnostics-output");
+  private readonly controllerLobby = requireElement<HTMLElement>("#controller-lobby");
+  private readonly controllerLobbyStatus = requireElement<HTMLElement>("#controller-lobby-status");
   private readonly todoToggle = requireElement<HTMLButtonElement>("#todo-toggle");
   private readonly todoCount = requireElement<HTMLElement>("#todo-count");
   private readonly objectiveList = requireElement<HTMLUListElement>("#objective-list");
@@ -135,6 +151,8 @@ export class Game {
   private lastInputTime = performance.now();
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private readonly canvasResizeObserver: ResizeObserver;
+  private controllerDiagnosticsRefresh = 0;
+  private localMultiplayer = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -154,7 +172,9 @@ export class Game {
     document.querySelector("#game-shell")?.append(this.transitionCurtain);
 
     this.scene.background = new THREE.Color(PALETTE.atmosphere.sky);
-    this.scene.add(this.world, this.goose);
+    this.goose2.name = "goose-2";
+    this.goose2.visible = false;
+    this.scene.add(this.world, this.goose, this.goose2);
     if (this.devMode) {
       // Dev-only handle for playtesting from the browser console.
       (window as unknown as { gooseGame?: Game }).gooseGame = this;
@@ -164,7 +184,7 @@ export class Game {
       document.querySelector("#game-shell")?.append(banner);
     }
     this.syncPlayerView();
-    this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket());
+    this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket(), this.goose2.getMouthSocket());
     this.renderObjectives();
 
     this.setupLighting();
@@ -189,6 +209,12 @@ export class Game {
     }
 
     if (!this.editorMode && !this.overviewMode) this.setupMobileControls();
+    if (!this.editorMode && !this.overviewMode) {
+      new MultiplayerMenu({
+        onOpenChange: (open) => this.setPauseReason("multiplayer", open),
+        onLocalStart: this.startLocalMultiplayer,
+      });
+    }
     this.canvasResizeObserver = new ResizeObserver(this.resize);
     this.canvasResizeObserver.observe(canvas);
     window.addEventListener("resize", this.resize);
@@ -243,7 +269,11 @@ export class Game {
       return;
     }
 
-    const frame = this.input.sample();
+    const localInput = this.localMultiplayer ? this.input.sampleLocalGamepads() : undefined;
+    if (localInput) this.updateControllerLobby(localInput.assignments);
+    const frame = localInput?.player1 ?? (this.localMultiplayer ? idleInputFrame() : this.input.sample());
+    const secondFrame = localInput?.player2;
+    this.updateControllerDiagnostics(delta);
     this.touchControls?.syncPoseState(frame.wingsSpread, frame.sneaking, frame.threatening);
     if (delta > 0) {
       if (frame.move.lengthSq() > 0.001 || frame.hurry || frame.interactPressed || frame.wingsSpread || frame.sneaking || frame.threatening) {
@@ -251,34 +281,15 @@ export class Game {
         this.controlsCard.classList.remove("controls-card--quiet");
       }
 
-      this.camera.getWorldDirection(this.cameraForward);
-      const cameraYaw = Math.atan2(this.cameraForward.x, this.cameraForward.z);
-      const controlYaw = this.controlHeading.update(frame.move.x, frame.move.y, cameraYaw, delta);
-      const forwardX = Math.sin(controlYaw); const forwardZ = Math.cos(controlYaw);
-      // Screen-right is forward × up: (-forwardZ, 0, forwardX).
-      this.moveDirection.set(
-        forwardX * frame.move.y - forwardZ * frame.move.x,
-        0,
-        forwardZ * frame.move.y + forwardX * frame.move.x,
-      );
-      if (this.moveDirection.lengthSq() > 1) this.moveDirection.normalize();
-
-      const events = this.simulation.advance(delta, {
-        moveX: this.moveDirection.x,
-        moveZ: this.moveDirection.z,
-        hurry: frame.hurry,
-        honkPressed: frame.honkPressed,
-        interactPressed: frame.interactPressed,
-        wingsSpread: frame.wingsSpread,
-        sneaking: frame.sneaking,
-        threatening: frame.threatening,
-      });
+      const command = this.commandForFrame(frame, this.controlHeading, this.moveDirection, delta);
+      const secondCommand = secondFrame ? this.commandForFrame(secondFrame, this.controlHeading2, this.moveDirection2, delta) : undefined;
+      const events = this.simulation.advancePlayers(delta, command, secondCommand);
       this.syncPlayerView();
       this.syncPoopViews();
-      this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket());
+      this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket(), this.goose2.getMouthSocket());
       for (const event of events) {
         if (event.type === "goose-honked") {
-          this.goose.honk();
+          (event.actorId === "goose-2" ? this.goose2 : this.goose).honk();
           void this.audio.playHonk();
           this.lastInputTime = performance.now();
         }
@@ -286,7 +297,10 @@ export class Game {
           this.goose.spook();
           this.framing.release(event.actorId);
         }
-        if ((event.type === "entity-grabbed" || event.type === "entity-dropped") && event.actorId === "goose") this.goose.grab();
+        if ((event.type === "entity-grabbed" || event.type === "entity-dropped")
+          && (event.actorId === "goose" || event.actorId === "goose-2")) {
+          (event.actorId === "goose-2" ? this.goose2 : this.goose).grab();
+        }
         if (event.type === "objective-completed") this.celebrateTask(event.objectiveId);
         if (event.type === "device-state-changed" && event.active && this.simulation.world.entities.find((entity) => entity.id === event.targetId)?.tags.includes("bell")) this.audio.playBell();
         if (event.type === "order-called") this.audio.playOrderCalled();
@@ -307,7 +321,13 @@ export class Game {
       player.wingsSpread || player.threatening,
       player.sneaking || player.threatening,
     );
+    const secondPlayer = this.simulation.secondaryPlayer;
+    if (secondPlayer) {
+      this.goose2.update(delta, this.simulation.elapsed, secondPlayer.speed / HURRY_SPEED, secondPlayer.turnAmount,
+        secondPlayer.wingsSpread || secondPlayer.threatening, secondPlayer.sneaking || secondPlayer.threatening);
+    }
     if (this.goose.stepped) void this.audio.playFootstep();
+    if (this.goose2.visible && this.goose2.stepped) void this.audio.playFootstep();
     this.audio.setCafeMusic(this.simulation.world.entities.some((entity) => entity.tags.includes("music") && entity.active === true));
     this.updateInteractionPrompt(frame.device);
 
@@ -318,9 +338,55 @@ export class Game {
     this.updateCamera(delta);
     this.world.updatePresentation(delta);
     this.gooseOcclusionFader.update(this.world, this.camera, this.goose, delta);
+    if (this.goose2.visible) this.goose2OcclusionFader.update(this.world, this.camera, this.goose2, delta);
     this.sunShadow.update(this.camera);
     this.renderer.render(this.scene, this.camera);
   };
+
+  private commandForFrame(frame: InputFrame, headingLock: ControlHeadingLock, output: THREE.Vector3, delta: number): PlayerCommand {
+    this.camera.getWorldDirection(this.cameraForward);
+    const cameraYaw = Math.atan2(this.cameraForward.x, this.cameraForward.z);
+    const controlYaw = headingLock.update(frame.move.x, frame.move.y, cameraYaw, delta);
+    const forwardX = Math.sin(controlYaw); const forwardZ = Math.cos(controlYaw);
+    // Screen-right is forward × up: (-forwardZ, 0, forwardX).
+    output.set(
+      forwardX * frame.move.y - forwardZ * frame.move.x,
+      0,
+      forwardZ * frame.move.y + forwardX * frame.move.x,
+    );
+    if (output.lengthSq() > 1) output.normalize();
+    return { moveX: output.x, moveZ: output.z, hurry: frame.hurry, honkPressed: frame.honkPressed,
+      interactPressed: frame.interactPressed, wingsSpread: frame.wingsSpread, sneaking: frame.sneaking,
+      threatening: frame.threatening };
+  }
+
+  private readonly startLocalMultiplayer = (): void => {
+    if (this.localMultiplayer) return;
+    this.localMultiplayer = true;
+    this.input.clear();
+    this.input.resetLocalGamepads();
+    this.simulation.enableSecondPlayer();
+    this.goose2.visible = true;
+    this.controllerLobby.hidden = false;
+    this.controllerLobbyStatus.textContent = "Press any button on the first sideways Joy-Con.";
+    this.touchControls?.clear();
+    this.updateTouchControlsVisibility();
+    this.syncPlayerView();
+    this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket(), this.goose2.getMouthSocket());
+  };
+
+  private updateControllerLobby(assignments: Readonly<{ player1?: number; player2?: number }>): void {
+    if (assignments.player1 === undefined) {
+      this.controllerLobby.hidden = false;
+      this.controllerLobbyStatus.textContent = "Press any button on the first sideways Joy-Con.";
+    } else if (assignments.player2 === undefined) {
+      this.controllerLobby.hidden = false;
+      this.controllerLobbyStatus.textContent = `Goose 1 joined on controller ${assignments.player1 + 1}. Press any button on the second Joy-Con.`;
+    } else {
+      this.controllerLobbyStatus.textContent = `Goose 1 · controller ${assignments.player1 + 1}   Goose 2 · controller ${assignments.player2 + 1}`;
+      this.controllerLobby.hidden = true;
+    }
+  }
 
   private beginAreaTransition(event: Extract<GameplayEvent, { type: "area-transition-requested" }>): void {
     if (this.transitioning) return;
@@ -342,14 +408,18 @@ export class Game {
       this.rules = createWorldRules(this.worldArea, this.worldLayout.transitions);
       this.simulation = new Simulation(this.rules, sessionState);
       this.simulation.setPlayerTransform(event.targetPosition, event.targetHeading);
+      if (this.localMultiplayer) {
+        this.simulation.enableSecondPlayer({ x: event.targetPosition.x + 0.9, y: event.targetPosition.y, z: event.targetPosition.z }, event.targetHeading);
+      }
       this.world.applyArea(this.worldArea);
       this.velocity.set(0, 0, 0);
       this.syncPlayerView();
-      this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket());
+      this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket(), this.goose2.getMouthSocket());
       this.syncPoopViews();
       this.renderObjectives();
       this.useAreaCameraTrack();
       this.controlHeading.reset();
+      this.controlHeading2.reset();
       this.framing.reset();
       this.snapCameraToGoose();
       this.transitionCurtain.classList.remove("area-transition-curtain--covered");
@@ -388,15 +458,20 @@ export class Game {
     const world = this.simulation.world;
     const janitor = world.janitor;
     const barista = world.cafePeople.find((person) => person.role === "barista");
+    const second = this.localMultiplayer ? this.simulation.secondaryPlayer : undefined;
+    const playerFocus = second
+      ? { x: (this.goose.position.x + this.goose2.position.x) * 0.5, z: (this.goose.position.z + this.goose2.position.z) * 0.5 }
+      : { x: this.goose.position.x, z: this.goose.position.z };
     const framed = this.framing.focus(
-      { x: this.goose.position.x, z: this.goose.position.z },
+      playerFocus,
       [...(janitor ? [{ id: janitor.id, x: janitor.position.x, z: janitor.position.z }] : []),
         ...(barista ? [{ id: barista.id, x: barista.position.x, z: barista.position.z }] : [])],
     );
+    const leadVelocity = second ? this.velocity.clone().add(this.velocity2).multiplyScalar(0.5) : this.velocity;
     this.desiredCameraFocus.set(
-      framed.x + this.velocity.x * leadSeconds,
-      this.goose.position.y + CAMERA_FOCUS_HEIGHT,
-      framed.z + this.velocity.z * leadSeconds,
+      framed.x + leadVelocity.x * leadSeconds,
+      (second ? (this.goose.position.y + this.goose2.position.y) * 0.5 : this.goose.position.y) + CAMERA_FOCUS_HEIGHT,
+      framed.z + leadVelocity.z * leadSeconds,
     );
   }
 
@@ -431,6 +506,16 @@ export class Game {
     const angle = Math.atan2(Math.sin(player.heading - previous.heading), Math.cos(player.heading - previous.heading));
     this.goose.rotation.y = previous.heading + angle * alpha;
     this.velocity.copy(player.velocity);
+    const second = this.simulation.secondaryPlayer;
+    const previousSecond = this.simulation.previousSecondaryPlayerTransform;
+    if (second && previousSecond) {
+      this.goose2.position.copy(previousSecond.position).lerp(second.position, alpha);
+      const secondAngle = Math.atan2(Math.sin(second.heading - previousSecond.heading), Math.cos(second.heading - previousSecond.heading));
+      this.goose2.rotation.y = previousSecond.heading + secondAngle * alpha;
+      this.velocity2.copy(second.velocity);
+    } else {
+      this.velocity2.set(0, 0, 0);
+    }
   }
 
   private updateGooseAttention(delta: number): void {
@@ -586,6 +671,16 @@ export class Game {
     this.interactionLabel.textContent = hint;
   }
 
+  private updateControllerDiagnostics(delta: number): void {
+    if (!this.controllerDiagnostics.open) return;
+    this.controllerDiagnosticsRefresh -= delta;
+    if (this.controllerDiagnosticsRefresh > 0) return;
+    this.controllerDiagnosticsRefresh = 0.12;
+    this.controllerDiagnosticsOutput.textContent = formatGamepadDiagnostics(
+      Array.from(navigator.getGamepads?.() ?? []) as readonly (GamepadLike | null)[],
+    );
+  }
+
   private readonly handleDeviceChanged = (device: InputDevice): void => {
     const usingGamepad = device === "gamepad";
     this.keyboardControls.hidden = usingGamepad;
@@ -654,7 +749,7 @@ export class Game {
 
   private updateTouchControlsVisibility(): void {
     const showTouchControls = shouldShowTouchControls(this.touchPreference, this.coarseTouchDevice)
-      && !this.pauseReasons.paused;
+      && !this.pauseReasons.paused && !this.localMultiplayer;
     this.touchControlsRoot.hidden = !showTouchControls;
     this.controlsCard.classList.toggle("controls-card--touch-visible", showTouchControls);
   }

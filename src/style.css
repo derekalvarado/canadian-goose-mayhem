@@ -371,6 +371,60 @@ kbd,
 .settings-card select, .settings-card button { min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--goose-white); background: rgb(13 34 24 / 72%); font: inherit; }
 .settings-card button { margin-top: 16px; cursor: pointer; }
 .settings-help, .rotate-message p { color: var(--ink-muted); font-size: .86rem; line-height: 1.45; }
+.controller-diagnostics {
+  margin: .8rem 0;
+  border: 1px solid var(--line);
+  border-radius: .7rem;
+  padding: .65rem .75rem;
+}
+.controller-diagnostics summary { cursor: pointer; font-weight: 700; }
+.controller-diagnostics pre {
+  max-width: min(36rem, 72vw);
+  max-height: 12rem;
+  overflow: auto;
+  margin: .65rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--goose-white);
+  font: .72rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.hud-action--multiplayer { left: max(24px, env(safe-area-inset-left)); top: max(24px, env(safe-area-inset-top)); }
+.multiplayer-card { width: min(92vw, 34rem); max-height: min(92vh, 46rem); overflow-y: auto; }
+.multiplayer-card textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: .55rem;
+  padding: .55rem;
+  color: var(--goose-white);
+  background: rgb(13 34 24 / 74%);
+  font: .72rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.multiplayer-paste { display: grid; gap: .35rem; margin: .75rem 0; color: var(--ink-muted); font-size: .82rem; }
+.multiplayer-share { display: grid; justify-items: center; gap: .65rem; margin: .9rem 0; }
+.multiplayer-share canvas { width: min(300px, 68vw); height: auto; border: 8px solid white; border-radius: .35rem; background: white; }
+.multiplayer-share-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .55rem; }
+.pairing-delivered { display: grid; gap: .8rem; }
+.pairing-delivered[hidden] { display: none; }
+.controller-lobby {
+  position: absolute;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 7;
+  display: grid;
+  gap: .25rem;
+  min-width: min(32rem, calc(100vw - 48px));
+  transform: translateX(-50%);
+  padding: .75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: .75rem;
+  background: var(--paper);
+  text-align: center;
+  pointer-events: none;
+}
+.controller-lobby[hidden] { display: none; }
+.controller-lobby span { color: var(--ink-muted); font-size: .82rem; }
 @media (pointer: coarse) and (orientation: landscape) { .controls-card { display: none; } .todo-list { width: min(280px, calc(100vw - 220px)); padding: 12px 14px; } .interaction-prompt { display: none; } .mission-card { width: min(310px, calc(100vw - 190px)); padding: 12px 14px; } .mission-card h1 { font-size: 1.15rem; } }
 
 .complete-card {

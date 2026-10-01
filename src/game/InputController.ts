@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { GamepadJoinLobby, gamepadHasActivity, sampleGamepad, type GamepadActions, type GamepadLike, type LocalPlayerNumber } from "./gamepads.ts";
 
 export type InputDevice = "keyboard" | "gamepad" | "touch";
 
@@ -11,6 +12,21 @@ export interface InputFrame {
   sneaking: boolean;
   threatening: boolean;
   device: InputDevice;
+}
+
+export interface LocalGamepadSample {
+  readonly player1?: InputFrame;
+  readonly player2?: InputFrame;
+  readonly assignments: Readonly<{ player1?: number; player2?: number }>;
+}
+
+interface LocalPadMemory {
+  honk: boolean;
+  interact: boolean;
+  wings: boolean;
+  sneak: boolean;
+  wingsToggled: boolean;
+  sneakToggled: boolean;
 }
 
 const MOVEMENT_KEYS = new Set([
@@ -32,12 +48,6 @@ const MOVEMENT_KEYS = new Set([
   "ControlRight",
 ]);
 
-function applyDeadzone(value: number, deadzone = 0.18): number {
-  const magnitude = Math.abs(value);
-  if (magnitude <= deadzone) return 0;
-  return Math.sign(value) * ((magnitude - deadzone) / (1 - deadzone));
-}
-
 export class InputController {
   readonly movement = new THREE.Vector2();
   private readonly keys = new Set<string>();
@@ -55,6 +65,8 @@ export class InputController {
   private touchThreatening = false;
   private connectedGamepad = false;
   private readonly onDeviceChanged: (device: InputDevice, connected: boolean) => void;
+  private readonly localLobby = new GamepadJoinLobby();
+  private readonly localPadMemory = new Map<number, LocalPadMemory>();
 
   constructor(onDeviceChanged: (device: InputDevice, connected: boolean) => void) {
     this.onDeviceChanged = onDeviceChanged;
@@ -81,22 +93,16 @@ export class InputController {
 
     if (gamepad) {
       this.connectedGamepad = true;
-      const stickX = applyDeadzone(gamepad.axes[0] ?? 0);
-      const stickY = -applyDeadzone(gamepad.axes[1] ?? 0);
-      const gamepadHurry = (gamepad.buttons[7]?.value ?? 0) > 0.25
-        || Boolean(gamepad.buttons[5]?.pressed);
-      const gamepadHonkDown = Boolean(gamepad.buttons[0]?.pressed);
-      const gamepadInteractDown = Boolean(gamepad.buttons[1]?.pressed);
-      const gamepadWingsSpread = Boolean(gamepad.buttons[2]?.pressed);
-      const gamepadSneaking = Boolean(gamepad.buttons[3]?.pressed);
-      const gamepadThreatening = Boolean(gamepad.buttons[4]?.pressed);
-      const gamepadActive = Math.hypot(stickX, stickY) > 0.03
-        || gamepadHurry
-        || gamepadHonkDown
-        || gamepadInteractDown
-        || gamepadWingsSpread
-        || gamepadSneaking
-        || gamepadThreatening;
+      const mapped = sampleGamepad(gamepad as GamepadLike);
+      const stickX = mapped.moveX;
+      const stickY = mapped.moveY;
+      const gamepadHurry = mapped.hurry;
+      const gamepadHonkDown = mapped.honk;
+      const gamepadInteractDown = mapped.interact;
+      const gamepadWingsSpread = mapped.wings;
+      const gamepadSneaking = mapped.sneak;
+      const gamepadThreatening = mapped.threaten;
+      const gamepadActive = gamepadHasActivity(gamepad as GamepadLike);
 
       if (gamepadWingsSpread && !this.gamepadWingsWasDown) this.wingsSpread = !this.wingsSpread;
       if (gamepadSneaking && !this.gamepadSneakWasDown) this.sneaking = !this.sneaking;
@@ -146,6 +152,22 @@ export class InputController {
     };
   }
 
+  sampleLocalGamepads(): LocalGamepadSample {
+    const pads = Array.from(navigator.getGamepads?.() ?? []) as readonly (GamepadLike | null)[];
+    for (const joined of this.localLobby.update(pads)) {
+      const pad = pads.find((candidate) => candidate?.index === joined.padIndex);
+      if (pad) this.localPadMemory.set(joined.padIndex, this.memoryFrom(sampleGamepad(pad)));
+    }
+    const player1 = this.sampleAssignedPad(1, pads);
+    const player2 = this.sampleAssignedPad(2, pads);
+    return { player1, player2, assignments: { player1: this.localLobby.assignment(1), player2: this.localLobby.assignment(2) } };
+  }
+
+  resetLocalGamepads(): void {
+    this.localLobby.clear();
+    this.localPadMemory.clear();
+  }
+
   clear(): void {
     this.honkQueued = false;
     this.interactionQueued = false;
@@ -156,6 +178,10 @@ export class InputController {
     this.wingsSpread = false;
     this.sneaking = false;
     this.touchThreatening = false;
+    for (const memory of this.localPadMemory.values()) {
+      memory.honk = false; memory.interact = false; memory.wings = false; memory.sneak = false;
+      memory.wingsToggled = false; memory.sneakToggled = false;
+    }
   }
 
   setTouchMovement(moveX: number, moveY: number, hurry: boolean): void {
@@ -232,4 +258,38 @@ export class InputController {
     this.connectedGamepad = connected;
     this.onDeviceChanged(this.lastDevice, connected);
   };
+
+  private sampleAssignedPad(player: LocalPlayerNumber, pads: readonly (GamepadLike | null)[]): InputFrame | undefined {
+    const index = this.localLobby.assignment(player);
+    if (index === undefined) return undefined;
+    const pad = pads.find((candidate) => candidate?.index === index && candidate.connected);
+    if (!pad) return this.emptyGamepadFrame();
+    const mapped = sampleGamepad(pad);
+    const memory = this.localPadMemory.get(index) ?? this.memoryFrom(mapped);
+    if (mapped.wings && !memory.wings) memory.wingsToggled = !memory.wingsToggled;
+    if (mapped.sneak && !memory.sneak) memory.sneakToggled = !memory.sneakToggled;
+    const frame: InputFrame = {
+      move: new THREE.Vector2(mapped.moveX, mapped.moveY),
+      hurry: mapped.hurry,
+      honkPressed: mapped.honk && !memory.honk,
+      interactPressed: mapped.interact && !memory.interact,
+      wingsSpread: memory.wingsToggled,
+      sneaking: memory.sneakToggled,
+      threatening: mapped.threaten,
+      device: "gamepad",
+    };
+    memory.honk = mapped.honk; memory.interact = mapped.interact; memory.wings = mapped.wings; memory.sneak = mapped.sneak;
+    this.localPadMemory.set(index, memory);
+    return frame;
+  }
+
+  private memoryFrom(mapped: GamepadActions): LocalPadMemory {
+    return { honk: mapped.honk, interact: mapped.interact, wings: mapped.wings, sneak: mapped.sneak,
+      wingsToggled: false, sneakToggled: false };
+  }
+
+  private emptyGamepadFrame(): InputFrame {
+    return { move: new THREE.Vector2(), hurry: false, honkPressed: false, interactPressed: false,
+      wingsSpread: false, sneaking: false, threatening: false, device: "gamepad" };
+  }
 }
