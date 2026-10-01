@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GamepadJoinLobby, gamepadHasActivity, sampleGamepad, type GamepadActions, type GamepadLike, type LocalPlayerNumber } from "./gamepads.ts";
 
 export type InputDevice = "keyboard" | "gamepad" | "touch";
+export type GamepadLayout = "standard" | "single-right-joycon";
 
 export interface InputFrame {
   move: THREE.Vector2;
@@ -12,6 +13,7 @@ export interface InputFrame {
   sneaking: boolean;
   threatening: boolean;
   device: InputDevice;
+  gamepadLayout?: GamepadLayout;
 }
 
 export interface LocalGamepadSample {
@@ -48,6 +50,10 @@ const MOVEMENT_KEYS = new Set([
   "ControlRight",
 ]);
 
+function gamepadLayout(gamepad: Pick<GamepadLike, "id" | "mapping">): GamepadLayout {
+  if (gamepad.mapping !== "standard" && /Joy-Con\s*\(R\)/i.test(gamepad.id)) return "single-right-joycon";
+  return "standard";
+}
 export class InputController {
   readonly movement = new THREE.Vector2();
   private readonly keys = new Set<string>();
@@ -90,9 +96,11 @@ export class InputController {
 
     const gamepads = navigator.getGamepads?.() ?? [];
     const gamepad = Array.from(gamepads).find((candidate) => candidate?.connected);
+    let activeGamepadLayout: GamepadLayout | undefined;
 
     if (gamepad) {
       this.connectedGamepad = true;
+      activeGamepadLayout = gamepadLayout(gamepad as GamepadLike);
       const mapped = sampleGamepad(gamepad as GamepadLike);
       const stickX = mapped.moveX;
       const stickY = mapped.moveY;
@@ -149,6 +157,7 @@ export class InputController {
       sneaking: this.sneaking,
       threatening,
       device: this.lastDevice,
+      gamepadLayout: activeGamepadLayout,
     };
   }
 
@@ -277,6 +286,7 @@ export class InputController {
       sneaking: memory.sneakToggled,
       threatening: mapped.threaten,
       device: "gamepad",
+      gamepadLayout: gamepadLayout(pad),
     };
     memory.honk = mapped.honk; memory.interact = mapped.interact; memory.wings = mapped.wings; memory.sneak = mapped.sneak;
     this.localPadMemory.set(index, memory);

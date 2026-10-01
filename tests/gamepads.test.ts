@@ -70,6 +70,16 @@ test("Nintendo face buttons retain physical-position actions", () => {
   assert.equal(left.honk, true);
 });
 
+test("a right Joy-Con keeps its sideways digital stick and face-button actions", () => {
+  let right = press(pad({ id: "Joy-Con (R)", mapping: "", axes: [0, 0, 0, 0] }), 12);
+  assert.equal(sampleGamepad(right).moveY, 1);
+  right = press(pad({ id: "Joy-Con (R)", mapping: "", axes: [0, 0, 0, 0] }), 2);
+  assert.equal(sampleGamepad(right).interact, true);
+  assert.equal(sampleGamepad(right).wings, false);
+  right = press(pad({ id: "Joy-Con (R)", mapping: "", axes: [0, 0, 0, 0] }), 1);
+  assert.equal(sampleGamepad(right).wings, true);
+});
+
 test("press-to-join assigns at most two different pads and keeps stable slots", () => {
   const lobby = new GamepadJoinLobby();
   const pad0 = press(pad({ index: 0 }), 0);

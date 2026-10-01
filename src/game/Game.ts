@@ -3,7 +3,7 @@ import { ViewSunShadow } from "./ViewSunShadow.ts";
 import * as THREE from "three";
 import { WorldView } from "./WorldView";
 import { Goose } from "./Goose";
-import { InputController, type InputDevice, type InputFrame } from "./InputController";
+import { InputController, type GamepadLayout, type InputDevice, type InputFrame } from "./InputController";
 import { TouchControls } from "./TouchControls";
 import { PauseReasons, parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
@@ -130,6 +130,13 @@ export class Game {
   private readonly controlsCard = requireElement<HTMLElement>("#controls-card");
   private readonly keyboardControls = requireElement<HTMLElement>("#keyboard-controls");
   private readonly gamepadControls = requireElement<HTMLElement>("#gamepad-controls");
+  private readonly gamepadMoveKey = requireElement<HTMLElement>("#gamepad-move-key");
+  private readonly gamepadHurryKey = requireElement<HTMLElement>("#gamepad-hurry-key");
+  private readonly gamepadHonkKey = requireElement<HTMLElement>("#gamepad-honk-key");
+  private readonly gamepadWingsKey = requireElement<HTMLElement>("#gamepad-wings-key");
+  private readonly gamepadSneakKey = requireElement<HTMLElement>("#gamepad-sneak-key");
+  private readonly gamepadThreatKey = requireElement<HTMLElement>("#gamepad-threat-key");
+  private readonly gamepadInteractKey = requireElement<HTMLElement>("#gamepad-interact-key");
   private readonly touchControlsRoot = requireElement<HTMLElement>("#touch-controls");
   private readonly settingsMenu = requireElement<HTMLElement>("#settings-menu");
   private readonly rotateMessage = requireElement<HTMLElement>("#rotate-message");
@@ -155,6 +162,7 @@ export class Game {
   private readonly startOverButton = requireElement<HTMLButtonElement>("#start-over");
   private todoTimer = 0;
   private highlightedObjectiveId: string | undefined;
+  private currentGamepadLayout: GamepadLayout = "standard";
   private startOverArmed = false;
   private readonly pauseReasons = new PauseReasons();
   private touchControls: TouchControls | null = null;
@@ -307,6 +315,7 @@ export class Game {
     if (localInput) this.updateControllerLobby(localInput.assignments);
     const frame = localInput?.player1 ?? (this.localMultiplayer ? idleInputFrame() : this.input.sample());
     const secondFrame = localInput?.player2;
+    this.updateGamepadLayout(frame.gamepadLayout);
     this.updateControllerDiagnostics(delta);
     this.touchControls?.syncPoseState(frame.wingsSpread, frame.sneaking, frame.threatening);
     if (this.onlineRole === "guest" && this.onlinePeer) {
@@ -369,7 +378,7 @@ export class Game {
     if (this.goose.stepped) void this.audio.playFootstep();
     if (this.goose2.visible && this.goose2.stepped) void this.audio.playFootstep();
     this.audio.setCafeMusic(this.simulation.world.entities.some((entity) => entity.tags.includes("music") && entity.active === true));
-    this.updateInteractionPrompt(frame.device);
+    this.updateInteractionPrompt(frame.device, frame.gamepadLayout);
 
     if (performance.now() - this.lastInputTime > 6200) {
       this.controlsCard.classList.add("controls-card--quiet");
@@ -883,11 +892,11 @@ export class Game {
     }));
   }
 
-  private updateInteractionPrompt(device: InputDevice): void {
+  private updateInteractionPrompt(device: InputDevice, layout?: GamepadLayout): void {
     const hint = this.simulation.interactionHint;
     this.interactionPrompt.hidden = !hint;
     if (!hint) return;
-    this.interactionKey.textContent = device === "gamepad" ? "B" : "F";
+    this.interactionKey.textContent = device === "gamepad" ? layout === "single-right-joycon" ? "X" : "B" : "F";
     this.interactionLabel.textContent = hint;
   }
 
@@ -900,6 +909,20 @@ export class Game {
     this.controllerDiagnosticsOutput.textContent = formatGamepadDiagnostics(
       Array.from(navigator.getGamepads?.() ?? []) as readonly (GamepadLike | null)[],
     );
+  }
+
+  private updateGamepadLayout(layout: GamepadLayout | undefined): void {
+    const nextLayout = layout ?? "standard";
+    if (nextLayout === this.currentGamepadLayout) return;
+    this.currentGamepadLayout = nextLayout;
+    const joyCon = nextLayout === "single-right-joycon";
+    this.gamepadMoveKey.textContent = joyCon ? "●" : "L";
+    this.gamepadHurryKey.textContent = joyCon ? "SR" : "RT";
+    this.gamepadHonkKey.textContent = "A";
+    this.gamepadWingsKey.textContent = joyCon ? "B" : "X";
+    this.gamepadSneakKey.textContent = "Y";
+    this.gamepadThreatKey.textContent = joyCon ? "SL" : "LB";
+    this.gamepadInteractKey.textContent = joyCon ? "X" : "B";
   }
 
   private readonly handleDeviceChanged = (device: InputDevice): void => {

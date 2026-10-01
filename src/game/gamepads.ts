@@ -62,7 +62,7 @@ const JOYCON_LEFT_PROFILE: GamepadProfile = {
 const JOYCON_RIGHT_PROFILE: GamepadProfile = {
   id: "joycon-right-sideways",
   label: "Right Joy-Con (sideways)",
-  buttonLabels: { honk: "B", interact: "A", wings: "Y", sneak: "X", threaten: "SL", hurry: "SR" },
+  buttonLabels: { honk: "A", interact: "X", wings: "B", sneak: "Y", threaten: "SL", hurry: "SR" },
 };
 
 const isDown = (pad: GamepadLike, ...indices: number[]): boolean => indices.some((index) => {
@@ -108,6 +108,12 @@ export function sampleGamepad(pad: GamepadLike): GamepadActions {
   } else if (profile.id === "joycon-right-sideways") {
     // Right Joy-Con with SL/SR on top: the matching physical orientation is opposite.
     [moveX, moveY] = [applyGamepadDeadzone(rawY), applyGamepadDeadzone(rawX)];
+    // Safari sometimes reports this stick as digital direction buttons instead
+    // of axes. Use those directions only when the analog axes are idle.
+    if (Math.hypot(moveX, moveY) <= 0.03) {
+      moveX = Number(isDown(pad, 15)) - Number(isDown(pad, 14));
+      moveY = Number(isDown(pad, 12)) - Number(isDown(pad, 13));
+    }
   }
 
   if (profile.id === "joycon-left-sideways") {
@@ -121,6 +127,18 @@ export function sampleGamepad(pad: GamepadLike): GamepadActions {
       sneak: isDown(pad, 15),
       threaten: isDown(pad, 4),
       hurry: isDown(pad, 5, 7),
+    };
+  }
+
+  if (profile.id === "joycon-right-sideways") {
+    return {
+      moveX, moveY,
+      hurry: isDown(pad, 5),
+      honk: isDown(pad, 0),
+      interact: isDown(pad, 2),
+      wings: isDown(pad, 1),
+      sneak: isDown(pad, 3),
+      threaten: isDown(pad, 4),
     };
   }
 
