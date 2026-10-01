@@ -42,8 +42,8 @@ export const both = (forward: number, out: number, elbow: number, wrist: Vec3 = 
 
 export interface Seat { hips: Vec3; legs: Rotations }
 /** Hips lowered onto the seat and pushed back over it, feet planted a little in front. */
-export function seat(legs: LegDimensions, k: number): Seat {
-  const hipsDrop = CAFE_SEAT_HEIGHT + 0.255 * k - 1.02 * k;
+export function seat(legs: LegDimensions, k: number, hipsY = 1.02 * k): Seat {
+  const hipsDrop = CAFE_SEAT_HEIGHT + 0.255 * k - hipsY;
   const back = 0.06 * k;
   const [hip, knee] = legAngles(legs.ankleY - (legs.hipJointY + hipsDrop), -0.42 * k, legs);
   const rot: Rotations = {};

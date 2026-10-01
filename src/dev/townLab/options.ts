@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import { arm, CAFE_WALK, full, withHips, type Rotations } from "../../game/cafeMoves.ts";
-import { createDogModel, dogPose } from "../../game/DogModel.ts";
+import { arm, full, withHips, type Rotations } from "../../game/cafeMoves.ts";
+import { createDogModel } from "../../game/DogModel.ts";
 import { cycleClip, paced, pulse, walkPose, wave, type WalkStyle } from "../../game/janitorGaits.ts";
 import { createTownsfolkModel, townsfolkLegs, type TownsfolkLook } from "../../game/TownsfolkModel.ts";
-import { TOWNSFOLK_RUN } from "../../game/townsfolkMoves.ts";
+import { TOWNSFOLK_RUN, townsfolkWalkStyle } from "../../game/townsfolkMoves.ts";
 import { TOWNSFOLK_WALK_SPEEDS } from "../../game/townsfolkTuning.ts";
 
 /**
@@ -41,7 +41,7 @@ export function watchBehind(look: TownsfolkLook): THREE.AnimationClip {
   }, 0, 0.012 * pulse(p * 2)), bind(look));
 }
 function walk(look: TownsfolkLook, name: string, tweak: Partial<WalkStyle>): THREE.AnimationClip {
-  const style = paced({ ...CAFE_WALK, ...tweak, legs: townsfolkLegs(look) }, TOWNSFOLK_WALK_SPEEDS[look] / (tweak.speed ?? CAFE_WALK.speed));
+  const style = townsfolkWalkStyle(look, townsfolkLegs(look), tweak);
   return cycleClip(name, style.duration, (p) => withHips(walkPose(style, p)), bind(look));
 }
 /** Looser and loungier: more hip sway, floppier arms, a softer bob. */
@@ -53,17 +53,4 @@ export function easyJog(): THREE.AnimationClip {
   const style = paced({ ...TOWNSFOLK_RUN, duration: 0.5, speed: 2.5, stepHeight: 0.14, bob: 0.04, armSwing: 0.45, elbowBend: 1.3, lean: 0.1, legs: townsfolkLegs("jogger") },
     TOWNSFOLK_WALK_SPEEDS.jogger / 2.5);
   return cycleClip("run B: easy jog", style.duration, (p) => withHips(walkPose(style, p)), bind("jogger"));
-}
-/** Each yap bounces the front paws off the bench. */
-export function hoppingBark(): THREE.AnimationClip {
-  return cycleClip("bark B: hopping", 0.6, (p) => {
-    const hop = pulse(p, 0.05);
-    return dogPose({
-      pelvis: [0.25 * hop, 0, 0], chest: [0.05 * hop, 0, 0], neck: [0.2 + 0.15 * hop, 0, 0], head: [0.05, 0, 0], jaw: [-0.5 * pulse(p, 0.1), 0, 0],
-      front_left_upper: [0.4 * hop - 0.25 * hop, 0, -0.08], front_right_upper: [0.4 * hop - 0.25 * hop, 0, 0.08],
-      front_left_lower: [0.6 * hop, 0, 0], front_right_lower: [0.6 * hop, 0, 0],
-      back_left_upper: [-0.25 * hop, 0, -0.05], back_right_upper: [-0.25 * hop, 0, 0.05], back_left_lower: [0.3 * hop, 0, 0], back_right_lower: [0.3 * hop, 0, 0],
-      tail: [-0.2, 0.45 * wave(p * 2), 0], left_ear: [0.2, 0, 0], right_ear: [0.2, 0, 0],
-    }, [0, 0.03 * hop, 0]);
-  }, bind("dog"));
 }

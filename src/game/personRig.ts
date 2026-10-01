@@ -14,9 +14,14 @@ export const HEAD_RADII: Point = [0.27, 0.3, 0.248];
  * metres (Y up, facing -Z, feet at Y=0) and scaled by `k`; skin weights are read
  * in janitor coordinates before scaling. Pieces are merged into one skinned mesh
  * per palette slot, named after the slot so the toon loader can recolour them.
- * `detail` below 1 trims facets for crowds.
+ * `detail` below 1 trims facets for crowds. `legScale` above 1 lengthens the legs
+ * between ankle and hip (feet keep their size) and lifts everything above.
  */
-export function createPersonRig<Slot extends string>(name: string, k: number, detail = 1) {
+export const RIG_ANKLE_Y = 0.19;
+export const RIG_HIP_JOINT_Y = 0.97;
+export function createPersonRig<Slot extends string>(name: string, k: number, detail = 1, legScale = 1) {
+  const stretch = (y: number) => y <= RIG_ANKLE_Y ? y
+    : y < RIG_HIP_JOINT_Y ? RIG_ANKLE_Y + (y - RIG_ANKLE_Y) * legScale : y + (RIG_HIP_JOINT_Y - RIG_ANKLE_Y) * (legScale - 1);
   const model = new THREE.Group();
   model.name = name;
   const bones: THREE.Bone[] = [];
@@ -24,7 +29,7 @@ export function createPersonRig<Slot extends string>(name: string, k: number, de
   function joint(boneName: string, position: Point, parent?: THREE.Bone): THREE.Bone {
     const bone = new THREE.Bone();
     bone.name = boneName;
-    const absolute = new THREE.Vector3(...position).multiplyScalar(k);
+    const absolute = new THREE.Vector3(position[0], stretch(position[1]), position[2]).multiplyScalar(k);
     bone.position.copy(absolute);
     if (parent) bone.position.sub(bindPositions.get(parent.name)!);
     (parent ?? model).add(bone);
@@ -59,6 +64,15 @@ export function createPersonRig<Slot extends string>(name: string, k: number, de
     }
     geometry.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(indices, 4));
     geometry.setAttribute("skinWeight", new THREE.Float32BufferAttribute(weights, 4));
+    if (legScale !== 1) {
+      // Stretching the legs tall also tilts their surface normals toward horizontal.
+      const normals = geometry.getAttribute("normal"); const n = new THREE.Vector3();
+      for (let i = 0; i < positions.count; i++) {
+        const y = positions.getY(i);
+        if (normals && y > RIG_ANKLE_Y && y < RIG_HIP_JOINT_Y) { n.fromBufferAttribute(normals, i); n.y /= legScale; n.normalize(); normals.setXYZ(i, n.x, n.y, n.z); }
+        positions.setY(i, stretch(y));
+      }
+    }
     geometry.scale(k, k, k);
     const bucket = pieces.get(slot) ?? [];
     bucket.push(geometry);

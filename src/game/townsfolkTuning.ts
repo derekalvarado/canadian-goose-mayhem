@@ -23,6 +23,8 @@ export const TOWNSFOLK_WALK_SPEEDS: Readonly<Record<TownsfolkLook, number>> = {
   jogger: 3.1, grandpa: 1.05, teen: 1.4, commuter: 1.75, artist: 1.25,
   "red-coat": 1.3, "bucket-hat": 1.5, raincoat: 1.45, "bow-tie": 1.25,
 };
+/** Townsfolk legs are this much longer than the café people's (ankle to hip), so they stand and walk tall. */
+export const TOWNSFOLK_LEG_SCALE = 1.14;
 /** The jogger runs instead of walking. */
 export const TOWNSFOLK_RUNNERS: readonly TownsfolkLook[] = ["jogger"];
 

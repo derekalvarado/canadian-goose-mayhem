@@ -3,7 +3,7 @@ import { createDogModel } from "../../game/DogModel.ts";
 import { createTownsfolkModel, TOWNSFOLK, TOWNSFOLK_LOOKS, type TownsfolkLook } from "../../game/TownsfolkModel.ts";
 import { TOWNSFOLK_WALK_SPEEDS } from "../../game/townsfolkTuning.ts";
 import type { LabVariant } from "../animLab/lab.ts";
-import { easyJog, hoppingBark, purposefulWalk, strollWalk, watchBehind, watchClasped } from "./options.ts";
+import { easyJog, purposefulWalk, strollWalk, watchBehind, watchClasped } from "./options.ts";
 
 /**
  * Edit freely: the lab page hot-reloads on save. Poses live in
@@ -60,7 +60,7 @@ export const VARIANTS: Variant[] = [
   card("dog", "dog", "lie", "Lying on the bench, chin on paws."),
   card("dog", "dog", "sit", "Sitting up beside its person."),
   card("dog", "dog", "alert", "Spotted the goose: ears up, head cocked."),
-  card("dog", "dog", "bark", "Standing up barking at a goose that comes close or honks."),
+  card("dog", "dog", "bark", "Barking at a goose that comes close or honks, front paws bouncing with each yap."),
   card("dog", "dog", "happy", "Being stroked."),
   card("dog", "dog", "stand", "Standing, tail wagging."),
   // Alternatives to pick from: "A" is what the game plays today.
@@ -72,6 +72,4 @@ export const VARIANTS: Variant[] = [
   { name: "Cap dad · walk C", group: "options", model: "cap-dad", clip: purposefulWalk("cap-dad"), travelSpeed: TOWNSFOLK_WALK_SPEEDS["cap-dad"], notes: "C: purposeful — leaning in, bigger arm swing, springier." },
   { ...card("options", "jogger", "run", "A (in game): long springy stride.", TOWNSFOLK_WALK_SPEEDS.jogger), name: "Jogger · run A (in game)" },
   { name: "Jogger · run B", group: "options", model: "jogger", clip: easyJog(), travelSpeed: TOWNSFOLK_WALK_SPEEDS.jogger, notes: "B: easy jog — shorter, quicker steps, relaxed arms." },
-  { ...card("options", "dog", "bark", "A (in game): standing bark, chest dips each yap."), name: "Dog · bark A (in game)" },
-  { name: "Dog · bark B", group: "options", model: "dog", clip: hoppingBark(), notes: "B: front paws bounce up with each yap." },
 ];

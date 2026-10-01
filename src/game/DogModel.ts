@@ -171,15 +171,16 @@ function createDogClips(bind: ReadonlyMap<string, THREE.Vector3>): THREE.Animati
     // Being stroked: leaning into the hand with the tail going like mad.
     cycleClip("happy", 0.8, (p) => sitting({ neck: [-0.35, 0.3, 0], head: [-0.05, 0.35, -0.25 + 0.06 * wave(p)], tail: [-0.9, 0.55 * wave(p * 2), 0],
       left_ear: [-0.35, 0, -0.25], right_ear: [-0.35, 0, 0.25], jaw: [-0.18, 0, 0] }), bind),
-    // Standing up on the bench, barking: each yap dips the chest and snaps the jaw open.
-    cycleClip("bark", 0.55, (p) => {
-      const yap = pulse(p, 0.1);
+    // Standing up on the bench, barking: each yap bounces the front paws up.
+    cycleClip("bark", 0.6, (p) => {
+      const hop = pulse(p, 0.05);
       return dogPose({
-        pelvis: [-0.06 * yap, 0, 0], chest: [-0.1 * yap, 0, 0], neck: [0.25 + 0.2 * yap, 0, 0], head: [0.05 + 0.1 * yap, 0, 0], jaw: [-0.5 * yap, 0, 0],
-        front_left_upper: [0.15 * yap, 0, -0.08], front_right_upper: [0.15 * yap, 0, 0.08],
-        back_left_upper: [-0.1, 0, -0.05], back_right_upper: [-0.1, 0, 0.05], back_left_lower: [0.15, 0, 0], back_right_lower: [0.15, 0, 0],
-        tail: [-0.2, 0.35 * wave(p * 2), 0], left_ear: [0.2, 0, 0], right_ear: [0.2, 0, 0],
-      }, [0, -0.03 * yap, 0]);
+        pelvis: [0.25 * hop, 0, 0], chest: [0.05 * hop, 0, 0], neck: [0.2 + 0.15 * hop, 0, 0], head: [0.05, 0, 0], jaw: [-0.5 * pulse(p, 0.1), 0, 0],
+        front_left_upper: [0.15 * hop, 0, -0.08], front_right_upper: [0.15 * hop, 0, 0.08],
+        front_left_lower: [0.6 * hop, 0, 0], front_right_lower: [0.6 * hop, 0, 0],
+        back_left_upper: [-0.25 * hop, 0, -0.05], back_right_upper: [-0.25 * hop, 0, 0.05], back_left_lower: [0.3 * hop, 0, 0], back_right_lower: [0.3 * hop, 0, 0],
+        tail: [-0.2, 0.45 * wave(p * 2), 0], left_ear: [0.2, 0, 0], right_ear: [0.2, 0, 0],
+      }, [0, 0.03 * hop, 0]);
     }, bind),
     // Standing, tail wagging, weight shifting: ready to go.
     cycleClip("stand", 1.6, (p) => dogPose({

@@ -1,6 +1,6 @@
 import type * as THREE from "three";
-import { cycleClip, JANITOR_LEGS, paced, pulse, walkPose, wave, type LegDimensions, type WalkStyle } from "./janitorGaits.ts";
-import { arm, both, CAFE_WALK, envelope, full, seat, seatedClips, standingClips, withHips, type Rotations } from "./cafeMoves.ts";
+import { cycleClip, paced, pulse, walkPose, wave, type LegDimensions, type WalkStyle } from "./janitorGaits.ts";
+import { arm, both, CAFE_WALK, carryPose, envelope, full, seat, seatedClips, standingClips, withHips, type Rotations } from "./cafeMoves.ts";
 import { CUSTOMER_SHARED_TUNING } from "./cafeTuning.ts";
 import { TOWNSFOLK_RUNNERS, TOWNSFOLK_WALK_SPEEDS, type TownsfolkLook } from "./townsfolkTuning.ts";
 
@@ -12,12 +12,33 @@ import { TOWNSFOLK_RUNNERS, TOWNSFOLK_WALK_SPEEDS, type TownsfolkLook } from "./
  */
 
 /** Clips borrowed from the café people. */
-const STANDING = new Set(["idle", "look", "walk", "carry", "shoo", "greet", "startle", "shrug"]);
+const STANDING = new Set(["idle", "look", "shoo", "greet", "startle", "shrug"]);
+
+/**
+ * The townsfolk walk: the café people's calm gait, carried tall on long legs —
+ * barely any crouch, a shorter stride (sized to the person) at a quicker step.
+ */
+export const TOWNSFOLK_WALK: Omit<WalkStyle, "legs" | "duration" | "speed"> = {
+  ...CAFE_WALK, crouch: 0.04, bob: 0.03, stepHeight: 0.08, lean: 0.03,
+};
+/** Metres per full cycle (two steps) for a person of height scale 1. */
+const STRIDE = 1.15;
+/** Leg lengths read off a townsperson's rig. */
+export function legsFromBind(bind: ReadonlyMap<string, THREE.Vector3>): LegDimensions {
+  const hipJointY = (bind.get("hips")?.y ?? 0) + (bind.get("left_hip")?.y ?? 0);
+  const thigh = -(bind.get("left_knee")?.y ?? 0); const shin = -(bind.get("left_ankle")?.y ?? 0);
+  return { thigh, shin, hipJointY, ankleY: hipJointY - thigh - shin };
+}
+/** The walk at this person's pace and size. */
+export function townsfolkWalkStyle(look: TownsfolkLook, legs: LegDimensions, tweak: Partial<WalkStyle> = {}): WalkStyle {
+  const k = legs.ankleY / 0.19; const speed = TOWNSFOLK_WALK_SPEEDS[look];
+  return { ...TOWNSFOLK_WALK, ...tweak, legs, speed, duration: STRIDE * k / speed };
+}
 const SEATED = new Set(["sit", "sit-sip", "sit-look", "sit-startle", "sit-shoo", "sit-wait"]);
 
 /** A light, springy run with a short flight phase and pumping arms. */
 export const TOWNSFOLK_RUN: Omit<WalkStyle, "legs"> = {
-  duration: 0.62, speed: 3.1, stance: 0.42, stepHeight: 0.2, crouch: 0.16, bob: 0.06, bounce: 0.7,
+  duration: 0.62, speed: 3.1, stance: 0.42, stepHeight: 0.2, crouch: 0.1, bob: 0.05, bounce: 0.7,
   sway: 0.02, roll: 0.04, twist: 0.16, lean: 0.16, leanPump: 0.03, headSteady: 0.75, nod: 0.04,
   armSwing: 0.7, armOut: 0.14, elbowBend: 1.45, elbowPump: 0.25, armLag: 0.03, heelStrike: 0.1,
 };
@@ -65,8 +86,8 @@ function squareClips(bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationC
   ];
 }
 
-function benchClips(legs: LegDimensions, k: number, bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationClip[] {
-  const s = seat(legs, k);
+function benchClips(legs: LegDimensions, k: number, hipsY: number, bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationClip[] {
+  const s = seat(legs, k, hipsY);
   const pose = (upper: Rotations) => full({ ...s.legs, ...upper }, s.hips);
   return [
     // Phone in both hands in the lap, head bowed.
@@ -88,17 +109,18 @@ function benchClips(legs: LegDimensions, k: number, bind: ReadonlyMap<string, TH
 }
 
 export function createTownsfolkClips(look: TownsfolkLook, bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationClip[] {
-  const k = (bind.get("hips")?.y ?? 1.02) / 1.02;
-  const legs: LegDimensions = { thigh: JANITOR_LEGS.thigh * k, shin: JANITOR_LEGS.shin * k, hipJointY: JANITOR_LEGS.hipJointY * k, ankleY: JANITOR_LEGS.ankleY * k };
+  const legs = legsFromBind(bind);
+  const k = legs.ankleY / 0.19; const hipsY = bind.get("hips")?.y ?? 1.02 * k;
   const speed = TOWNSFOLK_WALK_SPEEDS[look];
   const runner = TOWNSFOLK_RUNNERS.includes(look);
-  // Runners still walk while they get their breath back.
-  const walkSpeed = runner ? 1.5 : speed;
+  const walk = townsfolkWalkStyle(look, legs);
   const clips = [
-    ...standingClips(legs, walkSpeed, bind).filter((clip) => STANDING.has(clip.name)),
+    ...standingClips(legs, speed, bind).filter((clip) => STANDING.has(clip.name)),
+    cycleClip("walk", walk.duration, (p) => withHips(walkPose(walk, p)), bind),
+    cycleClip("carry", walk.duration, (p) => withHips(carryPose(walk, p)), bind),
     ...squareClips(bind),
-    ...seatedClips(seat(legs, k), bind, CUSTOMER_SHARED_TUNING.sipSeconds).filter((clip) => SEATED.has(clip.name)),
-    ...benchClips(legs, k, bind),
+    ...seatedClips(seat(legs, k, hipsY), bind, CUSTOMER_SHARED_TUNING.sipSeconds).filter((clip) => SEATED.has(clip.name)),
+    ...benchClips(legs, k, hipsY, bind),
   ];
   if (runner) {
     const run = paced({ ...TOWNSFOLK_RUN, legs }, speed / TOWNSFOLK_RUN.speed);
@@ -107,7 +129,3 @@ export function createTownsfolkClips(look: TownsfolkLook, bind: ReadonlyMap<stri
   return clips;
 }
 
-/** The same walk the clips use, for the lab's treadmill. */
-export function townsfolkWalkStyle(look: TownsfolkLook, legs: LegDimensions): WalkStyle {
-  return paced({ ...CAFE_WALK, legs }, TOWNSFOLK_WALK_SPEEDS[look] / CAFE_WALK.speed);
-}

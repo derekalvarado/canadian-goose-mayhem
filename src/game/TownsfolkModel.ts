@@ -3,7 +3,7 @@ import { PALETTE } from "./palette.ts";
 import { JANITOR_LEGS, type LegDimensions } from "./janitorGaits.ts";
 import { createPersonRig, HEAD_CENTER, HEAD_RADII, type Point, type Weight } from "./personRig.ts";
 import { createTownsfolkClips } from "./townsfolkMoves.ts";
-import type { TownsfolkLook } from "./townsfolkTuning.ts";
+import { TOWNSFOLK_LEG_SCALE, type TownsfolkLook } from "./townsfolkTuning.ts";
 
 export type { TownsfolkLook } from "./townsfolkTuning.ts";
 export { TOWNSFOLK_LOOKS } from "./townsfolkTuning.ts";
@@ -87,8 +87,9 @@ export const TOWNSFOLK_COLORS: Readonly<Record<TownsfolkLook, Readonly<Record<To
 
 export function townsfolkScale(look: TownsfolkLook): number { return TOWNSFOLK[look].height; }
 export function townsfolkLegs(look: TownsfolkLook): LegDimensions {
-  const k = TOWNSFOLK[look].height;
-  return { thigh: JANITOR_LEGS.thigh * k, shin: JANITOR_LEGS.shin * k, hipJointY: JANITOR_LEGS.hipJointY * k, ankleY: JANITOR_LEGS.ankleY * k };
+  const k = TOWNSFOLK[look].height; const stretch = TOWNSFOLK_LEG_SCALE;
+  return { thigh: JANITOR_LEGS.thigh * stretch * k, shin: JANITOR_LEGS.shin * stretch * k,
+    hipJointY: (JANITOR_LEGS.ankleY + (JANITOR_LEGS.hipJointY - JANITOR_LEGS.ankleY) * stretch) * k, ankleY: JANITOR_LEGS.ankleY * k };
 }
 
 /**
@@ -98,7 +99,7 @@ export function townsfolkLegs(look: TownsfolkLook): LegDimensions {
 export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
   const spec = TOWNSFOLK[look];
   const k = spec.height;
-  const rig = createPersonRig<TownSlot>(`townsfolk-${look}`, k, 0.62);
+  const rig = createPersonRig<TownSlot>(`townsfolk-${look}`, k, 0.62, TOWNSFOLK_LEG_SCALE);
   const { model, hips, chest, neck, head, joint, rigid, blendY, torsoWeight, add, oval, garment, tube, onFace } = rig;
   model.userData = { assetRole: "rigged-character", visualDetailTier: 3, forward: "-Z", look };
   const has = (extra: Extra) => spec.extras.includes(extra);
@@ -135,12 +136,20 @@ export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
   const bulky = spec.bulk;
   const longTop = spec.top === "coat" || spec.top === "raincoat";
   const hem = spec.top === "tank" || spec.top === "dress" ? 0.98 : spec.top === "hoodie" ? 0.92 : spec.top === "waistcoat" ? 1.02 : 0.95;
-  const neckline = spec.top === "tank" || spec.top === "dress" ? 0.24 : 0.22;
-  garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.65, 0.385 + bulky],
-    [1.79, 0.33 + bulky * 0.6], [1.86, neckline], [1.89, 0]], 0.73, [0, 0, 0], torsoWeight);
-  if (spec.top === "tank" || spec.top === "dress") {
-    // Bare shoulders above a scooped neckline.
-    oval("town-skin", [0, 1.79, -0.05], [0.31, 0.1, 0.25], torsoWeight);
+  const sleeveless = spec.top === "tank" || spec.top === "dress";
+  if (sleeveless) {
+    // The top stops at the chest; skin follows the same body shape up to the neck, with a strap over each shoulder.
+    garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.6, 0.395 + bulky], [1.68, 0.372 + bulky]],
+      0.73, [0, 0, 0], torsoWeight);
+    garment("town-skin", [[1.58, 0.39 + bulky], [1.65, 0.38 + bulky], [1.79, 0.326 + bulky * 0.6], [1.86, 0.215], [1.89, 0]], 0.722, [0, 0, 0], torsoWeight);
+    for (const side of [-1, 1]) {
+      tube("town-top", [side * 0.19, 1.64, -0.29], [side * 0.19, 1.83, -0.06], 0.035, torsoWeight);
+      tube("town-top", [side * 0.19, 1.83, -0.06], [side * 0.19, 1.83, 0.08], 0.035, torsoWeight);
+      tube("town-top", [side * 0.19, 1.83, 0.08], [side * 0.19, 1.64, 0.27], 0.035, torsoWeight);
+    }
+  } else {
+    garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.65, 0.385 + bulky],
+      [1.79, 0.33 + bulky * 0.6], [1.86, 0.22], [1.89, 0]], 0.73, [0, 0, 0], torsoWeight);
   }
   if (spec.top === "dress") {
     oval("town-trim", [0, 1.24, -0.04], [0.42 + bulky, 0.03, 0.31], torsoWeight); // tie belt
