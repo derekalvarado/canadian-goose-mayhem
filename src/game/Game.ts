@@ -7,7 +7,7 @@ import { InputController, type InputDevice, type InputFrame } from "./InputContr
 import { TouchControls } from "./TouchControls";
 import { PauseReasons, parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
-import { Simulation, FIXED_STEP, HURRY_SPEED, type GameplayEvent, type PlayerCommand } from "./simulation/Simulation";
+import { Simulation, FIXED_STEP, HURRY_SPEED, WALK_SPEED, type GameplayEvent, type PlayerCommand } from "./simulation/Simulation";
 import { PALETTE } from "./palette";
 import { WorldEditor } from "./WorldEditor";
 import { COFFEE_SHOP_AREA_ID, getWorldArea, loadWorldLayout, resolveStartAreaId } from "./worldLayout";
@@ -33,6 +33,7 @@ import {
   type AuthoritativeGameSnapshot,
   type NetworkPlayerCommand,
 } from "./multiplayer/protocol.ts";
+import { NetworkMotionSmoother } from "./multiplayer/networkMotion.ts";
 
 // A closer follow camera keeps the smaller goose readable and makes the plaza
 // landmarks feel larger without changing their gameplay dimensions.
@@ -41,6 +42,10 @@ const CAMERA_AXIS_OFFSET = 9.6 / CAMERA_FOLLOW_ZOOM;
 const CAMERA_LEAD_SECONDS = 0.2;
 // How quickly the camera glides along its track toward the goose.
 const CAMERA_TRACK_RESPONSE = 3.2;
+// Sending once per display frame overwhelms the host-side flood guard on 120 Hz
+// iPads. Movement is continuous between these updates, while button edges send
+// immediately so honks and interactions still feel responsive.
+const GUEST_COMMAND_SEND_INTERVAL = 1 / 30;
 
 function createPoopView(): THREE.Group {
   const poop = new THREE.Group();
@@ -174,6 +179,11 @@ export class Game {
   private remoteSnapshot?: AuthoritativeGameSnapshot;
   private networkSequence = 0;
   private snapshotSendAccumulator = 0;
+  private readonly guestMotion = new NetworkMotionSmoother();
+  private readonly hostMotion = new NetworkMotionSmoother();
+  private guestCommandSendAccumulator = 0;
+  private guestHonkQueued = false;
+  private guestInteractionQueued = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -396,6 +406,13 @@ export class Game {
     this.onlineIdentity = identity;
     this.onlineAuthenticated = false;
     this.remoteCommand = undefined;
+    this.remoteSnapshot = undefined;
+    this.networkSequence = 0;
+    this.guestCommandSendAccumulator = 0;
+    this.guestHonkQueued = false;
+    this.guestInteractionQueued = false;
+    this.guestMotion.clear();
+    this.hostMotion.clear();
     this.guestCommandGate = new GuestCommandGate();
     if (role === "host") {
       this.localMultiplayer = false;
@@ -414,6 +431,12 @@ export class Game {
   private readonly handleOnlineDisconnected = (role: MultiplayerRole): void => {
     this.onlineAuthenticated = false;
     this.remoteCommand = undefined;
+    this.remoteSnapshot = undefined;
+    this.guestCommandSendAccumulator = 0;
+    this.guestHonkQueued = false;
+    this.guestInteractionQueued = false;
+    this.guestMotion.clear();
+    this.hostMotion.clear();
     if (role === "guest") this.onlinePeer = undefined;
   };
 
@@ -480,31 +503,67 @@ export class Game {
   }
 
   private animateOnlineGuest(delta: number, frame: InputFrame): void {
+    let command: PlayerCommand | undefined;
     if (delta > 0 && this.onlineAuthenticated) {
-      const command = this.commandForFrame(frame, this.controlHeading2, this.moveDirection2, delta);
-      this.onlinePeer?.send(encodeGuestMessage({ type: "command", version: 1, playerId: "goose-2",
-        command: { ...command, sequence: this.networkSequence++ } }));
+      command = this.commandForFrame(frame, this.controlHeading2, this.moveDirection2, delta);
+      this.guestHonkQueued ||= command.honkPressed;
+      this.guestInteractionQueued ||= command.interactPressed === true;
+      this.guestCommandSendAccumulator += delta;
+      if (this.guestCommandSendAccumulator >= GUEST_COMMAND_SEND_INTERVAL
+        || this.guestHonkQueued || this.guestInteractionQueued) {
+        const sent = this.onlinePeer?.send(encodeGuestMessage({ type: "command", version: 1, playerId: "goose-2",
+          command: { ...command, honkPressed: this.guestHonkQueued, interactPressed: this.guestInteractionQueued,
+            sequence: this.networkSequence } }));
+        if (sent) {
+          this.networkSequence += 1;
+          this.guestCommandSendAccumulator %= GUEST_COMMAND_SEND_INTERVAL;
+          this.guestHonkQueued = false;
+          this.guestInteractionQueued = false;
+        }
+      }
     }
     const snapshot = this.remoteSnapshot;
     const guest = snapshot?.players.find((player) => player.id === "goose-2");
     const area = guest ? snapshot?.areas.find((candidate) => candidate.areaId === guest.areaId) : undefined;
     if (snapshot && guest && area) {
-      if (area.areaId !== this.worldArea.id) {
+      const areaChanged = area.areaId !== this.worldArea.id;
+      if (areaChanged) {
         this.worldArea = getWorldArea(this.worldLayout, area.areaId);
         this.world.applyArea(this.worldArea);
         this.useAreaCameraTrack();
         this.controlHeading2.reset();
       }
+      this.guestMotion.push({ sequence: snapshot.tick, position: guest.state.position,
+        velocity: guest.state.velocity, heading: guest.state.heading }, areaChanged);
+      const guestView = this.guestMotion.update(delta, command ? {
+        moveX: command.moveX,
+        moveZ: command.moveZ,
+        speed: command.hurry ? HURRY_SPEED : WALK_SPEED,
+      } : undefined);
       this.goose2.visible = true;
-      this.goose2.position.copy(guest.state.position);
-      this.goose2.rotation.y = guest.state.heading;
-      this.velocity2.copy(guest.state.velocity);
+      if (guestView) {
+        this.goose2.position.copy(guestView.position);
+        this.goose2.rotation.y = guestView.heading;
+        this.velocity2.copy(guestView.velocity);
+      }
       const host = snapshot.players.find((player) => player.id === "goose-1" && player.areaId === area.areaId);
       this.goose.visible = Boolean(host);
-      if (host) { this.goose.position.copy(host.state.position); this.goose.rotation.y = host.state.heading; this.velocity.copy(host.state.velocity); }
-      this.goose2.update(delta, snapshot.tick * FIXED_STEP, guest.state.speed / HURRY_SPEED, guest.state.turnAmount,
+      if (host) {
+        this.hostMotion.push({ sequence: snapshot.tick, position: host.state.position,
+          velocity: host.state.velocity, heading: host.state.heading }, areaChanged);
+        const hostView = this.hostMotion.update(delta);
+        if (hostView) {
+          this.goose.position.copy(hostView.position);
+          this.goose.rotation.y = hostView.heading;
+          this.velocity.copy(hostView.velocity);
+        }
+      } else {
+        this.hostMotion.clear();
+        this.velocity.set(0, 0, 0);
+      }
+      this.goose2.update(delta, snapshot.tick * FIXED_STEP, this.velocity2.length() / HURRY_SPEED, guest.state.turnAmount,
         guest.state.wingsSpread || guest.state.threatening, guest.state.sneaking || guest.state.threatening);
-      if (host) this.goose.update(delta, snapshot.tick * FIXED_STEP, host.state.speed / HURRY_SPEED, host.state.turnAmount,
+      if (host) this.goose.update(delta, snapshot.tick * FIXED_STEP, this.velocity.length() / HURRY_SPEED, host.state.turnAmount,
         host.state.wingsSpread || host.state.threatening, host.state.sneaking || host.state.threatening);
       this.world.syncGameplay(area.world, this.goose.getMouthSocket(), this.goose2.getMouthSocket());
       this.audio.setCafeMusic(area.world.entities.some((entity) => entity.tags.includes("music") && entity.active === true));
