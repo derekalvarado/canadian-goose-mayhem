@@ -178,9 +178,14 @@ export class Townsfolk {
 
   /** Where the goose was last seen this step; people steer their plans around it. */
   private goose?: Readonly<Position>;
+  private upset: readonly Readonly<Position>[] = [];
 
-  update(goose: TownGoose, events: GameplayEvent[], dt: number): void {
-    this.goose = goose.position;
+  /**
+   * `upset` holds where children are frightened or crying: parents nearby turn to
+   * call out to them (seated ones look over) until they settle.
+   */
+  update(goose: TownGoose, events: GameplayEvent[], dt: number, upset: readonly Readonly<Position>[] = []): void {
+    this.goose = goose.position; this.upset = upset;
     for (const person of this.people) { person.moving = false; this.updatePerson(person, goose, events, dt); }
     for (const dog of this.dogs) this.updateDog(dog, goose, events, dt);
   }
@@ -239,7 +244,14 @@ export class Townsfolk {
         if (this.follow(person, person.definition.walkSpeed, dt)) this.arrive(person);
         break;
       case "inside": break;
-      default:
+      default: {
+        const child = person.definition.role === "parent" ? this.upset.find((kid) => distance2d(kid, person.position) < 11) : undefined;
+        if (child) {
+          if (person.seated) person.activity = "sit-looking";
+          else { person.activity = "calling"; person.heading = headingTo(person.position, child); }
+          person.timer = Math.max(person.timer, 1.2);
+          break;
+        }
         person.timer -= dt;
         if (person.seated && person.definition.role === "walker") {
           person.seatTimer -= dt;
@@ -249,6 +261,7 @@ export class Townsfolk {
           if (person.definition.role === "walker" && !person.seated) this.chooseDestination(person);
           else this.nextPastime(person);
         }
+      }
     }
   }
 

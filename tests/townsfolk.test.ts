@@ -220,3 +220,35 @@ test("drafts saved before the townsfolk arrived gain them once, keeping other ed
   assert.equal(JSON.parse(values.get(WORLD_LAYOUT_STORAGE_KEY)!).canonicalRevision, updated.canonicalRevision);
   assert.equal(count(loadWorldLayout(store)), count(CANONICAL_WORLD_LAYOUT), "loading again adds nobody twice");
 });
+
+test("parents turn and call out to a frightened child nearby, then go back to what they were doing", () => {
+  const bench = seat("bench#0", 6, 6);
+  const people = town([standingParent("standing"), { ...standingParent("seated"), position: bench.position, seat: bench, pastimes: ["sit-phoning", "sitting"] }]);
+  const child = at(10, 13);
+  run(people, 1, far);
+  const events: GameplayEvent[] = [];
+  for (let tick = 0; tick < 60; tick += 1) people.update(far, events, FIXED_STEP, [child]);
+  const standing = person(people, "standing");
+  assert.equal(standing.activity, "calling");
+  const toChild = Math.atan2(-(child.x - standing.position.x), -(child.z - standing.position.z));
+  assert.ok(Math.cos(standing.heading - toChild) > 0.999, "facing the child");
+  assert.equal(person(people, "seated").activity, "sit-looking");
+  run(people, 12, far);
+  assert.notEqual(person(people, "standing").activity, "calling", "they settle once the child does");
+});
+
+test("an idle barista greets a regular who comes up to order", () => {
+  const area = getWorldArea(CANONICAL_WORLD_LAYOUT, COFFEE_SHOP_AREA_ID);
+  const simulation = new Simulation(createWorldRules(area, CANONICAL_WORLD_LAYOUT.transitions));
+  simulation.setPlayerTransform({ x: 8, y: 0, z: 5.5 }, 0);
+  let greeted = 0; let wasIdle = false; let ordering = new Set<string>();
+  for (let tick = 0; tick < 300 / FIXED_STEP; tick += 1) {
+    simulation.advance(FIXED_STEP, { moveX: 0, moveZ: 0, hurry: false, honkPressed: false });
+    const people = simulation.world.cafePeople;
+    const barista = people.find((candidate) => candidate.role === "barista")!;
+    const nowOrdering = new Set(people.filter((candidate) => candidate.activity === "ordering").map((candidate) => candidate.id));
+    if ([...nowOrdering].some((id) => !ordering.has(id)) && wasIdle) { assert.equal(barista.activity, "greeting"); greeted += 1; }
+    ordering = nowOrdering; wasIdle = barista.activity === "idle" && !barista.moving;
+  }
+  assert.ok(greeted >= 1);
+});

@@ -3,6 +3,7 @@ import { createDogModel } from "../../game/DogModel.ts";
 import { createTownsfolkModel, TOWNSFOLK, TOWNSFOLK_LOOKS, type TownsfolkLook } from "../../game/TownsfolkModel.ts";
 import { TOWNSFOLK_WALK_SPEEDS } from "../../game/townsfolkTuning.ts";
 import type { LabVariant } from "../animLab/lab.ts";
+import { easyJog, hoppingBark, purposefulWalk, strollWalk, watchBehind, watchClasped } from "./options.ts";
 
 /**
  * Edit freely: the lab page hot-reloads on save. Poses live in
@@ -11,7 +12,7 @@ import type { LabVariant } from "../animLab/lab.ts";
  */
 
 export interface Variant extends LabVariant {
-  group: "people" | "parents" | "bench" | "walk" | "react" | "dog";
+  group: "people" | "parents" | "bench" | "walk" | "react" | "dog" | "options";
   model: TownsfolkLook | "dog";
 }
 
@@ -62,4 +63,15 @@ export const VARIANTS: Variant[] = [
   card("dog", "dog", "bark", "Standing up barking at a goose that comes close or honks."),
   card("dog", "dog", "happy", "Being stroked."),
   card("dog", "dog", "stand", "Standing, tail wagging."),
+  // Alternatives to pick from: "A" is what the game plays today.
+  { ...card("options", "sunhat-mom", "watch", "A (in game): hands on hips."), name: "Sun-hat mom · watch A (in game)" },
+  { name: "Sun-hat mom · watch B", group: "options", model: "sunhat-mom", clip: watchClasped("sunhat-mom"), notes: "B: hands clasped in front, rocking gently." },
+  { name: "Sun-hat mom · watch C", group: "options", model: "sunhat-mom", clip: watchBehind("sunhat-mom"), notes: "C: hands behind the back, rocking heel to toe." },
+  { ...card("options", "cap-dad", "walk", "A (in game): the café walk at his pace.", TOWNSFOLK_WALK_SPEEDS["cap-dad"]), name: "Cap dad · walk A (in game)" },
+  { name: "Cap dad · walk B", group: "options", model: "cap-dad", clip: strollWalk("cap-dad"), travelSpeed: TOWNSFOLK_WALK_SPEEDS["cap-dad"], notes: "B: relaxed stroll — more hip sway, floppier arms." },
+  { name: "Cap dad · walk C", group: "options", model: "cap-dad", clip: purposefulWalk("cap-dad"), travelSpeed: TOWNSFOLK_WALK_SPEEDS["cap-dad"], notes: "C: purposeful — leaning in, bigger arm swing, springier." },
+  { ...card("options", "jogger", "run", "A (in game): long springy stride.", TOWNSFOLK_WALK_SPEEDS.jogger), name: "Jogger · run A (in game)" },
+  { name: "Jogger · run B", group: "options", model: "jogger", clip: easyJog(), travelSpeed: TOWNSFOLK_WALK_SPEEDS.jogger, notes: "B: easy jog — shorter, quicker steps, relaxed arms." },
+  { ...card("options", "dog", "bark", "A (in game): standing bark, chest dips each yap."), name: "Dog · bark A (in game)" },
+  { name: "Dog · bark B", group: "options", model: "dog", clip: hoppingBark(), notes: "B: front paws bounce up with each yap." },
 ];

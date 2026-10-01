@@ -450,7 +450,8 @@ export class Simulation {
     this.updateSplashKids(events);
     this.updateJanitor(events, honked);
     this.cafe?.update(this.cafeWorld(events, honked), events, FIXED_STEP);
-    this.town?.update({ position: this.position, startling: honked || this.wingsSpread || this.threatening }, events, FIXED_STEP);
+    this.town?.update({ position: this.position, startling: honked || this.wingsSpread || this.threatening }, events, FIXED_STEP,
+      this.splashKids.filter((child) => child.activity === "frightened" || child.activity === "crying").map((child) => child.position));
     this.syncOwnedEntities();
     for (const zone of this.rules.objectiveZones ?? []) {
       const guarded = zone.guardedBy === this.janitor?.definition.id

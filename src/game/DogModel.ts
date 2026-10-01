@@ -133,8 +133,10 @@ export function createDogModel(): THREE.Group {
   return model;
 }
 
-type Rot = Partial<Record<DogBone, Vec3>>;
-function pose(rot: Rot, pelvisMove: Vec3 = [0, 0, 0]): Pose {
+export type DogRotations = Partial<Record<DogBone, Vec3>>;
+type Rot = DogRotations;
+/** A full dog pose: every bone set (unlisted ones at rest) plus a pelvis offset. */
+export function dogPose(rot: Rot, pelvisMove: Vec3 = [0, 0, 0]): Pose {
   const complete: Record<string, Vec3> = {};
   for (const name of BONES) complete[name] = rot[name] ?? [0, 0, 0];
   return { rot: complete as Pose["rot"], move: { pelvis: pelvisMove } as Pose["move"] };
@@ -148,7 +150,7 @@ function sitting(extra: Rot = {}, lift = 0): Pose {
     back_left_upper: [0.75, 0, -0.12], back_right_upper: [0.75, 0, 0.12], back_left_lower: [-2.0, 0, 0], back_right_lower: [-2.0, 0, 0],
     tail: [-1.1, 0, 0], ...extra,
   };
-  return pose(rot, [0, -0.14, 0.02]);
+  return dogPose(rot, [0, -0.14, 0.02]);
 }
 
 function createDogClips(bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationClip[] {
@@ -157,7 +159,7 @@ function createDogClips(bind: ReadonlyMap<string, THREE.Vector3>): THREE.Animati
     cycleClip("sit", 4, (p) => sitting({ head: [-0.25 + 0.05 * wave(p * 2), 0.35 * wave(p), 0.1 * wave(p, 0.3)], tail: [-1.1, 0.25 * wave(p * 4), 0],
       chest: [0.1 + 0.015 * wave(p * 4), 0, 0] }), bind),
     // Lying flat on the bench, chin on paws, breathing.
-    cycleClip("lie", 5, (p) => pose({
+    cycleClip("lie", 5, (p) => dogPose({
       pelvis: [0, 0, 0], chest: [0.02 * wave(p * 2), 0, 0], neck: [-0.5, 0.15, 0], head: [0.15, 0.1 * wave(p), 0.12],
       front_left_upper: [1.45, 0, 0], front_right_upper: [1.45, 0, 0], front_left_lower: [0.05, 0, 0], front_right_lower: [0.05, 0, 0],
       back_left_upper: [1.3, 0, -0.35], back_right_upper: [1.3, 0, 0.35], back_left_lower: [-2.3, 0, 0], back_right_lower: [-2.3, 0, 0],
@@ -172,7 +174,7 @@ function createDogClips(bind: ReadonlyMap<string, THREE.Vector3>): THREE.Animati
     // Standing up on the bench, barking: each yap dips the chest and snaps the jaw open.
     cycleClip("bark", 0.55, (p) => {
       const yap = pulse(p, 0.1);
-      return pose({
+      return dogPose({
         pelvis: [-0.06 * yap, 0, 0], chest: [-0.1 * yap, 0, 0], neck: [0.25 + 0.2 * yap, 0, 0], head: [0.05 + 0.1 * yap, 0, 0], jaw: [-0.5 * yap, 0, 0],
         front_left_upper: [0.15 * yap, 0, -0.08], front_right_upper: [0.15 * yap, 0, 0.08],
         back_left_upper: [-0.1, 0, -0.05], back_right_upper: [-0.1, 0, 0.05], back_left_lower: [0.15, 0, 0], back_right_lower: [0.15, 0, 0],
@@ -180,7 +182,7 @@ function createDogClips(bind: ReadonlyMap<string, THREE.Vector3>): THREE.Animati
       }, [0, -0.03 * yap, 0]);
     }, bind),
     // Standing, tail wagging, weight shifting: ready to go.
-    cycleClip("stand", 1.6, (p) => pose({
+    cycleClip("stand", 1.6, (p) => dogPose({
       neck: [0.2, 0.15 * wave(p * 0.5), 0], head: [0, 0.2 * wave(p * 0.5), 0], tail: [-0.3, 0.4 * wave(p * 2), 0],
       chest: [0.02 * wave(p), 0, 0], left_ear: [0.1, 0, 0], right_ear: [0.1, 0, 0],
     }), bind),

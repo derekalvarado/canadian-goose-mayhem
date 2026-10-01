@@ -143,6 +143,7 @@ type BaristaJob =
   | { kind: "shoo" }
   | { kind: "startled" }
   | { kind: "evict" }
+  | { kind: "welcome"; patronId: string }
   | { kind: "idle" };
 
 interface Walker { readonly position: Position; heading: number; path: Position[]; pathTarget?: Position; replanSeconds: number; moved: boolean }
@@ -335,6 +336,11 @@ export class CafeCrew {
       case "entering":
         if (this.walkTo(patron, service.counter.position, definition.walkSpeed, dt, ARRIVE)) {
           patron.heading = service.counter.heading; patron.activity = "ordering"; patron.timer = definition.orderSeconds;
+          // A barista with nothing on greets them from the register.
+          const barista = this.barista;
+          if (barista && (!barista.job || barista.job.kind === "idle") && distance2d(barista.position, barista.definition.register.position) < 0.3) {
+            barista.job = { kind: "welcome", patronId: definition.id }; barista.timer = barista.definition.greetSeconds; barista.path = [];
+          }
         }
         break;
       case "ordering":
@@ -409,6 +415,7 @@ export class CafeCrew {
       case "shoo": return "shooing";
       case "startled": return "startled";
       case "evict": return barista.shoveCooldown > 0.4 ? "shooing" : "chasing";
+      case "welcome": return "greeting";
       case "idle": return moving ? "walking" : "idle";
     }
   }
@@ -518,6 +525,14 @@ export class CafeCrew {
           barista.timer -= dt;
           if (barista.timer <= 0) { barista.spills.splice(barista.spills.indexOf(job.surfaceId), 1); this.finishJob(barista); }
         }
+        break;
+      }
+      case "welcome": {
+        // A wave and a hello from the register while a regular orders.
+        const patron = this.patrons.find((candidate) => candidate.definition.id === job.patronId);
+        barista.timer -= dt;
+        if (patron) this.face(barista, patron.position);
+        if (barista.timer <= 0 || patron?.activity !== "ordering") this.finishJob(barista);
         break;
       }
       case "idle":

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { CAFE_TABLE_HEIGHT } from "./CoffeeFurnitureView.ts";
 import { createDogModel, DOG_COLORS } from "./DogModel.ts";
 import { PALETTE } from "./palette.ts";
 import { RiggedCharacterView, type CharacterLoader } from "./RiggedCharacterView.ts";
@@ -86,6 +87,7 @@ export class TownspersonView extends RiggedCharacterView {
   readonly look: TownsfolkLook;
   private readonly phone = createPhone();
   private readonly cup = createTakeawayCup();
+  private hand?: THREE.Object3D;
   private mouths?: { closed: THREE.Object3D[]; open: THREE.Object3D[] };
 
   constructor(look: TownsfolkLook, loader?: CharacterLoader) {
@@ -96,18 +98,27 @@ export class TownspersonView extends RiggedCharacterView {
     this.phone.visible = false; this.cup.visible = false;
     void this.ready.then(() => {
       const hand = this.getHandSocket("right"); if (!hand) return;
+      this.hand = hand;
       // Held flat in the palm, screen toward the face.
       this.phone.position.set(-0.03, -0.02, -0.03); this.phone.rotation.set(-0.3, 0, 0); hand.add(this.phone);
-      this.cup.position.set(-0.07, -0.02, -0.02); hand.add(this.cup);
+      this.holdCup(true);
     }).catch(() => undefined);
   }
 
+  /** The coffee rides in the right hand, or stands on the café table in front of them between sips. */
+  private holdCup(inHand: boolean): void {
+    if (inHand && this.hand && this.cup.parent !== this.hand) { this.hand.add(this.cup); this.cup.position.set(-0.07, -0.02, -0.02); this.cup.rotation.set(0, 0, 0); }
+    if (!inHand && this.cup.parent !== this) { this.add(this.cup); this.cup.position.set(0.22, CAFE_TABLE_HEIGHT + 0.11, -0.72); this.cup.rotation.set(0, 0, 0); }
+  }
+
   /** Shows a prop in hand and opens the mouth for surprised or noisy moments. */
-  private present(clip: string, open: boolean, hidden: boolean): void {
+  private present(clip: string, open: boolean, hidden: boolean, cupOnTable = false): void {
     this.visible = !hidden;
     this.playAnimation(clip, 0.25);
     this.phone.visible = clip === "phone" || clip === "film" || clip === "sit-phone";
-    this.cup.visible = clip === "sit-sip" || clip === "carry" || (this.look === "beard-dad" && clip.startsWith("sit"));
+    const sipping = clip === "sit-sip" || clip === "carry";
+    this.holdCup(sipping || !cupOnTable);
+    this.cup.visible = sipping || cupOnTable || (this.look === "beard-dad" && (clip === "sit" || clip === "sit-look"));
     if (!this.mouths && this.activeClip) {
       const mouths = { closed: [] as THREE.Object3D[], open: [] as THREE.Object3D[] };
       this.traverse((object) => {
@@ -129,7 +140,7 @@ export class TownspersonView extends RiggedCharacterView {
   setPatronState(person: CafePersonState): void {
     this.userData.gameplayState = person.activity;
     const clip = patronClipFor(person);
-    this.present(clip, /startle|shoo/.test(clip), person.activity === "away");
+    this.present(clip, /startle|shoo/.test(clip), person.activity === "away", person.seated);
   }
 }
 
