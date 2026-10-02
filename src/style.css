@@ -363,15 +363,15 @@ kbd,
 .pose-button--wings { grid-area: wings; }
 .pose-button--sneak { grid-area: sneak; }
 .pose-button--threat { grid-area: threat; border-color: rgb(241 211 139 / 78%); background: rgb(158 79 67 / 90%); }
-.settings-menu, .rotate-message { position: absolute; inset: 0; z-index: 15; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: rgb(15 26 18 / 68%); }
-.settings-menu[hidden], .rotate-message[hidden] { display: none; }
+.settings-menu { position: absolute; inset: 0; z-index: 15; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: rgb(15 26 18 / 68%); }
+.settings-menu[hidden] { display: none; }
 .settings-card { width: min(360px, 100%); padding: 22px; border: 1px solid var(--line); border-radius: 8px 22px 8px 22px; background: var(--paper); box-shadow: 0 18px 48px rgb(5 13 8 / 32%); }
 .settings-card h2 { margin: 0 0 18px; font-family: Georgia, serif; font-weight: 500; }
 .settings-card label { display: grid; gap: 7px; color: var(--ink-muted); font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .settings-card select, .settings-card input, .settings-card button { min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--goose-white); background: rgb(13 34 24 / 72%); font: inherit; }
 .settings-card input::placeholder { color: rgb(243 242 233 / 42%); }
 .settings-card button { margin-top: 16px; cursor: pointer; }
-.settings-help, .rotate-message p { color: var(--ink-muted); font-size: .86rem; line-height: 1.45; }
+.settings-help { color: var(--ink-muted); font-size: .86rem; line-height: 1.45; }
 .settings-family-pairing { margin: 1rem 0; padding-top: .8rem; border-top: 1px solid var(--line); }
 .settings-family-pairing h3 { margin: 0 0 .5rem; font: 600 1rem/1.3 Georgia, serif; }
 .settings-family-pairing input { width: 100%; }
@@ -1071,3 +1071,20 @@ kbd,
 .settings-card .settings-danger { width: 100%; border-color: rgb(241 211 139 / 45%); background: rgb(158 79 67 / 82%); }
 .settings-card #settings-close { width: 100%; margin-top: 10px; }
 .todo-list[hidden] { display: none; }
+
+.update-notice {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 40;
+  transform: translateX(-50%);
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid rgba(241, 211, 139, 0.6);
+  border-radius: 999px;
+  background: rgba(32, 37, 35, 0.92);
+  color: #f1d38b;
+  font: 700 13px/1.2 system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}

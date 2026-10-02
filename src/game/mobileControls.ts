@@ -57,10 +57,6 @@ export function shouldShowTouchControls(preference: TouchControlsPreference, coa
   return preference === "show" || (preference === "auto" && coarseTouchDevice);
 }
 
-export function shouldPauseForPortrait(coarseTouchDevice: boolean, width: number, height: number): boolean {
-  return coarseTouchDevice && height > width;
-}
-
 export class PauseReasons {
   private readonly reasons = new Set<string>();
 

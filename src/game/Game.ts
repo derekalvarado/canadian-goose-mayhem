@@ -5,7 +5,7 @@ import { WorldView } from "./WorldView";
 import { Goose } from "./Goose";
 import { InputController, type GamepadLayout, type InputDevice, type InputFrame } from "./InputController";
 import { TouchControls } from "./TouchControls";
-import { PauseReasons, parseTouchControlsPreference, shouldPauseForPortrait, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
+import { PauseReasons, parseTouchControlsPreference, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
 import { Simulation, FIXED_STEP, HURRY_SPEED, WALK_SPEED, type GameplayEvent, type PlayerCommand } from "./simulation/Simulation";
 import { PALETTE } from "./palette";
@@ -139,7 +139,6 @@ export class Game {
   private readonly gamepadInteractKey = requireElement<HTMLElement>("#gamepad-interact-key");
   private readonly touchControlsRoot = requireElement<HTMLElement>("#touch-controls");
   private readonly settingsMenu = requireElement<HTMLElement>("#settings-menu");
-  private readonly rotateMessage = requireElement<HTMLElement>("#rotate-message");
   private readonly settingsButton = requireElement<HTMLButtonElement>("#settings-button");
   private readonly installButton = requireElement<HTMLButtonElement>("#install-button");
   private readonly installMenu = requireElement<HTMLElement>("#install-menu");
@@ -940,7 +939,6 @@ export class Game {
     this.camera.updateProjectionMatrix();
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, width < 700 ? 1.25 : 1.5));
     this.renderer.setSize(width, height, false);
-    this.updateOrientationPause();
   };
 
   private setupMobileControls(): void {
@@ -1042,12 +1040,6 @@ export class Game {
     this.fullscreenButton.hidden = !document.fullscreenEnabled && !document.fullscreenElement;
     this.fullscreenButton.textContent = document.fullscreenElement ? "Exit fullscreen" : "Fullscreen";
   };
-
-  private updateOrientationPause(): void {
-    const portrait = shouldPauseForPortrait(this.coarseTouchDevice, window.innerWidth, window.innerHeight);
-    this.rotateMessage.hidden = !portrait;
-    this.setPauseReason("portrait", portrait);
-  }
 
   private setPauseReason(reason: string, active: boolean): void {
     const changed = this.pauseReasons.set(reason, active);

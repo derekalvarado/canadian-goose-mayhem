@@ -6,16 +6,21 @@ const RUNTIME_CACHE_NAME = `${RUNTIME_CACHE_PREFIX}${BUILD_ID}`;
 const PRECACHE_URLS = [];
 const HAS_PRECACHE = PRECACHE_URLS.length > 0;
 const NETWORK_TIMEOUT_MS = 1500;
+// Phones waking their radio can take several seconds to reach the server; giving up
+// sooner would show the previous version of the game even though a newer one exists.
+const NAVIGATION_TIMEOUT_MS = 8000;
+// Vite names built files after their contents, so a cached copy never goes stale.
+const IMMUTABLE_ASSET_PATTERN = /^assets\/.+-[A-Za-z0-9_-]{8}\.[a-z0-9]+$/;
 
 async function findCached(request) {
   return caches.match(request, { ignoreSearch: !HAS_PRECACHE });
 }
 
-async function fetchWithTimeout(request) {
+async function fetchWithTimeout(request, { timeoutMs = NETWORK_TIMEOUT_MS, cache } = {}) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(request, { signal: controller.signal });
+    return await fetch(cache ? new Request(request, { cache }) : request, { signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }
@@ -51,7 +56,22 @@ self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(PRECACHE_CACHE_NAME);
     const installUrls = HAS_PRECACHE ? PRECACHE_URLS : ["./"];
-    await Promise.all(installUrls.map((url) => cache.add(new URL(url, self.location)).catch(() => undefined)));
+    await Promise.all(installUrls.map(async (url) => {
+      const absoluteUrl = new URL(url, self.location);
+      try {
+        if (IMMUTABLE_ASSET_PATTERN.test(url)) {
+          const previous = await caches.match(absoluteUrl);
+          if (previous) {
+            await cache.put(absoluteUrl, previous);
+            return;
+          }
+        }
+        // Skip the browser's own short-term cache so a fresh deploy is never stored as stale.
+        await cache.add(new Request(absoluteUrl, { cache: "reload" }));
+      } catch {
+        // A file can fail on a flaky connection; it is fetched again when the game asks for it.
+      }
+    }));
     await self.skipWaiting();
   })());
 });
@@ -79,7 +99,7 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith((async () => {
       try {
-        const response = await fetchWithTimeout(request);
+        const response = await fetchWithTimeout(request, { timeoutMs: NAVIGATION_TIMEOUT_MS, cache: "no-cache" });
         if (!response.ok) throw new Error(`Navigation failed with ${response.status}`);
         await cacheNavigation(request, response);
         return response;
