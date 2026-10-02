@@ -15,6 +15,14 @@
         "limit": 30,
         "period": 60
       }
+    },
+    {
+      "name": "PAIRING_ATTEMPTS",
+      "namespace_id": "20261002",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
     }
   ],
   "durable_objects": {
@@ -22,6 +30,14 @@
       {
         "name": "ROOMS",
         "class_name": "SignalingRoom"
+      },
+      {
+        "name": "PAIRING_CODES",
+        "class_name": "PairingCode"
+      },
+      {
+        "name": "PAIRINGS",
+        "class_name": "FamilyPairing"
       }
     ]
   },
@@ -29,6 +45,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["SignalingRoom"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["PairingCode", "FamilyPairing"]
     }
   ],
   "observability": {

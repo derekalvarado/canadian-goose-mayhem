@@ -1,7 +1,7 @@
 # Two-goose multiplayer implementation
 
-Status: approved for implementation on 2026-09-30. Work is being delivered in
-small, tested checkpoints on `codex/two-goose-multiplayer`.
+Status: same-area local and online play are implemented. Family-device pairing
+is being delivered on `codex/family-pairing`.
 
 ## Product decisions
 
@@ -10,20 +10,21 @@ small, tested checkpoints on `codex/two-goose-multiplayer`.
   progress and world state.
 - Local play uses two individual sideways Joy-Cons on one iPad. Both geese stay
   in the same area and share one camera.
-- Online play uses two iPads. The host owns the authoritative simulation and its
-  saved progress. The guest runs the full game presentation and sends controls
-  for Goose 2.
-- Online geese may visit different authored areas. The host keeps every occupied
-  area active and sends the guest the authoritative snapshots it needs.
+- Online play uses two nearby devices. Either paired device can host; the host
+  owns the authoritative simulation and its saved progress. The guest runs the
+  full game presentation and sends controls for Goose 2.
+- Online geese currently stay in the same authored area. Independently occupied
+  areas remain future work.
 - GitHub Pages remains the game deployment target. A small Cloudflare Worker and
-  Durable Object provide short-lived signaling rooms so Player 2 only opens one
-  link; gameplay still travels peer-to-peer over WebRTC.
-- Nearby sharing should offer the native iPad share sheet (including AirDrop), QR
-  codes, and copy/paste as fallbacks.
+  Durable Objects remember one approved device pair, coordinate Host/Join, and
+  provide short-lived signaling rooms; gameplay still travels peer-to-peer over
+  WebRTC.
+- Four-digit codes are the default because they stay inside each installed PWA.
+  AirDrop, QR codes, and copy/paste remain link-based fallbacks.
 - If the guest disconnects, Goose 2 stands still and drops nothing. Closing the
   host still ends the authoritative session. Host migration and durable shared
-  saves remain future work, but signaling-room reconnects no longer require a
-  second manual link exchange.
+  saves remain future work. A guest can reopen the paired app and tap Join while
+  the host remains open.
 
 ## Architectural boundaries
 
@@ -51,11 +52,14 @@ small, tested checkpoints on `codex/two-goose-multiplayer`.
   movement and interaction arbitration, actor-aware NPC reactions and events.
 - [x] Local presentation: second goose view, shared-camera framing, two-controller
   lobby, disconnect behavior, and same-area transitions.
-- [ ] Online host/guest presentation: host-authoritative snapshots, independent
-  area views, guest input, latency handling, and Goose 2 standing on disconnect.
+- [x] Online host/guest presentation: host-authoritative same-area snapshots,
+  guest input, latency handling, and Goose 2 standing on disconnect.
 - [x] One-link signaling foundation: Cloudflare room service, automatic
   offer/answer relay, short-lived authenticated rooms, QR/AirDrop invitation,
   and the two-step exchange retained as a hidden fallback.
+- [x] Remembered family pairing: single-use four-digit codes, explicit approval,
+  one paired peer, editable names, first-host-wins presence, Join-before-Host,
+  guest reconnect, and either device hosting a later game.
 - [ ] PWA and device verification: GitHub Pages subpath links, two iPads, AirDrop,
   QR exchange, sideways Joy-Cons, reconnect while host is open, offline fallback.
 
@@ -64,29 +68,23 @@ Every checkpoint must keep single-player working and pass `npm test` and
 
 ## Current audit
 
-- Ready: fixed-step headless simulation, typed player command, durable entity IDs,
-  area snapshots, presentation-only rendering, PWA/GitHub Pages base-path support.
-- Correction needed: player identity is hard-coded as `goose` throughout the
-  simulation, interactions, events, NPC targeting, and `Game` presentation.
-- Correction needed: `InputController` selects only the first connected gamepad
-  and assumes a standard Xbox-style mapping. It has no join assignment or iPad
-  diagnostics.
-- Correction needed: one `Game` instance owns one active area, one goose view,
-  one camera target, and one area-transition curtain.
-- Remaining after the first checkpoint: online host/guest loop wiring,
-  independently occupied area sessions, actor-aware NPC targeting, and device
-  lifecycle/playtests.
+- Ready: fixed-step two-player simulation, typed player commands, durable entity
+  IDs, actor-aware interactions, two-controller assignment, iPad diagnostics,
+  same-area host/guest snapshots, presentation smoothing, PWA/GitHub Pages
+  support, Cloudflare rooms, and remembered pairing.
+- Remaining: independently occupied area sessions, real two-iPad verification of
+  the new code flow, broader network traversal, and host migration/shared saves.
 
 ## Implementation status
 
 - Controller profiles, sideways Joy-Con transforms, right-axis fallback,
   press-to-join assignment, and the iPad diagnostics readout are implemented.
 - The versioned network protocol rejects oversized, malformed, replayed, and
-  rate-flooded guest commands. The preferred flow uses a Cloudflare signaling room:
-  the host shares one short invitation and the guest joins automatically. Manual
-  compressed URL-fragment signaling remains available as a fallback. Same-network
-  play is the current connectivity target; no third-party STUN/TURN service is
-  silently used.
+  rate-flooded guest commands. The preferred flow pairs the installed apps once
+  with a four-digit code; either device can then Host or Join by saved player
+  name. Invitation links and compressed URL-fragment signaling remain fallbacks.
+  Same-network play is the current connectivity target; no third-party STUN/TURN
+  service is silently used.
 - `Simulation` can now run two geese in the same fixed tick. They move, honk,
   interact, hold separate items, arbitrate simultaneous grabs deterministically,
   and leave Goose 2 standing with her item when commands stop.
@@ -99,17 +97,20 @@ Every checkpoint must keep single-player working and pass `npm test` and
   commands are authenticated and rate-limited at the host; the guest renders
   bounded-rate authoritative host snapshots and never writes local progress.
 - Still required: support independently occupied areas online, replicate
-  one-shot presentation events and the guest to-do UI, add smoothing for remote
-  snapshots, and perform real iPad/Joy-Con/WebRTC playtests.
+  one-shot presentation events and the guest to-do UI, and perform complete
+  two-iPad/Joy-Con playtests of the code flow.
 - The signaling Worker is configured under `cloudflare/signaling`; Wrangler owns
-  provisioning and deployment. Rooms accept one host and one guest, expire after
-  twenty minutes, restrict browser origins, and retain only WebRTC setup messages.
-- Latest automated checkpoint: all 215 tests pass; the game and Worker TypeScript
-  builds are clean. The local Worker passed a two-WebSocket offer/answer smoke test.
-- Deployment checkpoint: Worker version `0729add4-ba27-4a01-8173-71c2da7f5901`
-  is live at `https://goose-game-signaling.goose-game-2.workers.dev`. Its health
-  check and a production two-WebSocket offer/answer relay test both pass. The
-  endpoint is included in `.env.production` for GitHub Pages builds.
+  provisioning and deployment. Pairing requires explicit approval and long random
+  credentials; rooms accept one host and one guest, expire after twenty minutes,
+  restrict browser origins, and retain only WebRTC setup messages.
+- Latest automated checkpoint: all 227 tests pass; the game and Worker TypeScript
+  builds are clean. The local Worker passed both the room relay smoke test and the
+  full pair/approve/first-host/join-before-host/private-room/forget smoke test.
+- Browser acceptance checkpoint: two isolated local app origins paired by code
+  and completed the automatic Host/Join WebRTC connection.
+- Deployment checkpoint: Worker version `0b2452b5-ffab-46ab-a3d3-20517d9988f6`
+  is live at `https://goose-game-signaling.goose-game-2.workers.dev`; its health,
+  room-relay, and full family-pairing smoke tests pass.
 
 ## Restart note
 

@@ -6,10 +6,15 @@ import {
   type RoomSignalMessage,
 } from "../../../src/game/multiplayer/roomSignalingProtocol.ts";
 import { allowedSignalingOrigin, nextSignalingMessageCount } from "./security.ts";
+import type { FamilyPairingEnv, PairingCode } from "./familyPairing.ts";
 
-interface Env {
+export { FamilyPairing, PairingCode } from "./familyPairing.ts";
+
+interface Env extends FamilyPairingEnv {
   readonly ROOMS: DurableObjectNamespace<SignalingRoom>;
+  readonly PAIRING_CODES: DurableObjectNamespace<PairingCode>;
   readonly ROOM_HANDSHAKES: RateLimit;
+  readonly PAIRING_ATTEMPTS: RateLimit;
   readonly ALLOWED_ORIGINS: string;
 }
 
@@ -19,12 +24,35 @@ interface SocketAttachment {
 }
 
 const ROOM_PATTERN = /^[A-Za-z0-9_-]{24,128}$/u;
+const PAIRING_CODE_ROUTE = /^\/pairing-codes\/(\d{4})\/(create|join|status|approve|deny|cancel)$/u;
+const FAMILY_PAIR_ROUTE = /^\/pairs\/([A-Za-z0-9_-]{24,128})\/(status|claim-host|heartbeat|release-host|join|publish-room|update-name|forget)$/u;
 const ROOM_LIFETIME_MS = 20 * 60 * 1_000;
 
 function textResponse(message: string, status: number, origin?: string): Response {
   const headers = new Headers({ "content-type": "text/plain; charset=utf-8" });
   if (origin) headers.set("access-control-allow-origin", origin);
   return new Response(message, { status, headers });
+}
+
+function corsResponse(response: Response, origin: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set("access-control-allow-origin", origin);
+  headers.set("vary", "Origin");
+  headers.set("cache-control", "no-store");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+function preflightResponse(origin: string): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-origin": origin,
+      "access-control-allow-methods": "POST, OPTIONS",
+      "access-control-allow-headers": "content-type",
+      "access-control-max-age": "600",
+      "vary": "Origin",
+    },
+  });
 }
 
 export default {
@@ -35,6 +63,33 @@ export default {
     const origin = request.headers.get("origin");
     const acceptedOrigin = allowedSignalingOrigin(origin, env.ALLOWED_ORIGINS);
     if (!acceptedOrigin) return textResponse("Origin is not allowed.", 403);
+    if (request.method === "OPTIONS") return preflightResponse(acceptedOrigin);
+
+    const pairingCode = PAIRING_CODE_ROUTE.exec(url.pathname);
+    if (pairingCode) {
+      if (request.method !== "POST") return textResponse("Method not allowed.", 405, acceptedOrigin);
+      if (pairingCode[2] === "create" || pairingCode[2] === "join") {
+        const rateLimitKey = request.headers.get("cf-connecting-ip") ?? acceptedOrigin;
+        const rateLimit = await env.PAIRING_ATTEMPTS.limit({ key: rateLimitKey });
+        if (!rateLimit.success) {
+          const response = Response.json(
+            { message: "Too many pairing attempts. Try again in a minute.", code: "rate-limited" },
+            { status: 429, headers: { "access-control-allow-origin": acceptedOrigin, "cache-control": "no-store", vary: "Origin" } },
+          );
+          response.headers.set("retry-after", "60");
+          return response;
+        }
+      }
+      const id = env.PAIRING_CODES.idFromName(pairingCode[1]);
+      return corsResponse(await env.PAIRING_CODES.get(id).fetch(request), acceptedOrigin);
+    }
+
+    const familyPair = FAMILY_PAIR_ROUTE.exec(url.pathname);
+    if (familyPair) {
+      if (request.method !== "POST") return textResponse("Method not allowed.", 405, acceptedOrigin);
+      const id = env.PAIRINGS.idFromName(familyPair[1]);
+      return corsResponse(await env.PAIRINGS.get(id).fetch(request), acceptedOrigin);
+    }
 
     const match = /^\/rooms\/([^/]+)$/u.exec(url.pathname);
     if (!match || !ROOM_PATTERN.test(match[1])) return textResponse("Room not found.", 404, acceptedOrigin);

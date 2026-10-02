@@ -17,7 +17,8 @@
     "typecheck:signaling": "tsc -p cloudflare/signaling/tsconfig.json",
     "signaling:dev": "wrangler dev --config cloudflare/signaling/wrangler.jsonc",
     "signaling:deploy": "wrangler deploy --config cloudflare/signaling/wrangler.jsonc",
-    "signaling:smoke": "node scripts/smoke-signaling.mjs"
+    "signaling:smoke": "node scripts/smoke-signaling.mjs",
+    "signaling:smoke:pairing": "node scripts/smoke-family-pairing.mjs"
   },
   "dependencies": {
     "lz-string": "^1.5.0",

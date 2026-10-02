@@ -42,40 +42,58 @@ working network connection while they play.
 ### The explain-it-like-I-am-five version
 
 The host is the device holding the real storybook. It decides where both geese
-are, what every person is doing, and which tasks are crossed off. Player 2's
+are, what every person is doing, and which tasks are crossed off. The other
 device is another window into that same storybook. It sends Goose 2's buttons to
 the host and receives the host's latest picture of the game.
 
-Cloudflare is the friend who introduces the two devices. It passes the WebRTC
-hello and reply between them, then the actual game traffic travels directly
-between the host and Player 2. Cloudflare does not run the village or store the
-save. Both devices currently need to be on the same Wi-Fi because the game does
-not yet use an internet relay.
+Cloudflare is the friend who remembers that these two devices belong together
+and introduces them when they want to play. It remembers only the two player
+names and random pairing credentials—not the village or its save. After the
+introduction, actual game traffic travels directly between the devices over
+WebRTC. Both devices currently need to be on the same Wi-Fi because the game
+does not yet use an internet relay.
 
 There are never more than two geese.
 
-### Mac host and iPad Player 2
+### Pair the two Home Screen apps once
 
-1. Open the game on the Mac and choose **Play together**. During local
-   development, run `npm run dev:lan` and open Vite's **Network** URL on the Mac
-   before hosting; an invitation made from `localhost` will not work on the iPad.
-2. Choose **Host this game** and leave that game tab open.
-3. Send the invitation to the iPad. Use **Share / AirDrop**, **Copy link**, or let
-   the iPad scan the QR code with its Camera app.
-4. Open the invitation in Safari on the iPad. The normal one-link room joins
-   automatically; Player 2 does not need to find another Join button or send a
-   response link back.
-5. Wait for both devices to say they are connected. The Mac controls Goose 1 and
-   the iPad controls Goose 2.
+1. Open the installed Goose Game 2 app on both devices and tap **Play together**.
+2. Enter a player name on each device.
+3. On either device, tap **Show a 4-digit code**.
+4. Enter that code on the other device and tap **Pair**.
+5. Look back at the device showing the code. It names the requesting player;
+   tap **Yes, pair** only if that is the person beside you.
+
+The code expires after five minutes and works once. The two apps remember each
+other after pairing, so no link, QR code, or Safari tab is needed next time.
+Each app remembers only one paired player. **Pair a different device** clearly
+warns that a successful new pairing replaces the old one.
+
+### Play after pairing
+
+1. On either device, open **Play together** and tap **Host game**. The host uses
+   its own saved to-do list.
+2. On the other device, tap **Join _player name_**. It is also fine to tap Join
+   first; that app waits until the paired player starts hosting.
+3. Wait for both devices to say they are connected. The host controls Goose 1
+   and the joining device controls Goose 2.
+
+If both players tap Host, the first device to reach Cloudflare stays host and the
+other automatically joins it. Either device can host a later game.
 
 The host owns the saved to-do list. If Player 2 disconnects, Goose 2 stands still
 and the host can keep playing. To reconnect while the host game is still open,
-make a new room and share its new invitation. If the host closes or reloads the
-game, that live multiplayer session is over.
+reopen the Home Screen app and tap **Join** again. If the host closes or reloads
+the game, that live multiplayer session is over; after its short presence lease
+expires, either paired device can host a new game. Pairing itself is not lost.
 
 Online area changes are not finished yet. Keep both geese in the current area
 during device testing rather than trying to leave one goose in the square and
 the other in the coffee shop.
+
+The former invitation-link and QR flow is still available under **Other ways to
+connect**. It is useful for an unpaired device, but iPadOS normally opens a shared
+web link in Safari rather than switching into an already-installed PWA.
 
 ### Two controllers on one iPad
 
@@ -89,16 +107,22 @@ physical controller claimed each goose until local multiplayer is restarted.
 
 ### Where the Cloudflare parts live
 
-- `cloudflare/signaling/src/index.ts` — the small Worker and its temporary,
-  one-host/one-guest Durable Object room
+- `cloudflare/signaling/src/index.ts` — Worker routing, origin checks, and safety
+  limits for pairing and temporary rooms
+- `cloudflare/signaling/src/familyPairing.ts` — five-minute codes, approval,
+  remembered device pairs, host presence, and waiting-to-join state
 - `cloudflare/signaling/wrangler.jsonc` — the Worker name, allowed production
-  browser origin, Durable Object binding, and deployment settings
+  browser origin, Durable Object bindings, rate limits, and deployment settings
 - `cloudflare/signaling/README.md` — local testing, deployment, health checks,
   and service-specific troubleshooting
 - `.env.production` — the public Worker address included in GitHub Pages builds
 - `.env.local` — an ignored local override for development
-- `src/game/multiplayer/MultiplayerMenu.ts` — Host button, automatic joining,
-  AirDrop/share sheet, copy button, QR code, and manual fallback
+- `src/game/multiplayer/familyPairingProtocol.ts` — validated local pairing data
+  and the one-paired-player browser record
+- `src/game/multiplayer/FamilyPairingClient.ts` — the short pairing and presence
+  conversation with Cloudflare
+- `src/game/multiplayer/MultiplayerMenu.ts` — codes, approval, Host/Join buttons,
+  reconnecting, and the older link/QR fallback
 - `src/game/multiplayer/RoomSignalingClient.ts` — the short conversation with
   the Cloudflare room
 - `src/game/multiplayer/WebRtcPeer.ts` — the direct browser-to-browser data
@@ -109,31 +133,37 @@ the Worker and provisions its Durable Object from the checked-in configuration.
 The deployed service is currently
 `https://goose-game-signaling.goose-game-2.workers.dev`.
 
-The public Worker requires an approved browser origin, limits room connection
-attempts per network, closes a signaling socket that sends more than the small
-offer/answer budget, deletes rooms after 20 minutes, and redacts room keys from
-persisted request logs. The invitation itself is still the room's password: share
-it only with Player 2 and create a new room if it goes somewhere unintended.
+The public Worker requires an approved browser origin, strictly limits code
+creation/guessing per network, requires approval on the code-creating device,
+and uses long random credentials after pairing. It also limits room connection
+attempts, closes a signaling socket that sends more than the small offer/answer
+budget, deletes rooms after 20 minutes, and redacts room keys from persisted
+request logs. No game save or gameplay traffic is stored there.
 
 ### Multiplayer troubleshooting
 
 | What you see | What to do |
 | --- | --- |
+| A pairing code does not work | Check all four digits and make sure the code is less than five minutes old. Make one fresh code rather than guessing repeatedly; too many attempts pause pairing for one minute. |
+| A strange name asks to pair | Tap **No**. Only approve the player sitting beside you. The code remains usable until it expires or is cancelled. |
+| Join says it is waiting | Leave that screen open and tap **Host game** on the paired device. Join can safely be tapped before Host. |
+| The old host was closed and the other device cannot host yet | Wait about 35 seconds for the host-presence lease to expire, then tap **Host game** again. The devices remain paired. |
+| A device says its pairing was forgotten | The other device forgot or replaced the pairing. Pair the two devices again with a new 4-digit code. |
 | The iPad cannot open a Mac development link | Start the game with `npm run dev:lan`, keep the Mac awake, and put both devices on the same Wi-Fi. The invitation should begin with the Mac's LAN address, such as `http://192.168…`, not `localhost`. Check the macOS firewall if the page itself will not load. |
 | The invitation opens, but the geese never connect | Keep the host tab open and in the foreground. Refresh both devices, create a new room, and use only its newest link. Make sure both devices are on the same normal Wi-Fi, not a guest network or VPN. |
 | The game says it cannot reach the private room | Open the Worker's `/health` URL or run the signaling smoke test described in `cloudflare/signaling/README.md`. The game page's public origin must also appear in `ALLOWED_ORIGINS` in `wrangler.jsonc`; private LAN origins are accepted automatically. |
 | Repeated room attempts temporarily stop connecting | Wait one minute, close old game tabs, and try one newly created room. This safety limit is deliberately much higher than one family session needs. |
-| **Host this game** says manual setup or asks for a response link | That build did not receive `VITE_SIGNALING_URL`. Check `.env.production` or `.env.local`, then restart Vite or rebuild the site. The normal Cloudflare flow needs only one link. |
+| Pairing buttons are unavailable or only manual links work | That build did not receive `VITE_SIGNALING_URL`. Check `.env.production` or `.env.local`, then restart Vite or rebuild the site. |
 | Share / AirDrop is missing | Apple's share sheet depends on browser and security support. Use the QR code or **Copy link** instead. |
 | Goose 2 looks jerky | Refresh both devices and create a new room so both are running the current movement-smoothing build. Keep them near a strong Wi-Fi access point and close older game tabs. |
 | A Joy-Con is paired but does nothing | Press one of its buttons so Safari exposes it, then open **Settings** → **Controller diagnostics**. The readout shows every axis and button without needing an iPad console. Switch controllers require iPadOS 16 or newer. |
 | The game pauses on an iPad | Keep Safari or the Home Screen app in the foreground and rotate the iPad to landscape. |
-| Player 2 disconnected | Goose 2 remains standing. On the still-running host, create a new room and send the new link. There is no host migration if the host closes. |
+| Player 2 disconnected | Goose 2 remains standing. Reopen the paired app and tap **Join** again while the host remains open. There is no mid-session host migration if the host closes. |
 
 The Cloudflare invitation room expires after 20 minutes. It is needed only for
 the introduction, so that timer does not end a WebRTC game that already connected.
-The hidden two-step pairing flow remains available under **Connection help &
-manual fallback** if the room service itself is unavailable.
+The older invitation and hidden two-step link flows remain available under
+**Other ways to connect**.
 
 ### Dev mode and start areas
 
@@ -254,10 +284,12 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/InputController.ts` — keyboard, touch, standard-controller, and two-controller assignment input
 - `src/game/multiplayer/protocol.ts` — bounded, versioned Goose 2 commands and authoritative host snapshots
 - `src/game/multiplayer/WebRtcPeer.ts` — direct peer-to-peer data-channel transport
+- `src/game/multiplayer/familyPairingProtocol.ts` — remembered two-device pairing records and validation
+- `src/game/multiplayer/FamilyPairingClient.ts` — Cloudflare pairing, presence, Host, and Join requests
 - `src/game/multiplayer/RoomSignalingClient.ts` — automatic Cloudflare room client
 - `src/game/multiplayer/networkMotion.ts` — smooth guest prediction and host correction without changing gameplay authority
-- `src/game/multiplayer/MultiplayerMenu.ts` — local play, hosting, one-link joining, sharing, QR, and manual fallback UI
-- `cloudflare/signaling/` — short-lived one-host/one-guest signaling rooms deployed independently with Wrangler
+- `src/game/multiplayer/MultiplayerMenu.ts` — one-time device pairing, local play, Host/Join, reconnecting, and link fallback UI
+- `cloudflare/signaling/` — paired-device presence plus short-lived one-host/one-guest signaling rooms deployed with Wrangler
 - `src/game/plazaLevel.ts` — legacy plaza-only bounds and collision retained for tests and migration
 - `src/game/plazaLayout.ts` — legacy PlazaEditor document validation used for automatic migration
 - `src/game/content/plaza-layout.json` — legacy canonical plaza arrangement migrated into the world document
@@ -267,7 +299,7 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `tests/plazaLevel.test.ts` — active plaza boundary and landmark tests
 - `tests/level.test.ts` — retained forest boundary and trail tests
 - `tests/simulation.test.ts` — timing, two-goose rules, input edges, objectives, pause/reset, and backtracking
-- `tests/multiplayerProtocol.test.ts`, `tests/roomSignaling.test.ts`, `tests/networkMotion.test.ts` — network trust boundaries, one-link rooms, and smooth guest presentation
+- `tests/familyPairing.test.ts`, `tests/multiplayerProtocol.test.ts`, `tests/roomSignaling.test.ts`, `tests/networkMotion.test.ts` — remembered pairing, network trust boundaries, room links, and smooth guest presentation
 
 Run `npm test` for headless gameplay checks and `npm run build` for TypeScript and
 the production bundle. The headless tests use Node's TypeScript stripping; use

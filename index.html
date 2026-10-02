@@ -109,6 +109,16 @@
             <p class="settings-help">Press each stick direction and button. This raw readout works without an iPad console.</p>
             <pre id="controller-diagnostics-output">No controller visible yet. Press a button on each Joy-Con.</pre>
           </details>
+          <section id="settings-family-pairing" class="settings-family-pairing" hidden>
+            <h3>Paired player</h3>
+            <p id="settings-family-peer" class="settings-help"></p>
+            <label for="settings-family-name">Your player name
+              <input id="settings-family-name" type="text" maxlength="24" autocomplete="nickname" />
+            </label>
+            <button id="settings-family-save-name" type="button">Save player name</button>
+            <p id="settings-family-status" class="settings-help" aria-live="polite"></p>
+            <button id="settings-family-forget" class="settings-danger" type="button">Forget paired player</button>
+          </section>
           <p class="settings-help">Your crossed-off tasks are saved in this browser.</p>
           <button id="start-over" class="settings-danger" type="button">Start over</button>
           <button id="settings-close" type="button">Done</button>
@@ -119,18 +129,54 @@
         <div class="settings-card multiplayer-card">
           <p class="complete-kicker">Two nearby iPads</p>
           <h2 id="multiplayer-title">Play together</h2>
-          <p id="multiplayer-status" class="settings-help" aria-live="polite">One iPad hosts the village. The other joins as Goose 2.</p>
-          <button id="multiplayer-local" type="button">Two controllers on this iPad</button>
-          <button id="multiplayer-host" type="button">Host this game</button>
-          <details id="multiplayer-manual-fallback" class="multiplayer-fallback">
-            <summary>Manual connection fallback</summary>
-            <button id="multiplayer-manual-host" type="button">Create a two-step pairing link</button>
-            <label class="multiplayer-paste" for="multiplayer-link-input">Or paste a pairing link
-              <textarea id="multiplayer-link-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-            </label>
-            <button id="multiplayer-use-link" type="button">Use pairing link</button>
-            <p class="settings-help">Use this only if the one-link room service is unavailable. It requires sending a response link back to the host.</p>
-          </details>
+          <p id="multiplayer-status" class="settings-help" aria-live="polite">Pair these two devices once. After that, either player can host.</p>
+          <div id="multiplayer-main-controls">
+            <section id="multiplayer-family-paired" class="multiplayer-family-panel" hidden>
+              <p id="multiplayer-family-label" class="multiplayer-family-label"></p>
+              <div class="multiplayer-family-actions">
+                <button id="multiplayer-host" type="button">Host game</button>
+                <button id="multiplayer-family-join" type="button">Join game</button>
+              </div>
+              <button id="multiplayer-pair-different" class="multiplayer-secondary" type="button">Pair a different device</button>
+            </section>
+            <section id="multiplayer-family-setup" class="multiplayer-family-panel">
+              <label for="multiplayer-family-name">Your player name
+                <input id="multiplayer-family-name" type="text" maxlength="24" autocomplete="nickname" placeholder="Your name" />
+              </label>
+              <button id="multiplayer-family-create" type="button">Show a 4-digit code</button>
+              <div class="multiplayer-code-entry">
+                <label for="multiplayer-family-code">Or enter their code
+                  <input id="multiplayer-family-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" placeholder="0000" />
+                </label>
+                <button id="multiplayer-family-request" type="button">Pair</button>
+              </div>
+              <div id="multiplayer-code-panel" class="multiplayer-code-panel" hidden>
+                <span>Tell the other player this code:</span>
+                <strong id="multiplayer-family-code-display">0000</strong>
+                <span>It expires in 5 minutes.</span>
+                <button id="multiplayer-family-cancel" class="multiplayer-secondary" type="button">Cancel code</button>
+              </div>
+              <div id="multiplayer-approval" class="multiplayer-approval" hidden>
+                <strong id="multiplayer-approval-question"></strong>
+                <div class="multiplayer-family-actions">
+                  <button id="multiplayer-family-approve" type="button">Yes, pair</button>
+                  <button id="multiplayer-family-deny" class="multiplayer-secondary" type="button">No</button>
+                </div>
+              </div>
+              <p id="multiplayer-replacement-note" class="settings-help" hidden>Pairing a new device will replace the current paired player on this device.</p>
+            </section>
+            <button id="multiplayer-local" type="button">Two controllers on this iPad</button>
+            <details id="multiplayer-manual-fallback" class="multiplayer-fallback">
+              <summary>Other ways to connect</summary>
+              <button id="multiplayer-link-host" type="button">Create a one-use invitation link</button>
+              <button id="multiplayer-manual-host" type="button">Create a two-step pairing link</button>
+              <label class="multiplayer-paste" for="multiplayer-link-input">Or paste a pairing link
+                <textarea id="multiplayer-link-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+              </label>
+              <button id="multiplayer-use-link" type="button">Use pairing link</button>
+              <p class="settings-help">Invitation links open in Safari instead of the installed app. The two-step link is only a fallback if the room service is unavailable.</p>
+            </details>
+          </div>
           <div id="multiplayer-share-panel" class="multiplayer-share" hidden>
             <p id="multiplayer-share-instruction" class="settings-help"></p>
             <canvas id="multiplayer-qr" aria-label="Pairing QR code"></canvas>
@@ -140,7 +186,7 @@
               <button id="multiplayer-copy" type="button">Copy link</button>
             </div>
           </div>
-          <p class="settings-help">Player 2 normally joins by opening one link. Keep both games open. Nearby devices on the same Wi-Fi work best.</p>
+          <p class="settings-help">The host uses their saved game. Keep both games open while playing. Nearby devices on the same Wi-Fi work best.</p>
           <button id="multiplayer-close" type="button">Back to game</button>
         </div>
       </section>

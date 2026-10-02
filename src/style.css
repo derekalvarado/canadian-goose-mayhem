@@ -368,9 +368,14 @@ kbd,
 .settings-card { width: min(360px, 100%); padding: 22px; border: 1px solid var(--line); border-radius: 8px 22px 8px 22px; background: var(--paper); box-shadow: 0 18px 48px rgb(5 13 8 / 32%); }
 .settings-card h2 { margin: 0 0 18px; font-family: Georgia, serif; font-weight: 500; }
 .settings-card label { display: grid; gap: 7px; color: var(--ink-muted); font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.settings-card select, .settings-card button { min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--goose-white); background: rgb(13 34 24 / 72%); font: inherit; }
+.settings-card select, .settings-card input, .settings-card button { min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--goose-white); background: rgb(13 34 24 / 72%); font: inherit; }
+.settings-card input::placeholder { color: rgb(243 242 233 / 42%); }
 .settings-card button { margin-top: 16px; cursor: pointer; }
 .settings-help, .rotate-message p { color: var(--ink-muted); font-size: .86rem; line-height: 1.45; }
+.settings-family-pairing { margin: 1rem 0; padding-top: .8rem; border-top: 1px solid var(--line); }
+.settings-family-pairing h3 { margin: 0 0 .5rem; font: 600 1rem/1.3 Georgia, serif; }
+.settings-family-pairing input { width: 100%; }
+.settings-family-pairing button { width: 100%; }
 .controller-diagnostics {
   margin: .8rem 0;
   border: 1px solid var(--line);
@@ -390,6 +395,21 @@ kbd,
 }
 .hud-action--multiplayer { left: max(24px, env(safe-area-inset-left)); top: max(24px, env(safe-area-inset-top)); }
 .multiplayer-card { width: min(92vw, 34rem); max-height: min(92vh, 46rem); overflow-y: auto; }
+.multiplayer-family-panel { display: grid; gap: .65rem; margin: .85rem 0; padding: .85rem; border: 1px solid var(--line); border-radius: .7rem; }
+.multiplayer-family-panel[hidden] { display: none; }
+.multiplayer-family-panel label { gap: .4rem; }
+.multiplayer-family-panel input { width: 100%; font-size: 1rem; letter-spacing: normal; text-transform: none; }
+.multiplayer-family-panel button { width: 100%; margin-top: 0; }
+.multiplayer-family-label { margin: 0; font-size: 1rem; font-weight: 700; text-align: center; }
+.multiplayer-family-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.multiplayer-code-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .55rem; }
+.multiplayer-code-entry button { width: auto; min-width: 5rem; }
+.multiplayer-code-entry input { font: 700 1.35rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2em; text-align: center; }
+.multiplayer-code-panel, .multiplayer-approval { display: grid; justify-items: center; gap: .5rem; padding: .75rem; border-radius: .55rem; background: rgb(13 34 24 / 48%); text-align: center; }
+.multiplayer-code-panel[hidden], .multiplayer-approval[hidden] { display: none; }
+.multiplayer-code-panel strong { color: var(--sun); font: 700 2.6rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .22em; }
+.multiplayer-code-panel span { color: var(--ink-muted); font-size: .82rem; }
+.settings-card .multiplayer-secondary { border-color: var(--line); background: rgb(13 34 24 / 36%); }
 .multiplayer-card textarea {
   box-sizing: border-box;
   width: 100%;
@@ -407,6 +427,7 @@ kbd,
 .multiplayer-fallback summary { color: var(--ink-muted); cursor: pointer; font-size: .82rem; font-weight: 700; }
 .multiplayer-fallback button { width: 100%; }
 .multiplayer-share { display: grid; justify-items: center; gap: .65rem; margin: .9rem 0; }
+.multiplayer-share[hidden] { display: none; }
 .multiplayer-share canvas { width: min(300px, 68vw); height: auto; border: 8px solid white; border-radius: .35rem; background: white; }
 .multiplayer-share-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .55rem; }
 .pairing-delivered { display: grid; gap: .8rem; }
