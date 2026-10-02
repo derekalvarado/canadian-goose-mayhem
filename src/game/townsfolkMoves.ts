@@ -95,6 +95,15 @@ function benchClips(legs: LegDimensions, k: number, hipsY: number, bind: Readonl
       ...both(0.55, -0.6, 1.15, [-0.3, 0, 0], 0.3), neck: [-0.18, 0, 0], head: [-0.32, 0.05 * wave(p), 0], spine: [-0.06, 0, 0],
       right_wrist: [-0.3 + 0.06 * pulse(p * 3), 0, 0],
     }), bind),
+    // On a bench there is no table: the cup rests in the lap, comes up to the lips for a sip, and goes back down.
+    cycleClip("bench-sip", CUSTOMER_SHARED_TUNING.sipSeconds, (p) => {
+      const e = envelope(p, 0.25, 0.3);
+      const mix = (from: number, to: number) => from + (to - from) * e;
+      return pose({
+        ...arm("left", 0.25, -0.5, 0.35, [-0.1, 0, 0], 0.1), head: [0.2 * e, 0, 0], neck: [0.06 * e, 0, 0], chest: [0.04 * e, 0, 0],
+        ...arm("right", mix(0.35, 1.6), mix(-0.3, -1.0), mix(0.85, 1.4), [mix(-0.1, -0.2), 0, 0], mix(0.1, 0.4)),
+      });
+    }, bind, 64),
     // Arms spread along the bench back, face turned up to the sun.
     cycleClip("sit-relax", 6, (p) => pose({
       ...arm("left", -0.6, 1.0, 0.3, [0, 0, 0], -0.2), ...arm("right", -0.6, 1.0, 0.3, [0, 0, 0], -0.2),

@@ -32,6 +32,7 @@ function buildLater(key: string, build: () => THREE.Group): CharacterLoader {
 }
 
 const T = PALETTE.townsfolk;
+const CUP_POINT = new THREE.Vector3();
 function createPhone(): THREE.Group {
   const group = new THREE.Group(); group.name = "phone";
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.02), toonMaterial(T.phone));
@@ -53,7 +54,7 @@ export function createTakeawayCup(): THREE.Group {
 }
 
 const SEATED_CLIPS: Partial<Record<TownActivity, string>> = {
-  "sit-looking": "sit-look", "sit-phoning": "sit-phone", "sit-sipping": "sit-sip", "sit-relaxing": "sit-relax", "sit-petting": "sit-pet",
+  "sit-looking": "sit-look", "sit-phoning": "sit-phone", "sit-sipping": "bench-sip", "sit-relaxing": "sit-relax", "sit-petting": "sit-pet",
   startled: "sit-startle", shooing: "sit-shoo", eyeing: "sit-look",
 };
 const STANDING_CLIPS: Partial<Record<TownActivity, string>> = {
@@ -89,6 +90,7 @@ export class TownspersonView extends RiggedCharacterView {
   private readonly phone = createPhone();
   private readonly cup = createTakeawayCup();
   private hand?: THREE.Object3D;
+  private cupInHand = true;
   private mouths?: { closed: THREE.Object3D[]; open: THREE.Object3D[] };
 
   constructor(look: TownsfolkLook, loader?: CharacterLoader) {
@@ -108,8 +110,28 @@ export class TownspersonView extends RiggedCharacterView {
 
   /** The coffee rides in the right hand, or stands on the café table in front of them between sips. */
   private holdCup(inHand: boolean): void {
-    if (inHand && this.hand && this.cup.parent !== this.hand) { this.hand.add(this.cup); this.cup.position.set(-0.07, -0.02, -0.02); this.cup.rotation.set(0, 0, 0); }
-    if (!inHand && this.cup.parent !== this) { this.add(this.cup); this.cup.position.set(0.22, CAFE_TABLE_HEIGHT + 0.11, -0.72); this.cup.rotation.set(0, 0, 0); }
+    if (this.cup.parent !== this) this.add(this.cup);
+    this.cupInHand = inHand;
+    if (!inHand) { this.cup.position.set(0.22, CAFE_TABLE_HEIGHT + 0.11, -0.72); this.cup.rotation.set(0, 0, 0); }
+  }
+
+  /**
+   * A held cup stays upright beside the palm (toward their middle) rather than
+   * turning with the wrist, and tips toward the mouth as the hand comes up to sip.
+   */
+  private placeCupInHand(): void {
+    if (!this.hand || !this.cupInHand || !this.cup.visible) return;
+    this.updateMatrixWorld(true);
+    const palm = this.worldToLocal(this.hand.getWorldPosition(CUP_POINT));
+    // How far the hand has come up from the lap toward the face (seated hips sit at the same height for everyone).
+    const raised = this.activeClip === "sit-sip" || this.activeClip === "bench-sip" ? THREE.MathUtils.clamp((palm.y - 1.25) / 0.45, 0, 1) : 0;
+    this.cup.position.set(palm.x - 0.075, palm.y + 0.02 * (1 - raised), palm.z);
+    this.cup.rotation.set(raised * 1.05, 0, 0);
+  }
+
+  override update(delta: number): void {
+    super.update(delta);
+    this.placeCupInHand();
   }
 
   /** Shows a prop in hand and opens the mouth for surprised or noisy moments. */
@@ -117,7 +139,7 @@ export class TownspersonView extends RiggedCharacterView {
     this.visible = !hidden;
     this.playAnimation(clip, 0.25);
     this.phone.visible = clip === "phone" || clip === "film" || clip === "sit-phone";
-    const sipping = clip === "sit-sip" || clip === "carry";
+    const sipping = clip === "sit-sip" || clip === "bench-sip" || clip === "carry";
     this.holdCup(sipping || !cupOnTable);
     this.cup.visible = sipping || cupOnTable || (this.look === "beard-dad" && (clip === "sit" || clip === "sit-look"));
     if (!this.mouths && this.activeClip) {
