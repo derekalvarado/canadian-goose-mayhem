@@ -142,11 +142,9 @@ export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
     garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.6, 0.395 + bulky], [1.68, 0.372 + bulky]],
       0.73, [0, 0, 0], torsoWeight);
     garment("town-skin", [[1.58, 0.39 + bulky], [1.65, 0.38 + bulky], [1.79, 0.326 + bulky * 0.6], [1.86, 0.215], [1.89, 0]], 0.722, [0, 0, 0], torsoWeight);
-    for (const side of [-1, 1]) {
-      tube("town-top", [side * 0.19, 1.64, -0.29], [side * 0.19, 1.83, -0.06], 0.035, torsoWeight);
-      tube("town-top", [side * 0.19, 1.83, -0.06], [side * 0.19, 1.83, 0.08], 0.035, torsoWeight);
-      tube("town-top", [side * 0.19, 1.83, 0.08], [side * 0.19, 1.64, 0.27], 0.035, torsoWeight);
-    }
+    // Straps: narrow stripes laid on the skin, rising from the top's edge over each shoulder front and back.
+    const strap: [number, number][] = [[1.6, 0.4 + bulky], [1.65, 0.389 + bulky], [1.79, 0.335 + bulky * 0.6], [1.85, 0.25]];
+    for (const middle of [Math.PI - 0.55, Math.PI + 0.55, 0.55, -0.55]) garment("town-top", strap, 0.722, [0, 0, 0], torsoWeight, middle - 0.11, 0.22);
   } else {
     garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.65, 0.385 + bulky],
       [1.79, 0.33 + bulky * 0.6], [1.86, 0.22], [1.89, 0]], 0.73, [0, 0, 0], torsoWeight);
