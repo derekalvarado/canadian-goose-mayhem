@@ -93,6 +93,61 @@ export function townsfolkLegs(look: TownsfolkLook): LegDimensions {
 }
 
 /**
+ * An even-width strap lying on a lathe-shaped body (`profile` as [height, radius],
+ * squashed front to back by `depth`): straight up the chest at `x`, over the
+ * shoulder, and down the back, `lift` metres off the surface.
+ */
+function shoulderStrap(profile: [number, number][], depth: number, x: number, width: number, lift: number): THREE.BufferGeometry {
+  const curve = new THREE.SplineCurve(profile.map(([y, radius]) => new THREE.Vector2(radius, y))).getPoints(48);
+  const radiusAt = (y: number) => {
+    for (let i = 1; i < curve.length; i++) if ((curve[i - 1].y - y) * (curve[i].y - y) <= 0) {
+      const t = (y - curve[i - 1].y) / ((curve[i].y - curve[i - 1].y) || 1); return curve[i - 1].x + (curve[i].x - curve[i - 1].x) * t;
+    }
+    return curve[curve.length - 1].x;
+  };
+  const bottom = profile[0][0] + 0.02; const top = profile[profile.length - 1][0] - 0.02;
+  // The path as (height, angle round the body) at the strap's centre line: front up, across the top, back down.
+  const surface = (y: number, angle: number, out: number) => {
+    const r = radiusAt(y) + out;
+    return new THREE.Vector3(r * Math.sin(angle), y, r * Math.cos(angle) * depth);
+  };
+  const angleFor = (y: number, offset: number, front: boolean) => {
+    const a = Math.asin(THREE.MathUtils.clamp((x + offset) / (radiusAt(y) + lift), -1, 1));
+    return front ? Math.PI - a : a;
+  };
+  const rows: [THREE.Vector3, THREE.Vector3][] = [];
+  const steps = 10;
+  for (let i = 0; i <= steps; i++) {
+    const y = bottom + (top - bottom) * (i / steps);
+    rows.push([surface(y, angleFor(y, -width / 2, true), lift), surface(y, angleFor(y, width / 2, true), lift)]);
+  }
+  const over = 6;
+  for (let i = 1; i < over; i++) {
+    const t = i / over;
+    const mix = (offset: number) => { const a = angleFor(top, offset, true); const b = angleFor(top, offset, false); return a + (b - a) * t; };
+    rows.push([surface(top, mix(-width / 2), lift), surface(top, mix(width / 2), lift)]);
+  }
+  for (let i = steps; i >= 0; i--) {
+    const y = bottom + (top - bottom) * (i / steps);
+    rows.push([surface(y, angleFor(y, -width / 2, false), lift), surface(y, angleFor(y, width / 2, false), lift)]);
+  }
+  const positions: number[] = []; const index: number[] = [];
+  rows.forEach(([a, b], i) => {
+    positions.push(...a.toArray(), ...b.toArray());
+    if (i > 0) { const p = (i - 1) * 2; index.push(p, p + 1, p + 2, p + 1, p + 3, p + 2); }
+  });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(index); geometry.computeVertexNormals();
+  // Make sure the strap faces outward from the body.
+  const normal = new THREE.Vector3().fromBufferAttribute(geometry.getAttribute("normal") as THREE.BufferAttribute, 0);
+  const outward = new THREE.Vector3(positions[0], 0, positions[2]);
+  if (normal.dot(outward) < 0) { for (let i = 0; i < index.length; i += 3) [index[i + 1], index[i + 2]] = [index[i + 2], index[i + 1]]; geometry.setIndex(index); geometry.computeVertexNormals(); }
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(new Array((positions.length / 3) * 2).fill(0), 2));
+  return geometry;
+}
+
+/**
  * A townsperson on the janitor's rig, drawn with the same kit as the café people
  * at a lighter facet count (there are many of them on screen at once).
  */
@@ -141,10 +196,10 @@ export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
     // The top stops at the chest; skin follows the same body shape up to the neck, with a strap over each shoulder.
     garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.6, 0.395 + bulky], [1.68, 0.372 + bulky]],
       0.73, [0, 0, 0], torsoWeight);
-    garment("town-skin", [[1.58, 0.39 + bulky], [1.65, 0.38 + bulky], [1.79, 0.326 + bulky * 0.6], [1.86, 0.215], [1.89, 0]], 0.722, [0, 0, 0], torsoWeight);
-    // Straps: narrow stripes laid on the skin, rising from the top's edge over each shoulder front and back.
-    const strap: [number, number][] = [[1.6, 0.4 + bulky], [1.65, 0.389 + bulky], [1.79, 0.335 + bulky * 0.6], [1.85, 0.25]];
-    for (const middle of [Math.PI - 0.55, Math.PI + 0.55, 0.55, -0.55]) garment("town-top", strap, 0.722, [0, 0, 0], torsoWeight, middle - 0.11, 0.22);
+    // Bare shoulders, and straps: narrow stripes of the same shape lifted just clear of the skin, rising over each shoulder.
+    const shoulders = (lift: number): [number, number][] => [[1.58, 0.39 + bulky + lift], [1.65, 0.38 + bulky + lift], [1.79, 0.326 + bulky * 0.6 + lift], [1.86, 0.215 + lift]];
+    garment("town-skin", [...shoulders(0), [1.89, 0]], 0.722, [0, 0, 0], torsoWeight);
+    for (const side of [-1, 1]) add(shoulderStrap(shoulders(0), 0.722, side * 0.19, 0.075, 0.018), "town-top", torsoWeight);
   } else {
     garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.65, 0.385 + bulky],
       [1.79, 0.33 + bulky * 0.6], [1.86, 0.22], [1.89, 0]], 0.73, [0, 0, 0], torsoWeight);
