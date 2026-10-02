@@ -105,32 +105,22 @@ function shoulderStrap(profile: [number, number][], depth: number, x: number, wi
     }
     return curve[curve.length - 1].x;
   };
-  const bottom = profile[0][0] + 0.02; const top = profile[profile.length - 1][0] - 0.02;
-  // The path as (height, angle round the body) at the strap's centre line: front up, across the top, back down.
-  const surface = (y: number, angle: number, out: number) => {
-    const r = radiusAt(y) + out;
-    return new THREE.Vector3(r * Math.sin(angle), y, r * Math.cos(angle) * depth);
+  const bottom = profile[0][0] + 0.02;
+  // Each edge runs at a fixed sideways offset: up the chest, over the top of the shoulder, and down the back.
+  const edge = (offset: number) => {
+    const across = x + offset;
+    let peak = bottom;
+    for (const point of curve) if (point.y > peak && point.x + lift >= Math.abs(across)) peak = point.y;
+    const at = (t: number, back: boolean) => {
+      const y = bottom + (peak - bottom) * (1 - (1 - t) ** 2);
+      const z = Math.sqrt(Math.max(0, (radiusAt(y) + lift) ** 2 - across * across)) * depth;
+      return new THREE.Vector3(across, y, back ? z : -z);
+    };
+    const steps = 16;
+    return [...Array.from({ length: steps + 1 }, (_, i) => at(i / steps, false)), ...Array.from({ length: steps }, (_, i) => at(1 - (i + 1) / steps, true))];
   };
-  const angleFor = (y: number, offset: number, front: boolean) => {
-    const a = Math.asin(THREE.MathUtils.clamp((x + offset) / (radiusAt(y) + lift), -1, 1));
-    return front ? Math.PI - a : a;
-  };
-  const rows: [THREE.Vector3, THREE.Vector3][] = [];
-  const steps = 10;
-  for (let i = 0; i <= steps; i++) {
-    const y = bottom + (top - bottom) * (i / steps);
-    rows.push([surface(y, angleFor(y, -width / 2, true), lift), surface(y, angleFor(y, width / 2, true), lift)]);
-  }
-  const over = 6;
-  for (let i = 1; i < over; i++) {
-    const t = i / over;
-    const mix = (offset: number) => { const a = angleFor(top, offset, true); const b = angleFor(top, offset, false); return a + (b - a) * t; };
-    rows.push([surface(top, mix(-width / 2), lift), surface(top, mix(width / 2), lift)]);
-  }
-  for (let i = steps; i >= 0; i--) {
-    const y = bottom + (top - bottom) * (i / steps);
-    rows.push([surface(y, angleFor(y, -width / 2, false), lift), surface(y, angleFor(y, width / 2, false), lift)]);
-  }
+  const inner = edge(-width / 2); const outer = edge(width / 2);
+  const rows = inner.map((point, i): [THREE.Vector3, THREE.Vector3] => [point, outer[i]]);
   const positions: number[] = []; const index: number[] = [];
   rows.forEach(([a, b], i) => {
     positions.push(...a.toArray(), ...b.toArray());
