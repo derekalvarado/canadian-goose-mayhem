@@ -1,4 +1,3 @@
-import { toCanvas } from "qrcode";
 import {
   FamilyPairingClient,
   FamilyPairingServiceError,
@@ -24,20 +23,9 @@ import {
 import { WebRtcPeer, type WebRtcPeerStatus } from "./WebRtcPeer.ts";
 import {
   RoomSignalingClient,
-  roomInvitationFromUrl,
-  roomInvitationUrl,
   type RoomInvitation,
 } from "./RoomSignalingClient.ts";
 import type { RoomSignalMessage } from "./roomSignalingProtocol.ts";
-import {
-  createPairingToken,
-  decodeManualSignal,
-  pairingUrl,
-  PAIRING_ANSWER_CHANNEL,
-  pendingAnswerStorageKey,
-  signalFromUrl,
-  type ManualSignal,
-} from "./signaling.ts";
 
 export type MultiplayerRole = "host" | "guest";
 export interface MultiplayerConnectionIdentity { readonly sessionId: string; readonly reconnectToken: string }
@@ -64,7 +52,6 @@ function required<T extends HTMLElement>(selector: string): T {
 
 export class MultiplayerMenu {
   private readonly menu = required<HTMLElement>("#multiplayer-menu");
-  private readonly mainControls = required<HTMLElement>("#multiplayer-main-controls");
   private readonly status = required<HTMLElement>("#multiplayer-status");
   private readonly hostButton = required<HTMLButtonElement>("#multiplayer-host");
   private readonly joinButton = required<HTMLButtonElement>("#multiplayer-family-join");
@@ -84,18 +71,7 @@ export class MultiplayerMenu {
   private readonly approveButton = required<HTMLButtonElement>("#multiplayer-family-approve");
   private readonly denyButton = required<HTMLButtonElement>("#multiplayer-family-deny");
   private readonly replacementNote = required<HTMLElement>("#multiplayer-replacement-note");
-  private readonly linkHostButton = required<HTMLButtonElement>("#multiplayer-link-host");
-  private readonly manualHostButton = required<HTMLButtonElement>("#multiplayer-manual-host");
-  private readonly manualFallback = required<HTMLDetailsElement>("#multiplayer-manual-fallback");
   private readonly localButton = required<HTMLButtonElement>("#multiplayer-local");
-  private readonly useLinkButton = required<HTMLButtonElement>("#multiplayer-use-link");
-  private readonly input = required<HTMLTextAreaElement>("#multiplayer-link-input");
-  private readonly sharePanel = required<HTMLElement>("#multiplayer-share-panel");
-  private readonly shareInstruction = required<HTMLElement>("#multiplayer-share-instruction");
-  private readonly shareLink = required<HTMLTextAreaElement>("#multiplayer-share-link");
-  private readonly shareButton = required<HTMLButtonElement>("#multiplayer-share");
-  private readonly copyButton = required<HTMLButtonElement>("#multiplayer-copy");
-  private readonly qrCanvas = required<HTMLCanvasElement>("#multiplayer-qr");
   private readonly openButton = required<HTMLButtonElement>("#multiplayer-button");
   private readonly closeButton = required<HTMLButtonElement>("#multiplayer-close");
   private readonly settingsPairing = required<HTMLElement>("#settings-family-pairing");
@@ -128,8 +104,6 @@ export class MultiplayerMenu {
   private role?: MultiplayerRole;
   private sessionId?: string;
   private reconnectToken?: string;
-  private pendingJoin?: ManualSignal;
-  private answerChannel?: BroadcastChannel;
   private roomSignaling?: RoomSignalingClient;
   private peerConnected = false;
 
@@ -144,49 +118,19 @@ export class MultiplayerMenu {
     this.cancelCodeButton.addEventListener("click", () => { void this.cancelPairingSetup(); });
     this.approveButton.addEventListener("click", () => { void this.approveFamilyPairing(); });
     this.denyButton.addEventListener("click", () => { void this.denyFamilyPairing(); });
-    this.linkHostButton.addEventListener("click", () => { void this.startRoomHost(); });
-    this.manualHostButton.addEventListener("click", () => { void this.startManualHost(); });
     this.localButton.addEventListener("click", () => { this.stopFamilyPresence(true); this.options.onLocalStart?.(); this.close(); });
-    this.useLinkButton.addEventListener("click", () => { void this.usePairingLink(); });
-    this.shareButton.addEventListener("click", () => { void this.shareCurrentLink(); });
-    this.copyButton.addEventListener("click", () => { void this.copyCurrentLink(); });
     this.settingsSaveName.addEventListener("click", () => { void this.updateFamilyName(); });
     this.settingsForget.addEventListener("click", () => { void this.forgetFamilyPairing(); });
     this.codeInput.addEventListener("input", () => {
       this.codeInput.value = this.codeInput.value.replace(/\D/gu, "").slice(0, 4);
     });
-    document.addEventListener("visibilitychange", this.consumeStoredAnswer);
     window.addEventListener("pagehide", this.releaseFamilyHost, { once: true });
-    this.input.addEventListener("input", () => { this.pendingJoin = undefined; this.useLinkButton.textContent = "Use pairing link"; });
     this.updateFamilyUi();
 
-    try {
-      const roomInvitation = roomInvitationFromUrl(window.location.href);
-      if (roomInvitation) {
-        this.prepareGuestMenu("Joining the host as Goose 2…");
-        if (!ROOM_SIGNALING_URL) throw new Error("Online rooms are not configured in this build.");
-        void this.joinRoom(roomInvitation);
-        return;
-      }
-      const inbound = signalFromUrl(window.location.href);
-      if (inbound?.mode === "join") {
-        this.pendingJoin = inbound.signal;
-        this.prepareGuestMenu("Ready to join the nearby host as Goose 2.");
-        this.manualFallback.hidden = false;
-        this.manualFallback.open = true;
-        this.useLinkButton.textContent = "Join host game";
-      }
-    } catch (error) {
-      this.status.textContent = error instanceof Error ? error.message : "This pairing link is damaged.";
-      this.open();
-    }
     if (!ROOM_SIGNALING_URL) {
       this.createCodeButton.disabled = true;
       this.requestPairingButton.disabled = true;
-      this.linkHostButton.hidden = true;
-      this.manualHostButton.hidden = false;
-      this.manualFallback.open = true;
-      this.status.textContent = "Online rooms are not configured in this build. Local play and manual links are still available.";
+      this.status.textContent = "Online pairing is not configured in this build. Local two-controller play is still available.";
     }
   }
 
@@ -490,7 +434,7 @@ export class MultiplayerMenu {
     this.familyRoomOpening = true;
     this.status.textContent = `${this.pairing.peerName} is joining. Opening a private room…`;
     try {
-      const invitation = await this.createHostedRoom(false);
+      const invitation = await this.createHostedRoom();
       await this.familyClient.publishRoom(this.pairing, requestId, invitation);
       this.handledJoinRequestId = requestId;
       this.status.textContent = `Room ready. Connecting ${this.pairing.peerName}…`;
@@ -647,27 +591,12 @@ export class MultiplayerMenu {
     this.fail(error);
   }
 
-  private async startRoomHost(): Promise<void> {
-    if (!ROOM_SIGNALING_URL) return this.startManualHost();
-    this.stopFamilyPresence(true);
-    this.linkHostButton.disabled = true;
-    try {
-      await this.createHostedRoom(true);
-      this.status.textContent = "Waiting for Goose 2 to open the invitation link…";
-      this.linkHostButton.textContent = "Create a new invitation link";
-    } catch (error) {
-      this.fail(error);
-    } finally {
-      this.linkHostButton.disabled = false;
-    }
-  }
-
-  private async createHostedRoom(showShare: boolean): Promise<RoomInvitation> {
+  private async createHostedRoom(): Promise<RoomInvitation> {
     this.closePeer();
     this.role = "host";
     const invitation: RoomInvitation = {
-      roomId: createPairingToken(16),
-      reconnectToken: createPairingToken(16),
+      roomId: createFamilyToken(),
+      reconnectToken: createFamilyToken(),
     };
     this.sessionId = invitation.roomId;
     this.reconnectToken = invitation.reconnectToken;
@@ -675,14 +604,6 @@ export class MultiplayerMenu {
     try {
       this.roomSignaling = this.createRoomSignaling("host", invitation);
       await this.roomSignaling.connect();
-      if (showShare) {
-        await this.showShareLink(
-          roomInvitationUrl(window.location.href, invitation),
-          "Player 2 only needs to open this link. Keep this game open.",
-        );
-      } else {
-        this.sharePanel.hidden = true;
-      }
       this.peer = this.createPeer("host");
       const description = await this.peer.createHostOffer();
       if (description.type !== "offer" || !description.sdp) throw new Error("WebRTC did not create a host offer.");
@@ -743,71 +664,6 @@ export class MultiplayerMenu {
     } catch (error) { this.fail(error); }
   }
 
-  private prepareGuestMenu(status: string): void {
-    this.mainControls.hidden = true;
-    this.status.textContent = status;
-    this.open();
-  }
-
-  private async startManualHost(): Promise<void> {
-    this.stopFamilyPresence(true);
-    this.closePeer();
-    this.role = "host";
-    this.sessionId ??= createPairingToken(12);
-    this.reconnectToken ??= createPairingToken(16);
-    this.status.textContent = "Preparing a private nearby link…";
-    this.manualHostButton.disabled = true;
-    try {
-      this.peer = this.createPeer("host");
-      const description = await this.peer.createHostOffer();
-      const signal: ManualSignal = { version: 1, sessionId: this.sessionId, reconnectToken: this.reconnectToken, description };
-      await this.showShareLink(pairingUrl(window.location.href, "join", signal), "Send this link to Goose 2. Then keep this game open.");
-      this.status.textContent = "Waiting for Goose 2's response…";
-      this.manualHostButton.textContent = "Create a new reconnect link";
-      this.watchForAnswer();
-    } catch (error) {
-      this.fail(error);
-    } finally {
-      this.manualHostButton.disabled = false;
-    }
-  }
-
-  private async usePairingLink(): Promise<void> {
-    try {
-      const inbound = this.pendingJoin ? { mode: "join" as const, signal: this.pendingJoin } : signalFromUrl(this.input.value.trim());
-      if (!inbound) throw new Error("Paste the complete pairing link first.");
-      if (inbound.mode === "join") await this.joinHost(inbound.signal);
-      else await this.acceptAnswer(inbound.signal);
-    } catch (error) { this.fail(error); }
-  }
-
-  private async joinHost(signal: ManualSignal): Promise<void> {
-    if (signal.description.type !== "offer") throw new Error("This is not a host invitation.");
-    this.stopFamilyPresence(true);
-    this.closePeer();
-    this.role = "guest";
-    this.sessionId = signal.sessionId;
-    this.reconnectToken = signal.reconnectToken;
-    this.status.textContent = "Preparing Goose 2's response…";
-    this.useLinkButton.disabled = true;
-    this.peer = this.createPeer("guest");
-    const description = await this.peer.acceptOfferAndCreateAnswer(signal.description);
-    const answer: ManualSignal = { version: 1, sessionId: signal.sessionId, reconnectToken: signal.reconnectToken, description };
-    await this.showShareLink(pairingUrl(window.location.href, "answer", answer), "Send this response back to the host iPad.");
-    this.status.textContent = "Response ready. Share it back, then keep this game open.";
-    this.useLinkButton.disabled = false;
-  }
-
-  private async acceptAnswer(signal: ManualSignal): Promise<void> {
-    if (this.role !== "host" || !this.peer || !this.sessionId || !this.reconnectToken) throw new Error("Start hosting in the original game before using a response.");
-    if (signal.description.type !== "answer" || signal.sessionId !== this.sessionId || signal.reconnectToken !== this.reconnectToken) {
-      throw new Error("That response belongs to a different host link.");
-    }
-    await this.peer.acceptGuestAnswer(signal.description);
-    try { window.localStorage.removeItem(pendingAnswerStorageKey(signal.sessionId)); } catch { /* Storage is optional. */ }
-    this.status.textContent = "Response accepted. Connecting to Goose 2…";
-  }
-
   private createPeer(role: MultiplayerRole): WebRtcPeer {
     return new WebRtcPeer({
       onStatus: (status) => this.handlePeerStatus(role, status),
@@ -822,7 +678,6 @@ export class MultiplayerMenu {
       this.status.textContent = role === "host"
         ? `${peerName ?? "Goose 2"} connected.`
         : `Connected to ${peerName ?? "the host"} as Goose 2.`;
-      this.sharePanel.hidden = true;
       if (this.sessionId && this.reconnectToken) {
         this.options.onConnected?.(role, this.peer!, { sessionId: this.sessionId, reconnectToken: this.reconnectToken });
       }
@@ -834,71 +689,10 @@ export class MultiplayerMenu {
       } else if (this.familyMode === "join") {
         this.status.textContent = `Connection lost. Open Play together and tap Join ${this.pairing?.peerName ?? "host"} to reconnect.`;
       } else {
-        this.status.textContent = role === "host"
-          ? "Goose 2 disconnected. They will stand still; create a reconnect link when ready."
-          : "Connection to the host was lost.";
+        this.status.textContent = "Connection lost. Open Play together to reconnect.";
       }
       this.options.onDisconnected?.(role);
     }
-  }
-
-  private async showShareLink(link: string, instruction: string): Promise<void> {
-    this.shareInstruction.textContent = instruction;
-    this.shareLink.value = link;
-    this.sharePanel.hidden = false;
-    this.shareButton.hidden = typeof navigator.share !== "function";
-    try {
-      await toCanvas(this.qrCanvas, link, { errorCorrectionLevel: "L", margin: 2, width: 300 });
-      this.qrCanvas.hidden = false;
-    } catch {
-      this.qrCanvas.hidden = true;
-      this.status.textContent = "The pairing link is ready, but it is too large for a QR code. Use Share or Copy.";
-    }
-  }
-
-  private async shareCurrentLink(): Promise<void> {
-    if (!this.shareLink.value || typeof navigator.share !== "function") return;
-    try { await navigator.share({ title: "Goose Game Two", text: this.shareInstruction.textContent ?? "Pair with my game", url: this.shareLink.value }); }
-    catch { /* Cancelling the native share sheet changes nothing. */ }
-  }
-
-  private async copyCurrentLink(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(this.shareLink.value);
-      this.copyButton.textContent = "Copied";
-      window.setTimeout(() => { this.copyButton.textContent = "Copy link"; }, 1_500);
-    } catch {
-      this.shareLink.hidden = false;
-      this.shareLink.select();
-      this.status.textContent = "Copy the selected pairing link.";
-    }
-  }
-
-  private watchForAnswer(): void {
-    this.answerChannel?.close();
-    if (typeof BroadcastChannel !== "undefined") {
-      this.answerChannel = new BroadcastChannel(PAIRING_ANSWER_CHANNEL);
-      this.answerChannel.addEventListener("message", this.receiveBroadcastAnswer);
-    }
-    this.consumeStoredAnswer();
-  }
-
-  private readonly receiveBroadcastAnswer = (event: MessageEvent<unknown>): void => {
-    if (typeof event.data !== "string") return;
-    void this.acceptEncodedAnswer(event.data);
-  };
-
-  private readonly consumeStoredAnswer = (): void => {
-    if (!this.sessionId || this.role !== "host") return;
-    try {
-      const encoded = window.localStorage.getItem(pendingAnswerStorageKey(this.sessionId));
-      if (encoded) void this.acceptEncodedAnswer(encoded);
-    } catch { /* Paste remains available when storage is blocked. */ }
-  };
-
-  private async acceptEncodedAnswer(encoded: string): Promise<void> {
-    try { await this.acceptAnswer(decodeManualSignal(encoded)); }
-    catch (error) { this.fail(error); }
   }
 
   private closePeer(): void {
@@ -907,8 +701,6 @@ export class MultiplayerMenu {
     this.roomSignaling?.close();
     this.roomSignaling = undefined;
     this.peerConnected = false;
-    this.answerChannel?.close();
-    this.answerChannel = undefined;
   }
 
   private fail(error: unknown): void {

@@ -1,7 +1,7 @@
 # Two-goose multiplayer implementation
 
-Status: same-area local and online play are implemented. Family-device pairing
-is being delivered on `codex/family-pairing`.
+Status: same-area local and online play with remembered family-device pairing is
+implemented.
 
 ## Product decisions
 
@@ -19,8 +19,8 @@ is being delivered on `codex/family-pairing`.
   Durable Objects remember one approved device pair, coordinate Host/Join, and
   provide short-lived signaling rooms; gameplay still travels peer-to-peer over
   WebRTC.
-- Four-digit codes are the default because they stay inside each installed PWA.
-  AirDrop, QR codes, and copy/paste remain link-based fallbacks.
+- Four-digit codes are the only online pairing flow, so both players stay inside
+  their installed PWA.
 - If the guest disconnects, Goose 2 stands still and drops nothing. Closing the
   host still ends the authoritative session. Host migration and durable shared
   saves remain future work. A guest can reopen the paired app and tap Join while
@@ -46,22 +46,20 @@ is being delivered on `codex/family-pairing`.
 - [x] Input foundation: explicit gamepad profiles, per-pad sampling, press-to-join
   assignments, and an on-screen controller diagnostics panel suitable for iPad.
 - [x] Multiplayer protocol: bounded command/snapshot messages with protocol tests.
-- [x] Manual WebRTC signaling: host offer, guest answer, reconnect token, native
-  sharing, copy fallback, and a QR adapter.
+- [x] WebRTC foundation: host offer, guest answer, and reconnect credentials.
 - [x] Two-player simulation: stable `goose-1`/`goose-2` actors, deterministic
   movement and interaction arbitration, actor-aware NPC reactions and events.
 - [x] Local presentation: second goose view, shared-camera framing, two-controller
   lobby, disconnect behavior, and same-area transitions.
 - [x] Online host/guest presentation: host-authoritative same-area snapshots,
   guest input, latency handling, and Goose 2 standing on disconnect.
-- [x] One-link signaling foundation: Cloudflare room service, automatic
-  offer/answer relay, short-lived authenticated rooms, QR/AirDrop invitation,
-  and the two-step exchange retained as a hidden fallback.
+- [x] Cloudflare signaling foundation: automatic offer/answer relay and
+  short-lived authenticated rooms.
 - [x] Remembered family pairing: single-use four-digit codes, explicit approval,
   one paired peer, editable names, first-host-wins presence, Join-before-Host,
   guest reconnect, and either device hosting a later game.
-- [ ] PWA and device verification: GitHub Pages subpath links, two iPads, AirDrop,
-  QR exchange, sideways Joy-Cons, reconnect while host is open, offline fallback.
+- [ ] PWA and device verification: GitHub Pages, two iPads, four-digit pairing,
+  sideways Joy-Cons, reconnect while host is open, and offline fallback.
 
 Every checkpoint must keep single-player working and pass `npm test` and
 `npm run build`. Browser-only behavior also requires an in-browser smoke test.
@@ -82,9 +80,8 @@ Every checkpoint must keep single-player working and pass `npm test` and
 - The versioned network protocol rejects oversized, malformed, replayed, and
   rate-flooded guest commands. The preferred flow pairs the installed apps once
   with a four-digit code; either device can then Host or Join by saved player
-  name. Invitation links and compressed URL-fragment signaling remain fallbacks.
-  Same-network play is the current connectivity target; no third-party STUN/TURN
-  service is silently used.
+  name. Same-network play is the current connectivity target; no third-party
+  STUN/TURN service is silently used.
 - `Simulation` can now run two geese in the same fixed tick. They move, honk,
   interact, hold separate items, arbitrate simultaneous grabs deterministically,
   and leave Goose 2 standing with her item when commands stop.
@@ -103,7 +100,7 @@ Every checkpoint must keep single-player working and pass `npm test` and
   provisioning and deployment. Pairing requires explicit approval and long random
   credentials; rooms accept one host and one guest, expire after twenty minutes,
   restrict browser origins, and retain only WebRTC setup messages.
-- Latest automated checkpoint: all 227 tests pass; the game and Worker TypeScript
+- Latest automated checkpoint: all 223 tests pass; the game and Worker TypeScript
   builds are clean. The local Worker passed both the room relay smoke test and the
   full pair/approve/first-host/join-before-host/private-room/forget smoke test.
 - Browser acceptance checkpoint: two isolated local app origins paired by code

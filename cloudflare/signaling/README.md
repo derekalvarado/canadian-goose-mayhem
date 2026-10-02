@@ -14,12 +14,12 @@ lease, so a closed host stops blocking a later game.
 Rooms use an unguessable ID and key, accept at most one socket per role, and
 expire after twenty minutes. The Worker stores only the latest offer/answer
 needed to finish the connection. Game saves and gameplay traffic never pass
-through this service. Manual two-step signaling remains the final fallback.
+through this service.
 
 The production service is
 `https://goose-game-signaling.goose-game-2.workers.dev`. Its address is public
-configuration, not a secret; the unguessable room ID and key are created in each
-invitation.
+configuration, not a secret; each private connection receives an unguessable
+room ID and key.
 
 ## What is where
 
@@ -33,7 +33,7 @@ invitation.
   pairing and Host/Join presence
 - `../../src/game/multiplayer/RoomSignalingClient.ts` — browser client for these
   rooms
-- `../../src/game/multiplayer/MultiplayerMenu.ts` — creates invitations and
+- `../../src/game/multiplayer/MultiplayerMenu.ts` — creates private rooms and
   starts the WebRTC offer/answer flow
 - `../../.env.production` — tells the GitHub Pages build which Worker to use
 - `../../.env.local` — optional ignored override for local development
@@ -65,7 +65,7 @@ npm run signaling:smoke -- http://127.0.0.1:8787 http://192.168.1.20:5173
 2. Run `npm run signaling:deploy`.
 3. Put the printed HTTPS endpoint in `.env.local` for local builds.
 4. Put the public endpoint in the tracked `.env.production` file so GitHub Pages
-   builds enable one-link rooms. `VITE_SIGNALING_URL` can still override it when
+   builds enable pairing and rooms. `VITE_SIGNALING_URL` can still override it when
    deploying a different environment.
 
 The first deployment may ask the account owner to choose a `workers.dev`
@@ -100,9 +100,8 @@ origin must be added to `ALLOWED_ORIGINS` before that site can pair or open room
   offer/answer after 20 minutes.
 - Observability remains enabled, but `redact_query_string` prevents the room key
   in the WebSocket URL from being persisted in invocation logs.
-- The invitation is a capability: anyone who receives its unguessable room ID
-  and key can use that room until it expires. Make a new room if a link is shared
-  accidentally.
+- Room credentials are capabilities delivered only through the authenticated
+  device pair. Anyone who obtains them can use that room until it expires.
 
 The origin check is defense in depth, not user authentication—a custom client can
 forge browser headers. The rate limiter and per-socket message budget therefore
@@ -133,7 +132,7 @@ npm run signaling:smoke:pairing -- https://goose-game-signaling.goose-game-2.wor
 
 ## Troubleshooting
 
-- **The game offers only manual setup.** `VITE_SIGNALING_URL` was missing when
+- **The pairing buttons are unavailable.** `VITE_SIGNALING_URL` was missing when
   Vite started or when the production bundle was built. Check the appropriate
   environment file, then restart or rebuild.
 - **A code is missing, expired, or says there are too many attempts.** Make one
@@ -156,9 +155,8 @@ npm run signaling:smoke:pairing -- https://goose-game-signaling.goose-game-2.wor
   introduces the browsers. The current peer transport has no STUN/TURN service,
   so use the same ordinary Wi-Fi, avoid guest-network client isolation and VPNs,
   keep the host page open, and create a fresh room.
-- **A room says the host is missing or closes before connection.** Invitations
-  are temporary, the host must open the room first, and a newer connection for
-  the same role replaces the older one. Create a new room and use only its latest
-  link.
+- **A room says the host is missing or closes before connection.** Rooms are
+  temporary, the host must remain open, and a newer connection for the same role
+  replaces the older one. Tap Host and Join again.
 - **A deployment changed the service address.** Update `.env.production` and any
   local override, rebuild the site, and run the production smoke test.

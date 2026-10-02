@@ -410,28 +410,6 @@ kbd,
 .multiplayer-code-panel strong { color: var(--sun); font: 700 2.6rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .22em; }
 .multiplayer-code-panel span { color: var(--ink-muted); font-size: .82rem; }
 .settings-card .multiplayer-secondary { border-color: var(--line); background: rgb(13 34 24 / 36%); }
-.multiplayer-card textarea {
-  box-sizing: border-box;
-  width: 100%;
-  resize: vertical;
-  border: 1px solid var(--line);
-  border-radius: .55rem;
-  padding: .55rem;
-  color: var(--goose-white);
-  background: rgb(13 34 24 / 74%);
-  font: .72rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-.multiplayer-paste { display: grid; gap: .35rem; margin: .75rem 0; color: var(--ink-muted); font-size: .82rem; }
-.multiplayer-fallback { margin-top: .9rem; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: .7rem; }
-.multiplayer-fallback[hidden] { display: none; }
-.multiplayer-fallback summary { color: var(--ink-muted); cursor: pointer; font-size: .82rem; font-weight: 700; }
-.multiplayer-fallback button { width: 100%; }
-.multiplayer-share { display: grid; justify-items: center; gap: .65rem; margin: .9rem 0; }
-.multiplayer-share[hidden] { display: none; }
-.multiplayer-share canvas { width: min(300px, 68vw); height: auto; border: 8px solid white; border-radius: .35rem; background: white; }
-.multiplayer-share-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .55rem; }
-.pairing-delivered { display: grid; gap: .8rem; }
-.pairing-delivered[hidden] { display: none; }
 .controller-lobby {
   position: absolute;
   left: 50%;

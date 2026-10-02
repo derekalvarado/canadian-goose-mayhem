@@ -10,8 +10,8 @@ export interface WebRtcPeerOptions {
 const DEFAULT_ICE_TIMEOUT_MS = 12_000;
 
 /**
- * Data-channel transport only. Offer/answer movement belongs to the manual
- * signaling adapter today and can be replaced by a server later.
+ * Data-channel transport only. The Cloudflare room adapter moves offers and
+ * answers between paired browsers before gameplay goes peer to peer.
  */
 export class WebRtcPeer {
   private readonly connection: RTCPeerConnection;

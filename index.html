@@ -166,25 +166,6 @@
               <p id="multiplayer-replacement-note" class="settings-help" hidden>Pairing a new device will replace the current paired player on this device.</p>
             </section>
             <button id="multiplayer-local" type="button">Two controllers on this iPad</button>
-            <details id="multiplayer-manual-fallback" class="multiplayer-fallback">
-              <summary>Other ways to connect</summary>
-              <button id="multiplayer-link-host" type="button">Create a one-use invitation link</button>
-              <button id="multiplayer-manual-host" type="button">Create a two-step pairing link</button>
-              <label class="multiplayer-paste" for="multiplayer-link-input">Or paste a pairing link
-                <textarea id="multiplayer-link-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-              </label>
-              <button id="multiplayer-use-link" type="button">Use pairing link</button>
-              <p class="settings-help">Invitation links open in Safari instead of the installed app. The two-step link is only a fallback if the room service is unavailable.</p>
-            </details>
-          </div>
-          <div id="multiplayer-share-panel" class="multiplayer-share" hidden>
-            <p id="multiplayer-share-instruction" class="settings-help"></p>
-            <canvas id="multiplayer-qr" aria-label="Pairing QR code"></canvas>
-            <textarea id="multiplayer-share-link" rows="3" readonly aria-label="Pairing link"></textarea>
-            <div class="multiplayer-share-actions">
-              <button id="multiplayer-share" type="button">Share / AirDrop</button>
-              <button id="multiplayer-copy" type="button">Copy link</button>
-            </div>
           </div>
           <p class="settings-help">The host uses their saved game. Keep both games open while playing. Nearby devices on the same Wi-Fi work best.</p>
           <button id="multiplayer-close" type="button">Back to game</button>
@@ -210,12 +191,6 @@
         <span id="startup-error-detail">Try again. If the problem persists, check hardware acceleration and the startup details.</span>
         <button id="startup-retry" type="button">Try again</button>
       </div>
-
-      <section id="pairing-delivered" class="webgl-error pairing-delivered" hidden role="status">
-        <strong>Response delivered to the host game.</strong>
-        <span>Return to the Goose Game Two window you already had open.</span>
-        <button id="pairing-delivered-close" type="button">Close this page</button>
-      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

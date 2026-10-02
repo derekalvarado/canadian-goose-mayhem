@@ -26,25 +26,6 @@ function assertToken(value: unknown, label: string): asserts value is string {
   if (typeof value !== "string" || !TOKEN_PATTERN.test(value)) throw new Error(`Invalid ${label}.`);
 }
 
-export function roomInvitationUrl(pageUrl: string, invitation: RoomInvitation): string {
-  assertToken(invitation.roomId, "room ID");
-  assertToken(invitation.reconnectToken, "room key");
-  const url = new URL(pageUrl);
-  url.hash = new URLSearchParams({ room: invitation.roomId, key: invitation.reconnectToken }).toString();
-  return url.toString();
-}
-
-export function roomInvitationFromUrl(pageUrl: string): RoomInvitation | undefined {
-  const url = new URL(pageUrl);
-  const params = new URLSearchParams(url.hash.replace(/^#/u, ""));
-  const roomId = params.get("room");
-  const reconnectToken = params.get("key");
-  if (!roomId && !reconnectToken) return undefined;
-  assertToken(roomId, "room ID");
-  assertToken(reconnectToken, "room key");
-  return { roomId, reconnectToken };
-}
-
 export function roomSocketUrl(serviceUrl: string, invitation: RoomInvitation, role: RoomRole): string {
   assertToken(invitation.roomId, "room ID");
   assertToken(invitation.reconnectToken, "room key");

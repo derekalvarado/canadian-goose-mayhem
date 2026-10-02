@@ -91,10 +91,6 @@ Online area changes are not finished yet. Keep both geese in the current area
 during device testing rather than trying to leave one goose in the square and
 the other in the coffee shop.
 
-The former invitation-link and QR flow is still available under **Other ways to
-connect**. It is useful for an unpaired device, but iPadOS normally opens a shared
-web link in Safari rather than switching into an already-installed PWA.
-
 ### Two controllers on one iPad
 
 1. Pair both individual Joy-Cons in iPad Settings first.
@@ -122,7 +118,7 @@ physical controller claimed each goose until local multiplayer is restarted.
 - `src/game/multiplayer/FamilyPairingClient.ts` — the short pairing and presence
   conversation with Cloudflare
 - `src/game/multiplayer/MultiplayerMenu.ts` — codes, approval, Host/Join buttons,
-  reconnecting, and the older link/QR fallback
+  and reconnecting
 - `src/game/multiplayer/RoomSignalingClient.ts` — the short conversation with
   the Cloudflare room
 - `src/game/multiplayer/WebRtcPeer.ts` — the direct browser-to-browser data
@@ -149,21 +145,18 @@ request logs. No game save or gameplay traffic is stored there.
 | Join says it is waiting | Leave that screen open and tap **Host game** on the paired device. Join can safely be tapped before Host. |
 | The old host was closed and the other device cannot host yet | Wait about 35 seconds for the host-presence lease to expire, then tap **Host game** again. The devices remain paired. |
 | A device says its pairing was forgotten | The other device forgot or replaced the pairing. Pair the two devices again with a new 4-digit code. |
-| The iPad cannot open a Mac development link | Start the game with `npm run dev:lan`, keep the Mac awake, and put both devices on the same Wi-Fi. The invitation should begin with the Mac's LAN address, such as `http://192.168…`, not `localhost`. Check the macOS firewall if the page itself will not load. |
-| The invitation opens, but the geese never connect | Keep the host tab open and in the foreground. Refresh both devices, create a new room, and use only its newest link. Make sure both devices are on the same normal Wi-Fi, not a guest network or VPN. |
+| An iPad cannot open the game from the Mac during development | Start the game with `npm run dev:lan`, keep the Mac awake, and open the Mac's LAN address, such as `http://192.168…`, instead of `localhost`. Check the macOS firewall if the page itself will not load. |
+| The devices pair, but the geese never connect | Keep both apps open and in the foreground, then tap **Join** again. Make sure both devices are on the same normal Wi-Fi, not a guest network or VPN. |
 | The game says it cannot reach the private room | Open the Worker's `/health` URL or run the signaling smoke test described in `cloudflare/signaling/README.md`. The game page's public origin must also appear in `ALLOWED_ORIGINS` in `wrangler.jsonc`; private LAN origins are accepted automatically. |
-| Repeated room attempts temporarily stop connecting | Wait one minute, close old game tabs, and try one newly created room. This safety limit is deliberately much higher than one family session needs. |
-| Pairing buttons are unavailable or only manual links work | That build did not receive `VITE_SIGNALING_URL`. Check `.env.production` or `.env.local`, then restart Vite or rebuild the site. |
-| Share / AirDrop is missing | Apple's share sheet depends on browser and security support. Use the QR code or **Copy link** instead. |
-| Goose 2 looks jerky | Refresh both devices and create a new room so both are running the current movement-smoothing build. Keep them near a strong Wi-Fi access point and close older game tabs. |
+| Repeated room attempts temporarily stop connecting | Wait one minute, close old game tabs, and tap **Host** and **Join** again. This safety limit is deliberately much higher than one family session needs. |
+| Pairing buttons are unavailable | That build did not receive `VITE_SIGNALING_URL`. Check `.env.production` or `.env.local`, then restart Vite or rebuild the site. |
+| Goose 2 looks jerky | Refresh both devices and reconnect so both are running the current movement-smoothing build. Keep them near a strong Wi-Fi access point and close older game tabs. |
 | A Joy-Con is paired but does nothing | Press one of its buttons so Safari exposes it, then open **Settings** → **Controller diagnostics**. The readout shows every axis and button without needing an iPad console. Switch controllers require iPadOS 16 or newer. |
 | The game pauses on an iPad | Keep Safari or the Home Screen app in the foreground and rotate the iPad to landscape. |
 | Player 2 disconnected | Goose 2 remains standing. Reopen the paired app and tap **Join** again while the host remains open. There is no mid-session host migration if the host closes. |
 
-The Cloudflare invitation room expires after 20 minutes. It is needed only for
-the introduction, so that timer does not end a WebRTC game that already connected.
-The older invitation and hidden two-step link flows remain available under
-**Other ways to connect**.
+The Cloudflare room expires after 20 minutes. It is needed only to introduce the
+paired browsers, so that timer does not end a WebRTC game that already connected.
 
 ### Dev mode and start areas
 
