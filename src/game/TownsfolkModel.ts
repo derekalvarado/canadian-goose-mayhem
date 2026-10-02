@@ -381,8 +381,14 @@ export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
       break;
     }
     case "headband": {
-      const band = new THREE.TorusGeometry(0.275, 0.03, 6, 26); band.rotateX(Math.PI / 2 - 0.25).scale(1, 1, 0.94).translate(0, 2.33, -0.02);
-      add(band, "town-hat", rigid(head));
+      // Hugs the head over the hair: high across the forehead, dipping to the nape.
+      const around = Array.from({ length: 32 }, (_, i) => {
+        const angle = (i / 32) * Math.PI * 2;
+        const y = 2.31 - 0.085 * Math.cos(angle); // front (cos = -1) sits highest, on the forehead
+        const ring = Math.sqrt(Math.max(0, 1 - ((y - HEAD_CENTER[1]) / HEAD_RADII[1]) ** 2)) * 1.08;
+        return new THREE.Vector3(HEAD_RADII[0] * ring * Math.sin(angle), y, HEAD_CENTER[2] + HEAD_RADII[2] * ring * Math.cos(angle));
+      });
+      add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(around, true), 48, 0.03, 6, true), "town-hat", rigid(head));
       break;
     }
     default: break;
