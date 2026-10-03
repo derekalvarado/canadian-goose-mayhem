@@ -1016,6 +1016,9 @@ export class Game {
       },
     );
     this.settingsButton.addEventListener("click", this.openSettings);
+    requireElement<HTMLButtonElement>("#settings-controls-row").addEventListener("click", this.openControlsSettings);
+    requireElement<HTMLButtonElement>("#settings-back").addEventListener("click", this.backToSettings);
+    requireElement<HTMLButtonElement>("#settings-play-together").addEventListener("click", this.closeSettingsForMultiplayer);
     this.todoToggle.addEventListener("click", this.toggleTodoList);
     window.addEventListener("keydown", this.handleTodoShortcut);
     this.startOverButton.addEventListener("click", this.startOver);
@@ -1049,15 +1052,37 @@ export class Game {
   }
 
   private readonly openSettings = (): void => {
+    requireElement<HTMLElement>("#settings-home").hidden = false;
+    requireElement<HTMLElement>("#settings-controls").hidden = true;
+    this.settingsMenu.setAttribute("aria-labelledby", "settings-title");
     this.settingsMenu.hidden = false;
     this.setPauseReason("settings", true);
-    this.touchPreferenceSelect.focus({ preventScroll: true });
+    requireElement<HTMLElement>("#settings-title").focus({ preventScroll: true });
+  };
+
+  private readonly openControlsSettings = (): void => {
+    requireElement<HTMLElement>("#settings-home").hidden = true;
+    requireElement<HTMLElement>("#settings-controls").hidden = false;
+    this.settingsMenu.setAttribute("aria-labelledby", "settings-controls-title");
+    requireElement<HTMLElement>("#settings-controls-title").focus({ preventScroll: true });
+  };
+
+  private readonly backToSettings = (): void => {
+    requireElement<HTMLElement>("#settings-controls").hidden = true;
+    requireElement<HTMLElement>("#settings-home").hidden = false;
+    this.settingsMenu.setAttribute("aria-labelledby", "settings-title");
+    requireElement<HTMLButtonElement>("#settings-controls-row").focus({ preventScroll: true });
   };
 
   private readonly closeSettings = (): void => {
     this.settingsMenu.hidden = true;
     this.setPauseReason("settings", false);
     this.settingsButton.focus({ preventScroll: true });
+  };
+
+  private readonly closeSettingsForMultiplayer = (): void => {
+    this.settingsMenu.hidden = true;
+    this.setPauseReason("settings", false);
   };
 
   private isIPhoneSafariTab(): boolean {

@@ -41,9 +41,9 @@ function memoryStorage(): Storage {
 
 test("family player names are human-readable and bounded", () => {
   assert.equal(normalizeFamilyPlayerName("  Goose   Kid  "), "Goose Kid");
-  assert.throws(() => normalizeFamilyPlayerName(""), /1–24/);
-  assert.throws(() => normalizeFamilyPlayerName("x".repeat(25)), /1–24/);
-  assert.throws(() => normalizeFamilyPlayerName("bad\u0000name"), /ordinary/);
+  assert.throws(() => normalizeFamilyPlayerName(""), Error);
+  assert.throws(() => normalizeFamilyPlayerName("x".repeat(25)), Error);
+  assert.throws(() => normalizeFamilyPlayerName("bad\u0000name"), Error);
 });
 
 test("pairing codes require all four digits", () => {

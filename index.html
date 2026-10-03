@@ -29,7 +29,6 @@
 
       <div class="hud" aria-label="Game information">
         <button id="settings-button" class="hud-action" type="button" aria-haspopup="dialog" aria-controls="settings-menu">Settings</button>
-        <button id="multiplayer-button" class="hud-action hud-action--multiplayer" type="button" aria-haspopup="dialog" aria-controls="multiplayer-menu">Play together</button>
         <button id="install-button" class="hud-action hud-action--install" type="button" hidden aria-haspopup="dialog" aria-controls="install-menu">Install app</button>
         <button id="fullscreen-button" class="hud-action hud-action--fullscreen" type="button">Fullscreen</button>
 
@@ -105,21 +104,15 @@
 
       <section id="settings-menu" class="settings-menu" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <div class="settings-card">
-          <p class="complete-kicker">Game settings</p>
-          <h2 id="settings-title">Controls</h2>
-          <label for="touch-controls-preference">Touch controls
-            <select id="touch-controls-preference">
-              <option value="auto">Auto</option>
-              <option value="show">Show</option>
-              <option value="hide">Hide</option>
-            </select>
-          </label>
-          <p class="settings-help">Auto shows controls on touch-first devices. Keyboard and controllers remain available.</p>
-          <details id="controller-diagnostics" class="controller-diagnostics">
-            <summary>Controller diagnostics</summary>
-            <p class="settings-help">Press each stick direction and button. This raw readout works without an iPad console.</p>
-            <pre id="controller-diagnostics-output">No controller visible yet. Press a button on each Joy-Con.</pre>
-          </details>
+          <div id="settings-home">
+            <p class="complete-kicker">Game settings</p>
+            <h2 id="settings-title" tabindex="-1">Settings</h2>
+            <button id="settings-controls-row" class="settings-row" type="button" aria-controls="settings-controls">
+              <span><strong>Controls</strong><small>Touch and controller preferences</small></span><span aria-hidden="true">›</span>
+            </button>
+            <button id="settings-play-together" class="settings-row" type="button" aria-haspopup="dialog" aria-controls="multiplayer-menu">
+              <span><strong>Play together</strong><small>Pair another device or use two controllers</small></span><span aria-hidden="true">›</span>
+            </button>
           <section id="settings-family-pairing" class="settings-family-pairing" hidden>
             <h3>Paired player</h3>
             <p id="settings-family-peer" class="settings-help"></p>
@@ -133,16 +126,47 @@
           <p class="settings-help">Your crossed-off tasks are saved in this browser.</p>
           <button id="start-over" class="settings-danger" type="button">Start over</button>
           <button id="settings-close" type="button">Done</button>
+          </div>
+          <div id="settings-controls" hidden>
+            <p class="complete-kicker">Game settings</p>
+            <button id="settings-back" class="settings-back" type="button">‹ Settings</button>
+            <h2 id="settings-controls-title" tabindex="-1">Controls</h2>
+            <label for="touch-controls-preference">Touch controls
+              <select id="touch-controls-preference">
+                <option value="auto">Auto</option>
+                <option value="show">Show</option>
+                <option value="hide">Hide</option>
+              </select>
+            </label>
+            <p class="settings-help">Auto shows controls on touch-first devices. Keyboard and controllers remain available.</p>
+            <details id="controller-diagnostics" class="controller-diagnostics">
+              <summary>Controller diagnostics</summary>
+              <p class="settings-help">Press each stick direction and button. This readout works without a developer console.</p>
+              <pre id="controller-diagnostics-output">No controller visible yet. Press a button on each Joy-Con.</pre>
+            </details>
+          </div>
         </div>
       </section>
 
       <section id="multiplayer-menu" class="settings-menu multiplayer-menu" hidden role="dialog" aria-modal="true" aria-labelledby="multiplayer-title">
         <div class="settings-card multiplayer-card">
-          <p class="complete-kicker">Two nearby iPads</p>
-          <h2 id="multiplayer-title">Play together</h2>
-          <p id="multiplayer-status" class="settings-help" aria-live="polite">Pair these two devices once. After that, either player can host.</p>
+          <p class="complete-kicker">Play together</p>
+          <h2 id="multiplayer-title" tabindex="-1">How will you play?</h2>
+          <p id="multiplayer-status" class="settings-help" role="status" aria-live="polite" aria-atomic="true">Pair these two devices once. After that, either player can host.</p>
           <p id="multiplayer-join-debug" class="settings-help multiplayer-join-debug" hidden></p>
           <div id="multiplayer-main-controls">
+            <section id="multiplayer-choice-panel" class="multiplayer-choice-panel">
+              <p class="settings-help">Choose how the second player joins.</p>
+              <p class="multiplayer-choice-label">Two devices</p>
+              <button id="multiplayer-choose-host" class="multiplayer-choice" type="button"><span><strong>Host another player</strong><small>Create a code for the other player</small></span><span aria-hidden="true">›</span></button>
+              <button id="multiplayer-choose-join" class="multiplayer-choice" type="button"><span><strong>Join another player</strong><small>Enter the code shown by the host</small></span><span aria-hidden="true">›</span></button>
+              <div class="multiplayer-choice-local">
+                <p class="multiplayer-choice-label">One device</p>
+                <button id="multiplayer-choose-local" class="multiplayer-choice" type="button"><span><strong>Two controllers</strong><small>Play side by side on this device</small></span><span aria-hidden="true">›</span></button>
+              </div>
+            </section>
+            <button id="multiplayer-back-options" class="multiplayer-back-options" type="button" hidden>‹ All play options</button>
+            <p id="multiplayer-flow-help" class="settings-help" hidden></p>
             <section id="multiplayer-family-paired" class="multiplayer-family-panel" hidden>
               <p id="multiplayer-family-label" class="multiplayer-family-label"></p>
               <div class="multiplayer-family-actions">
@@ -151,35 +175,45 @@
               </div>
               <button id="multiplayer-pair-different" class="multiplayer-secondary" type="button">Pair a different device</button>
             </section>
-            <section id="multiplayer-family-setup" class="multiplayer-family-panel">
+            <section id="multiplayer-family-setup" class="multiplayer-family-panel" hidden>
+              <h3>1. Your player name</h3>
               <label for="multiplayer-family-name">Your player name
                 <input id="multiplayer-family-name" type="text" maxlength="24" autocomplete="nickname" placeholder="Your name" />
               </label>
-              <button id="multiplayer-family-create" type="button">Show a 4-digit code</button>
-              <div class="multiplayer-code-entry">
-                <label for="multiplayer-family-code">Or enter their code
+              <div id="multiplayer-host-setup" class="multiplayer-flow-step" hidden>
+                <h3>2. Pair the devices</h3>
+                <p class="settings-help">Show a code, then have the other player enter it on their device. It lasts five minutes.</p>
+                <button id="multiplayer-family-create" type="button">Show a 4-digit code</button>
+                <div id="multiplayer-code-panel" class="multiplayer-code-panel" hidden>
+                  <span>Tell the other player this code:</span>
+                  <strong id="multiplayer-family-code-display">0000</strong>
+                  <span>It expires in 5 minutes.</span>
+                  <button id="multiplayer-family-cancel" class="multiplayer-secondary" type="button">Cancel code</button>
+                </div>
+                <div id="multiplayer-approval" class="multiplayer-approval" hidden>
+                  <strong id="multiplayer-approval-question"></strong>
+                  <div class="multiplayer-family-actions">
+                    <button id="multiplayer-family-approve" type="button">Yes, pair</button>
+                    <button id="multiplayer-family-deny" class="multiplayer-secondary" type="button">No</button>
+                  </div>
+                </div>
+              </div>
+              <div id="multiplayer-join-setup" class="multiplayer-flow-step" hidden>
+                <h3>2. Enter the host's code</h3>
+                <label for="multiplayer-family-code">4-digit code
                   <input id="multiplayer-family-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" placeholder="0000" />
                 </label>
-                <button id="multiplayer-family-request" type="button">Pair</button>
-              </div>
-              <div id="multiplayer-code-panel" class="multiplayer-code-panel" hidden>
-                <span>Tell the other player this code:</span>
-                <strong id="multiplayer-family-code-display">0000</strong>
-                <span>It expires in 5 minutes.</span>
-                <button id="multiplayer-family-cancel" class="multiplayer-secondary" type="button">Cancel code</button>
-              </div>
-              <div id="multiplayer-approval" class="multiplayer-approval" hidden>
-                <strong id="multiplayer-approval-question"></strong>
-                <div class="multiplayer-family-actions">
-                  <button id="multiplayer-family-approve" type="button">Yes, pair</button>
-                  <button id="multiplayer-family-deny" class="multiplayer-secondary" type="button">No</button>
-                </div>
+                <button id="multiplayer-family-request" type="button">Pair devices</button>
               </div>
               <p id="multiplayer-replacement-note" class="settings-help" hidden>Pairing a new device will replace the current paired player on this device.</p>
             </section>
-            <button id="multiplayer-local" type="button">Two controllers on this iPad</button>
+            <section id="multiplayer-local-panel" class="multiplayer-family-panel" hidden>
+              <h3>Both players are here</h3>
+              <p class="settings-help">Connect two controllers to this device. Each player gets a goose.</p>
+              <button id="multiplayer-local" type="button">Start local game</button>
+            </section>
           </div>
-          <p class="settings-help">The host uses their saved game. Keep both games open while playing. Nearby devices on the same Wi-Fi work best.</p>
+          <p id="multiplayer-game-help" class="settings-help" hidden>The host uses their saved game. Keep both games open while playing. Nearby devices on the same Wi-Fi work best.</p>
           <button id="multiplayer-close" type="button">Back to game</button>
         </div>
       </section>
