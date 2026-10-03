@@ -398,6 +398,7 @@ kbd,
 .multiplayer-family-panel { display: grid; gap: .65rem; margin: .85rem 0; padding: .85rem; border: 1px solid var(--line); border-radius: .7rem; }
 .multiplayer-family-panel[hidden] { display: none; }
 .multiplayer-family-panel label { gap: .4rem; }
+.multiplayer-join-debug { margin: .5rem 0; color: var(--sun); font-size: .75rem; }
 .multiplayer-family-panel input { width: 100%; font-size: 1rem; letter-spacing: normal; text-transform: none; }
 .multiplayer-family-panel button { width: 100%; margin-top: 0; }
 .multiplayer-family-label { margin: 0; font-size: 1rem; font-weight: 700; text-align: center; }
@@ -414,7 +415,7 @@ kbd,
   position: absolute;
   top: max(72px, calc(env(safe-area-inset-top) + 56px));
   left: 50%;
-  z-index: 12;
+  z-index: 16;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: .85rem;

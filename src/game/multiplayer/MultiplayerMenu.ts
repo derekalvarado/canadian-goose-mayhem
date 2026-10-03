@@ -55,6 +55,7 @@ function required<T extends HTMLElement>(selector: string): T {
 export class MultiplayerMenu {
   private readonly menu = required<HTMLElement>("#multiplayer-menu");
   private readonly status = required<HTMLElement>("#multiplayer-status");
+  private readonly joinDebug = required<HTMLElement>("#multiplayer-join-debug");
   private readonly hostButton = required<HTMLButtonElement>("#multiplayer-host");
   private readonly joinButton = required<HTMLButtonElement>("#multiplayer-family-join");
   private readonly pairedPanel = required<HTMLElement>("#multiplayer-family-paired");
@@ -130,9 +131,9 @@ export class MultiplayerMenu {
     this.approveButton.addEventListener("click", () => { void this.approveFamilyPairing(); });
     this.denyButton.addEventListener("click", () => { void this.denyFamilyPairing(); });
     this.localButton.addEventListener("click", () => {
-      this.stopIdleStatusPolling();
       this.hideJoinNotice();
       this.stopFamilyPresence(true);
+      this.startIdleStatusPolling();
       this.options.onLocalStart?.();
       this.close();
     });
@@ -144,6 +145,15 @@ export class MultiplayerMenu {
       this.codeInput.value = this.codeInput.value.replace(/\D/gu, "").slice(0, 4);
     });
     window.addEventListener("pagehide", this.releaseFamilyHost, { once: true });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) return;
+      if (this.familyMode === "join") void this.pollFamilyJoin();
+      else if (this.idleStatusPollTimer !== undefined) void this.pollIdleFamilyStatus();
+    });
+    if (import.meta.env.DEV) {
+      this.joinDebug.hidden = false;
+      this.joinDebug.textContent = "Join alerts: waiting for the first check…";
+    }
     this.updateFamilyUi();
 
     if (!ROOM_SIGNALING_URL) {
@@ -161,7 +171,13 @@ export class MultiplayerMenu {
   private readonly open = (): void => {
     this.menu.hidden = false;
     this.options.onOpenChange?.(true);
-    if (this.pairing && this.familyClient) void this.pollIdleFamilyStatus();
+    if (this.pairing && this.familyClient) {
+      if (this.familyMode === "join") void this.pollFamilyJoin();
+      else if (!this.familyMode) {
+        this.startIdleStatusPolling();
+        void this.pollIdleFamilyStatus();
+      }
+    }
     this.closeButton.focus({ preventScroll: true });
   };
 
@@ -369,7 +385,9 @@ export class MultiplayerMenu {
   }
 
   private startIdleStatusPolling(): void {
-    if (!this.familyClient || !this.pairing || this.idleStatusPollTimer !== undefined) return;
+    if (!this.familyClient) return this.reportJoinCheck("Pairing service is not configured");
+    if (!this.pairing) return this.reportJoinCheck("No saved device pairing");
+    if (this.idleStatusPollTimer !== undefined) return;
     this.idleStatusPollTimer = window.setInterval(() => { void this.pollIdleFamilyStatus(); }, IDLE_STATUS_POLL_MS);
     void this.pollIdleFamilyStatus();
   }
@@ -382,7 +400,15 @@ export class MultiplayerMenu {
   }
 
   private async pollIdleFamilyStatus(): Promise<void> {
-    if (!this.familyClient || !this.pairing || this.familyMode || this.idleStatusPollRunning || document.hidden) return;
+    if (!this.familyClient || !this.pairing || this.idleStatusPollRunning) return;
+    if (this.familyMode) {
+      this.reportJoinCheck(`Already ${this.familyMode === "host" ? "hosting" : "joining"}; idle alerts paused`);
+      return;
+    }
+    if (document.hidden) {
+      this.reportJoinCheck("App is hidden; checks resume when it opens");
+      return;
+    }
     this.idleStatusPollRunning = true;
     const generation = this.idleStatusPollGeneration;
     try {
@@ -390,16 +416,35 @@ export class MultiplayerMenu {
       if (generation !== this.idleStatusPollGeneration || this.familyMode) return;
       this.syncPairingNames(status);
       this.syncJoinNotice(status);
+      const request = status.joinRequest;
+      this.reportJoinCheck(!request
+        ? "No pending Join request"
+        : request.deviceId !== this.pairing?.peerDeviceId
+          ? "Join request does not match this paired player"
+          : request.requestId === this.dismissedJoinRequestId
+            ? "Join request was dismissed"
+            : this.joinNotice.hidden
+              ? "Join request received, but popup is hidden"
+              : "Join request received; popup shown");
     } catch (error) {
-      if (generation === this.idleStatusPollGeneration
-        && error instanceof FamilyPairingServiceError && error.code === "pairing-missing") this.handleFamilyError(error);
+      if (generation === this.idleStatusPollGeneration) {
+        this.reportJoinCheck(`Check failed: ${error instanceof Error ? error.message : "unknown error"}`, error);
+        if (error instanceof FamilyPairingServiceError && error.code === "pairing-missing") this.handleFamilyError(error);
+      }
     } finally {
       if (generation === this.idleStatusPollGeneration) this.idleStatusPollRunning = false;
     }
   }
 
+  private reportJoinCheck(message: string, error?: unknown): void {
+    if (!import.meta.env.DEV) return;
+    this.joinDebug.textContent = `Join alerts · ${new Date().toLocaleTimeString()}: ${message}`;
+    if (error) console.warn("[Goose join alerts]", message, error);
+    else console.info("[Goose join alerts]", message);
+  }
+
   private syncJoinNotice(status: FamilyPairStatus): void {
-    if (!this.pairing || this.familyMode) return this.hideJoinNotice();
+    if (!this.pairing || this.familyMode === "host") return this.hideJoinNotice();
     const request = peerJoinRequestToPrompt(status, this.pairing, this.dismissedJoinRequestId);
     if (!request) return this.hideJoinNotice();
     this.pendingJoinRequestId = request.requestId;
@@ -481,8 +526,13 @@ export class MultiplayerMenu {
     if (this.familyMode !== "host" || !this.pairing || !this.familyClient || this.presencePollRunning) return;
     this.presencePollRunning = true;
     try {
-      await this.handleHostStatus(await this.familyClient.pairStatus(this.pairing));
+      const status = await this.familyClient.pairStatus(this.pairing);
+      this.reportJoinCheck(status.joinRequest
+        ? "Already hosting; paired player is joining automatically"
+        : "Already hosting; waiting for the paired player");
+      await this.handleHostStatus(status);
     } catch (error) {
+      this.reportJoinCheck(`Host check failed: ${error instanceof Error ? error.message : "unknown error"}`, error);
       this.handleFamilyError(error);
     } finally {
       this.presencePollRunning = false;
@@ -530,17 +580,20 @@ export class MultiplayerMenu {
     this.stopFamilyPresence(false);
     this.closePeer();
     this.joinButton.disabled = true;
+    this.reportJoinCheck("Sending Join request to the pairing service");
     try {
       if (wasHosting) await this.familyClient.releaseHost(pairing);
       this.familyMode = "join";
       this.joinRequestId = createFamilyToken();
       this.joinRefreshAt = Date.now() + JOIN_REFRESH_MS;
       const status = await this.familyClient.requestJoin(pairing, this.joinRequestId);
+      this.reportJoinCheck("Join request accepted; waiting for the paired player");
       this.syncPairingNames(status);
       this.describeJoinWait(status);
       this.presencePollTimer = window.setInterval(() => { void this.pollFamilyJoin(); }, PRESENCE_POLL_MS);
       await this.handleJoinStatus(status);
     } catch (error) {
+      this.reportJoinCheck(`Join request failed: ${error instanceof Error ? error.message : "unknown error"}`, error);
       this.stopFamilyPresence(false);
       this.handleFamilyError(error);
     } finally {
@@ -557,8 +610,14 @@ export class MultiplayerMenu {
         await this.familyClient.requestJoin(this.pairing, this.joinRequestId);
         this.joinRefreshAt = Date.now() + JOIN_REFRESH_MS;
       }
-      await this.handleJoinStatus(await this.familyClient.pairStatus(this.pairing, this.joinRequestId));
+      const status = await this.familyClient.pairStatus(this.pairing, this.joinRequestId);
+      this.syncJoinNotice(status);
+      this.reportJoinCheck(this.joinNotice.hidden
+        ? "Waiting to join; no request from the paired player"
+        : "Paired player also wants to join; popup shown");
+      await this.handleJoinStatus(status);
     } catch (error) {
+      this.reportJoinCheck(`Join wait check failed: ${error instanceof Error ? error.message : "unknown error"}`, error);
       this.handleFamilyError(error);
     } finally {
       this.presencePollRunning = false;

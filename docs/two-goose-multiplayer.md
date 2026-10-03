@@ -108,7 +108,7 @@ Every checkpoint must keep single-player working and pass `npm test` and
   full pair/approve/first-host/join-before-host/private-room/forget smoke test.
 - Browser acceptance checkpoint: two isolated local app origins paired by code
   and completed the automatic Host/Join WebRTC connection.
-- Deployment checkpoint: Worker version `0b2452b5-ffab-46ab-a3d3-20517d9988f6`
+- Deployment checkpoint: Worker version `8fa4c5d8-fa3c-4596-b9e9-73ee9ca7a59e`
   is live at `https://goose-game-signaling.goose-game-2.workers.dev`; its health,
   room-relay, and full family-pairing smoke tests pass.
 

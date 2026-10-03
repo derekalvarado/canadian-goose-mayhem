@@ -14,6 +14,8 @@ interface ServiceErrorBody {
   readonly hostName?: string;
 }
 
+const SERVICE_TIMEOUT_MS = 12_000;
+
 export class FamilyPairingServiceError extends Error {
   constructor(
     message: string,
@@ -145,31 +147,39 @@ export class FamilyPairingClient {
 
   private async request<T>(path: string, body: unknown, keepalive = false): Promise<T> {
     const url = new URL(path, this.serviceUrl);
-    let response: Response;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), SERVICE_TIMEOUT_MS);
     try {
-      response = await fetch(url, {
+      const response = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
         cache: "no-store",
         keepalive,
+        signal: controller.signal,
       });
-    } catch {
+      const raw = await response.text();
+      let decoded: unknown;
+      try { decoded = raw ? JSON.parse(raw) : undefined; }
+      catch { decoded = undefined; }
+      if (!response.ok) {
+        const error = decoded && typeof decoded === "object" ? decoded as ServiceErrorBody : undefined;
+        throw new FamilyPairingServiceError(
+          error?.message ?? "Family pairing could not be completed.",
+          response.status,
+          error?.code,
+          error?.hostName,
+        );
+      }
+      return decoded as T;
+    } catch (error) {
+      if (error instanceof FamilyPairingServiceError) throw error;
+      if (controller.signal.aborted) {
+        throw new FamilyPairingServiceError("Pairing service did not respond in time.", 0, "timeout");
+      }
       throw new FamilyPairingServiceError("Could not reach the family pairing service.", 0, "network");
+    } finally {
+      window.clearTimeout(timeout);
     }
-    const raw = await response.text();
-    let decoded: unknown;
-    try { decoded = raw ? JSON.parse(raw) : undefined; }
-    catch { decoded = undefined; }
-    if (!response.ok) {
-      const error = decoded && typeof decoded === "object" ? decoded as ServiceErrorBody : undefined;
-      throw new FamilyPairingServiceError(
-        error?.message ?? "Family pairing could not be completed.",
-        response.status,
-        error?.code,
-        error?.hostName,
-      );
-    }
-    return decoded as T;
   }
 }
