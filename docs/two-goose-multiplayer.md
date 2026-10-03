@@ -103,7 +103,7 @@ Every checkpoint must keep single-player working and pass `npm test` and
   provisioning and deployment. Pairing requires explicit approval and long random
   credentials; rooms accept one host and one guest, expire after twenty minutes,
   restrict browser origins, and retain only WebRTC setup messages.
-- Latest automated checkpoint: all 225 tests pass; the game and Worker TypeScript
+- Latest automated checkpoint: all 240 tests pass; the game and Worker TypeScript
   builds are clean. The local Worker passed both the room relay smoke test and the
   full pair/approve/first-host/join-before-host/private-room/forget smoke test.
 - Browser acceptance checkpoint: two isolated local app origins paired by code
