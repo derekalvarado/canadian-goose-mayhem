@@ -688,8 +688,10 @@ export class MultiplayerMenu {
         this.status.textContent = `${this.pairing?.peerName ?? "Goose 2"} disconnected. Their goose will stand still until they rejoin.`;
       } else if (this.familyMode === "join") {
         this.status.textContent = `Connection lost. Open Play together and tap Join ${this.pairing?.peerName ?? "host"} to reconnect.`;
+        this.open();
       } else {
         this.status.textContent = "Connection lost. Open Play together to reconnect.";
+        if (role === "guest") this.open();
       }
       this.options.onDisconnected?.(role);
     }

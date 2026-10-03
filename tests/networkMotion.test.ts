@@ -24,6 +24,16 @@ test("guest input predicts movement before another host snapshot arrives", () =>
   assert.ok(predicted.velocity.x > 0);
 });
 
+test("stale host samples do not leash guest prediction inside an invisible box", () => {
+  const motion = new NetworkMotionSmoother();
+  motion.push(sample(1, 0));
+  let predicted = motion.update(0)!;
+  for (let frame = 0; frame < 60; frame += 1) {
+    predicted = motion.update(1 / 60, { moveX: 1, moveZ: 0, speed: 3.45 })!;
+  }
+  assert.ok(predicted.position.x > 2.5, `expected continued movement, got ${predicted.position.x}`);
+});
+
 test("small authority corrections are smoothed while area-sized jumps snap", () => {
   const motion = new NetworkMotionSmoother();
   motion.push(sample(1, 0));

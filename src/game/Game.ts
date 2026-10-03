@@ -317,7 +317,10 @@ export class Game {
     this.updateGamepadLayout(frame.gamepadLayout);
     this.updateControllerDiagnostics(delta);
     this.touchControls?.syncPoseState(frame.wingsSpread, frame.sneaking, frame.threatening);
-    if (this.onlineRole === "guest" && this.onlinePeer) {
+    // A disconnected guest must remain in the read-only network view. Falling
+    // through here would move the unrelated local simulation while the camera
+    // and Goose 2 view remain at their final authoritative positions.
+    if (this.onlineRole === "guest") {
       this.animateOnlineGuest(delta, frame);
       return;
     }
@@ -437,6 +440,21 @@ export class Game {
   };
 
   private readonly handleOnlineDisconnected = (role: MultiplayerRole): void => {
+    if (role === "guest" && this.remoteSnapshot) {
+      const guest = this.remoteSnapshot.players.find((player) => player.id === "goose-2");
+      const host = this.remoteSnapshot.players.find((player) => player.id === "goose-1"
+        && player.areaId === guest?.areaId);
+      if (guest) {
+        this.goose2.position.copy(guest.state.position);
+        this.goose2.rotation.y = guest.state.heading;
+      }
+      if (host) {
+        this.goose.position.copy(host.state.position);
+        this.goose.rotation.y = host.state.heading;
+      }
+      this.velocity.set(0, 0, 0);
+      this.velocity2.set(0, 0, 0);
+    }
     this.onlineAuthenticated = false;
     this.remoteCommand = undefined;
     this.remoteSnapshot = undefined;
