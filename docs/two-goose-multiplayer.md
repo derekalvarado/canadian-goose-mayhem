@@ -21,6 +21,8 @@ implemented.
   WebRTC.
 - Four-digit codes are the only online pairing flow, so both players stay inside
   their installed PWA.
+- Tapping Join sends the paired player an in-game request with **Host game** and
+  **Not now** choices, so the host does not have to discover the request manually.
 - If the guest disconnects, Goose 2 stands still and drops nothing. Closing the
   host still ends the authoritative session. Host migration and durable shared
   saves remain future work. A guest can reopen the paired app and tap Join while
@@ -57,7 +59,8 @@ implemented.
   short-lived authenticated rooms.
 - [x] Remembered family pairing: single-use four-digit codes, explicit approval,
   one paired peer, editable names, first-host-wins presence, Join-before-Host,
-  guest reconnect, and either device hosting a later game.
+  an in-game Join request, guest reconnect, and either device hosting a later
+  game.
 - [ ] PWA and device verification: GitHub Pages, two iPads, four-digit pairing,
   sideways Joy-Cons, reconnect while host is open, and offline fallback.
 
@@ -100,7 +103,7 @@ Every checkpoint must keep single-player working and pass `npm test` and
   provisioning and deployment. Pairing requires explicit approval and long random
   credentials; rooms accept one host and one guest, expire after twenty minutes,
   restrict browser origins, and retain only WebRTC setup messages.
-- Latest automated checkpoint: all 223 tests pass; the game and Worker TypeScript
+- Latest automated checkpoint: all 225 tests pass; the game and Worker TypeScript
   builds are clean. The local Worker passed both the room relay smoke test and the
   full pair/approve/first-host/join-before-host/private-room/forget smoke test.
 - Browser acceptance checkpoint: two isolated local app origins paired by code

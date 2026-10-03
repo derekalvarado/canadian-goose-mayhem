@@ -4,8 +4,10 @@ import {
   FAMILY_PAIRING_STORAGE_KEY,
   clearStoredFamilyPairing,
   familyPairingForDevice,
+  joinRequestVisibleToDevice,
   loadStoredFamilyPairing,
   normalizeFamilyPlayerName,
+  peerJoinRequestToPrompt,
   pairingWithUpdatedDevices,
   parseFamilyPairingCode,
   saveStoredFamilyPairing,
@@ -82,4 +84,16 @@ test("a credential cannot be installed on an unrelated device", () => {
     () => familyPairingForDevice(credential, "33333333333333333333333333333333"),
     /different devices/,
   );
+});
+
+test("only the other paired device sees and prompts for a waiting join request", () => {
+  const request = { deviceId: deviceTwo, requestId: "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr", expiresAt: Date.now() + 60_000 };
+  assert.equal(joinRequestVisibleToDevice(request, deviceTwo), undefined);
+  assert.deepEqual(joinRequestVisibleToDevice(request, deviceOne), request);
+
+  const hostPairing = familyPairingForDevice(credential, deviceOne);
+  const status = { devices: credential.devices, joinRequest: request };
+  assert.deepEqual(peerJoinRequestToPrompt(status, hostPairing), request);
+  assert.equal(peerJoinRequestToPrompt(status, hostPairing, request.requestId), undefined);
+  assert.equal(peerJoinRequestToPrompt({ ...status, joinRequest: { ...request, deviceId: deviceOne } }, hostPairing), undefined);
 });

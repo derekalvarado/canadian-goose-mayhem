@@ -71,10 +71,10 @@ warns that a successful new pairing replaces the old one.
 
 ### Play after pairing
 
-1. On either device, open **Play together** and tap **Host game**. The host uses
-   its own saved to-do list.
-2. On the other device, tap **Join _player name_**. It is also fine to tap Join
-   first; that app waits until the paired player starts hosting.
+1. On one device, open **Play together** and tap **Join _player name_**.
+2. The paired player sees an in-game request. Tap **Host game** to accept it.
+   The host uses its own saved to-do list. The host can also start first from
+   **Play together** if preferred.
 3. Wait for both devices to say they are connected. The host controls Goose 1
    and the joining device controls Goose 2.
 
@@ -142,7 +142,7 @@ request logs. No game save or gameplay traffic is stored there.
 | --- | --- |
 | A pairing code does not work | Check all four digits and make sure the code is less than five minutes old. Make one fresh code rather than guessing repeatedly; too many attempts pause pairing for one minute. |
 | A strange name asks to pair | Tap **No**. Only approve the player sitting beside you. The code remains usable until it expires or is cancelled. |
-| Join says it is waiting | Leave that screen open and tap **Host game** on the paired device. Join can safely be tapped before Host. |
+| Join says it is waiting | Keep both apps open in the foreground. On the paired device, tap **Host game** on the Join request. You can also open **Play together** and start hosting there. |
 | The old host was closed and the other device cannot host yet | Wait about 35 seconds for the host-presence lease to expire, then tap **Host game** again. The devices remain paired. |
 | A device says its pairing was forgotten | The other device forgot or replaced the pairing. Pair the two devices again with a new 4-digit code. |
 | An iPad cannot open the game from the Mac during development | Start the game with `npm run dev:lan`, keep the Mac awake, and open the Mac's LAN address, such as `http://192.168…`, instead of `localhost`. Check the macOS firewall if the page itself will not load. |
