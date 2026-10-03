@@ -30,6 +30,8 @@ const CAFE_CHALLENGES_REVISION = 21;
 const CAFE_KITCHEN_REVISION = 22;
 const CAFE_KITCHEN_MOVE_REVISION = 23;
 const TOWNSFOLK_REVISION = 24;
+const MUSICIAN_REVISION = 25;
+const SOUTHWEST_ROW_SETBACK_REVISION = 26;
 export const PRE_REBUILD_LAYOUT_STORAGE_KEY = "goose-game-2.world-layout.before-old-town.v4";
 
 export interface WorldTransform { x: number; y: number; z: number; rotationY: number }
@@ -581,6 +583,61 @@ function addTownsfolkContent(layout: WorldLayout, store?: WorldLayoutStorage): W
   return validated;
 }
 
+/** The street musician, their guitar, and its stand on the square's stage: added once to drafts saved before they existed. */
+const MUSICIAN_INSTANCE_IDS = ["oldtown.street-musician", "oldtown.guitar-stand", "oldtown.musician-guitar"];
+function addMusicianContent(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= MUSICIAN_REVISION) return layout;
+  const updated = cloneWorldLayout(layout);
+  const plaza = updated.areas.find((area) => area.id === CENTRAL_PLAZA_AREA_ID);
+  const canonical = getWorldArea(CANONICAL_WORLD_LAYOUT).instances.filter((item) => MUSICIAN_INSTANCE_IDS.includes(item.id));
+  if (plaza) for (const item of canonical) {
+    if (!plaza.instances.some((existing) => existing.id === item.id)) plaza.instances.push(JSON.parse(JSON.stringify(item)) as WorldInstance);
+  }
+  updated.canonicalRevision = MUSICIAN_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its street musician could not be saved", error); return layout; }
+  }
+  return validated;
+}
+
+/**
+ * The southwest shop row and its gas meters moved back 3 m, the splash-pad faucet
+ * shifted, and the square's camera track was redrawn: applied to older drafts only
+ * where they still hold the previous defaults, so anything moved by hand stays put.
+ */
+function setBackSouthwestRow(layout: WorldLayout, store?: WorldLayoutStorage): WorldLayout {
+  if (layout.canonicalRevision >= SOUTHWEST_ROW_SETBACK_REVISION) return layout;
+  const updated = cloneWorldLayout(layout);
+  const plaza = updated.areas.find((area) => area.id === CENTRAL_PLAZA_AREA_ID);
+  const canonical = getWorldArea(CANONICAL_WORLD_LAYOUT);
+  const previous: Readonly<Record<string, Readonly<{ x: number; z: number }>>> = {
+    "oldtown.southwest.shop-0": { x: -11, z: -17.5 }, "oldtown.southwest.shop-1": { x: -4.1, z: -17.5 },
+    "oldtown.southwest.shop-2": { x: 2.8, z: -17.5 }, "oldtown.southwest.shop-3": { x: 10.1, z: -17.5 },
+    "oldtown.southwest.shop-4": { x: 17, z: -17.5 }, "plaza.splash-faucet": { x: -6, z: 7 }, "oldtown.gas-meter-bank-muegqelt": { x: -15, z: -16.5 },
+  };
+  const previousTrack = [[-60, 14, -18, 1], [-20, 14, -18, 1], [12, 14, -18, 1], [34, 14, -16, 1], [44, 14, -4, 1.1], [44, 14, 24, 1.1]];
+  if (plaza) {
+    for (const item of plaza.instances) {
+      const was = previous[item.id]; const next = canonical.instances.find((candidate) => candidate.id === item.id);
+      if (was && next && item.transform.x === was.x && item.transform.z === was.z && item.transform.rotationY === next.transform.rotationY) item.transform = { ...next.transform };
+    }
+    const track = plaza.cameraTracks?.find((candidate) => candidate.id === "main");
+    const untouched = track && track.points.length === previousTrack.length
+      && track.points.every((point, index) => [point.x, point.y, point.z, point.zoom].every((value, axis) => value === previousTrack[index][axis]));
+    const nextTrack = canonical.cameraTracks?.find((candidate) => candidate.id === "main");
+    if (track && untouched && nextTrack) track.points = JSON.parse(JSON.stringify(nextTrack.points)) as typeof track.points;
+  }
+  updated.canonicalRevision = SOUTHWEST_ROW_SETBACK_REVISION;
+  const validated = validateWorldLayout(updated);
+  if (store) {
+    try { store.setItem(WORLD_LAYOUT_STORAGE_KEY, serializeWorldLayout(validated)); }
+    catch (error) { console.warn("Keeping the previous world because its southwest row update could not be saved", error); return layout; }
+  }
+  return validated;
+}
+
 export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefined {
   try {
     const raw = store?.getItem(PRE_REBUILD_LAYOUT_STORAGE_KEY);
@@ -594,9 +651,9 @@ export function loadPreviousWorldLayout(store = storage()): WorldLayout | undefi
 export function loadWorldLayout(store = storage()): WorldLayout {
   try {
     const saved = store?.getItem(WORLD_LAYOUT_STORAGE_KEY);
-    if (saved) return addTownsfolkContent(moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store);
+    if (saved) return setBackSouthwestRow(addMusicianContent(addTownsfolkContent(moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migrateStreetJanitor(validateWorldLayout(JSON.parse(saved))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store);
     const legacy = store?.getItem(PLAZA_LAYOUT_STORAGE_KEY);
-    return legacy ? addTownsfolkContent(moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
+    return legacy ? setBackSouthwestRow(addMusicianContent(addTownsfolkContent(moveCoffeeShopKitchen(addCoffeeShopKitchen(rebuildCoffeeShopForChallenges(addPlazaCameraTrack(giveAriFloaties(swapCoopersmithPub(renameNorthSouthRows(addGasMeterPairContent(addBreweryTankContent(addGasMeterContent(addCoffeeShopTransitionContent(addCoffeeShopContent(polishJanitorCleanupContent(addJanitorCleanupContent(addSplashKidsContent(addGameplayContent(upgradeOldTown(migratePlazaLayout(validatePlazaLayout(JSON.parse(legacy))), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store), store) : cloneWorldLayout(CANONICAL_WORLD_LAYOUT);
   } catch (error) {
     console.warn("Ignoring invalid saved world layout", error);
     return cloneWorldLayout(CANONICAL_WORLD_LAYOUT);

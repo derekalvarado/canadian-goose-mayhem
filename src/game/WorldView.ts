@@ -5,11 +5,12 @@ import { SplashKidView } from "./SplashKidView.ts";
 import { CafePersonView } from "./CafePersonView.ts";
 import { DogView, TownspersonView } from "./TownsfolkView.ts";
 import { RiggedCharacterView } from "./RiggedCharacterView.ts";
+import { MusicianView } from "./MusicianView.ts";
 import type { SyncState, UpdatePresentation } from "./CafePropsView.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { isWorldChunkPlayable, WORLD_CHUNK_SIZE, type WorldArea, type WorldInstance } from "./worldLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
-import type { WorldSnapshot } from "./simulation/Simulation.ts";
+import type { WorldEntityState, WorldSnapshot } from "./simulation/Simulation.ts";
 
 const LITTER_PICKER_ASSET_ID = "prop.litter-picker";
 const LITTER_PICKER_GROUND_ROTATION_X = Math.PI / 2;
@@ -31,6 +32,8 @@ const BEAK_GRIPS: Readonly<Record<string, Readonly<{ offset: THREE.Vector3Tuple;
   "coffee.counter-croissant": { offset: [0, -0.045, -0.02] },
   "coffee.mug": { offset: [0, -0.1, 0.01] },
   "coffee.order-cup": { offset: [0, -0.17, 0.01] },
+  // Bitten by the very end of the neck; the rest is dragged along the ground (see `placeDraggedItems`).
+  "prop.guitar": { offset: [0, -0.03, -0.02] },
 };
 /** How people hold things: the prop sits `inward` of the palm (toward their middle) and `below` it. */
 const HAND_GRIPS: Readonly<Record<string, Readonly<{ inward: number; below: number }>>> = {
@@ -42,8 +45,16 @@ const DEFAULT_HAND_GRIP = { inward: 0.05, below: 0.05 };
 const HAND_POINT = new THREE.Vector3();
 const HAND_RIGHT = new THREE.Vector3();
 const DEFAULT_BEAK_GRIP: Readonly<{ offset: THREE.Vector3Tuple; rotation?: THREE.Vector3Tuple }> = { offset: [0, -0.08, 0] };
+const DRAG_GRIP = new THREE.Vector3();
+const DRAG_TRAIL = new THREE.Vector3();
+const DRAG_UP = new THREE.Vector3();
+const DRAG_FACE = new THREE.Vector3();
+const DRAG_SIDE = new THREE.Vector3();
+const DRAG_BASIS = new THREE.Matrix4();
+/** How high a lying item's middle sits above the ground, so it rests on it rather than in it. */
+const LYING_CLEARANCE = 0.05;
 
-type GameplayView = SplashPadView | JanitorView | SplashKidView | CafePersonView | TownspersonView | DogView;
+type GameplayView = SplashPadView | JanitorView | SplashKidView | CafePersonView | TownspersonView | DogView | MusicianView;
 
 export class WorldView extends THREE.Group {
   readonly instances = new Map<string, THREE.Group>();
@@ -55,6 +66,10 @@ export class WorldView extends THREE.Group {
   private presentationUpdates: UpdatePresentation[] = [];
   private readonly handHeld: { wrapper: THREE.Group; socket: THREE.Object3D; personId: string; assetId?: string; sipping: boolean }[] = [];
   private readonly gameplayViews = new Map<string, GameplayView>();
+  /** Dragged or lying items, placed each frame after the goose has posed (see `placeDraggedItems`). */
+  private readonly dragged: { wrapper: THREE.Group; entity: WorldEntityState; socket?: THREE.Object3D; assetId?: string }[] = [];
+  /** Draw the musician's view cone (developer mode). */
+  showSightLines = false;
 
   constructor(area: WorldArea, playableOnly = false) {
     super();
@@ -98,7 +113,7 @@ export class WorldView extends THREE.Group {
     );
     wrapper.add(view);
     if (view instanceof SplashPadView || view instanceof JanitorView || view instanceof SplashKidView || view instanceof CafePersonView
-      || view instanceof TownspersonView || view instanceof DogView) {
+      || view instanceof TownspersonView || view instanceof DogView || view instanceof MusicianView) {
       this.presentationViews.push(view);
       this.gameplayViews.set(instance.id, view);
     }
@@ -112,6 +127,43 @@ export class WorldView extends THREE.Group {
     for (const view of this.presentationViews) view.update(delta);
     for (const update of this.presentationUpdates) update(delta);
     this.placeHandHeldItems();
+    this.placeDraggedItems();
+  }
+
+  /**
+   * A dragged guitar runs from the bill (or, once let go, the end it was held by)
+   * back to its far end on the ground, strings up.
+   */
+  private placeDraggedItems(): void {
+    for (const item of this.dragged) {
+      const { entity, wrapper } = item;
+      if (!entity.trail) continue;
+      if (item.socket) {
+        const grip = (item.assetId ? BEAK_GRIPS[item.assetId] : undefined) ?? DEFAULT_BEAK_GRIP;
+        item.socket.updateWorldMatrix(true, false);
+        item.socket.localToWorld(DRAG_GRIP.set(...grip.offset));
+        this.updateWorldMatrix(true, false); this.worldToLocal(DRAG_GRIP);
+      } else DRAG_GRIP.set(entity.position.x, entity.position.y + LYING_CLEARANCE, entity.position.z);
+      DRAG_TRAIL.set(entity.trail.x, entity.trail.y + LYING_CLEARANCE, entity.trail.z).sub(DRAG_GRIP);
+      if (DRAG_TRAIL.lengthSq() < 1e-6) DRAG_TRAIL.set(Math.sin(entity.heading), 0, Math.cos(entity.heading));
+      DRAG_TRAIL.normalize();
+      DRAG_UP.set(0, 1, 0).addScaledVector(DRAG_TRAIL, -DRAG_TRAIL.y);
+      if (DRAG_UP.lengthSq() < 1e-6) DRAG_UP.set(-Math.sin(entity.heading), 0, -Math.cos(entity.heading));
+      DRAG_UP.normalize();
+      DRAG_SIDE.crossVectors(DRAG_UP, DRAG_TRAIL);
+      wrapper.position.copy(DRAG_GRIP);
+      wrapper.quaternion.setFromRotationMatrix(DRAG_BASIS.makeBasis(DRAG_SIDE, DRAG_UP, DRAG_TRAIL));
+    }
+  }
+
+  /** A dragged item resting upright on its stand: headstock up, leaning back a little, strings to the audience. */
+  private standUpright(wrapper: THREE.Group, entity: WorldEntityState): void {
+    DRAG_FACE.set(-Math.sin(entity.heading), 0, -Math.cos(entity.heading));
+    DRAG_TRAIL.set(0, -1, 0).addScaledVector(DRAG_FACE, 0.2).normalize();
+    DRAG_UP.copy(DRAG_FACE).addScaledVector(DRAG_TRAIL, -DRAG_FACE.dot(DRAG_TRAIL)).normalize();
+    DRAG_SIDE.crossVectors(DRAG_UP, DRAG_TRAIL);
+    wrapper.position.set(entity.position.x, entity.position.y + 0.98, entity.position.z).addScaledVector(DRAG_FACE, -0.1);
+    wrapper.quaternion.setFromRotationMatrix(DRAG_BASIS.makeBasis(DRAG_SIDE, DRAG_UP, DRAG_TRAIL));
   }
 
   /**
@@ -139,6 +191,9 @@ export class WorldView extends THREE.Group {
 
   syncGameplay(snapshot: WorldSnapshot, gooseMouthSocket?: THREE.Object3D, secondGooseMouthSocket?: THREE.Object3D): void {
     this.handHeld.length = 0;
+    this.dragged.length = 0;
+    const musician = snapshot.musician;
+    const musicianView = musician ? this.gameplayViews.get(musician.id) : undefined;
     const janitor = snapshot.janitor;
     const janitorView = janitor ? this.gameplayViews.get(janitor.id) : undefined;
     // A person sipping lifts the drink from their table into their hand, for looks only.
@@ -177,7 +232,19 @@ export class WorldView extends THREE.Group {
         ? entity.holderId : sipping.get(entity.id);
       const personView = personId ? this.gameplayViews.get(personId) : undefined;
       const personSocket = personView instanceof RiggedCharacterView ? personView.getHandSocket("right") : undefined;
-      if (socket && (assetId === "prop.trash-bag" || assetId === "prop.litter-picker")) {
+      const draggable = assetId ? getWorldAsset(assetId)?.carryable?.drag !== undefined : false;
+      if (musicianView instanceof MusicianView && entity.holderId === musician?.id) {
+        const guitarSocket = musicianView.getGuitarSocket();
+        if (wrapper.parent !== guitarSocket) guitarSocket.add(wrapper);
+        wrapper.position.set(0, 0, 0); wrapper.rotation.set(0, 0, 0);
+      } else if (entity.trail) {
+        if (wrapper.parent !== this) this.add(wrapper);
+        this.dragged.push({ wrapper, entity, assetId,
+          socket: entity.holderId === "goose" ? gooseMouthSocket : entity.holderId === "goose-2" ? secondGooseMouthSocket : undefined });
+      } else if (draggable && !entity.holderId) {
+        if (wrapper.parent !== this) this.add(wrapper);
+        this.standUpright(wrapper, entity);
+      } else if (socket && (assetId === "prop.trash-bag" || assetId === "prop.litter-picker")) {
         if (wrapper.parent !== socket) socket.add(wrapper);
         wrapper.position.set(0, assetId === "prop.litter-picker" ? -1.48 : -0.58, 0);
         wrapper.rotation.set(0, 0, 0);
@@ -227,6 +294,11 @@ export class WorldView extends THREE.Group {
       const wrapper = this.instances.get(person.id); const view = this.gameplayViews.get(person.id);
       if (wrapper) { wrapper.position.set(person.position.x, person.position.y, person.position.z); wrapper.rotation.y = person.heading; }
       if (view instanceof TownspersonView) view.setState(person);
+    }
+    if (musician) {
+      const wrapper = this.instances.get(musician.id);
+      if (wrapper) { wrapper.position.set(musician.position.x, musician.position.y, musician.position.z); wrapper.rotation.y = musician.heading; }
+      if (musicianView instanceof MusicianView) { musicianView.setState(musician); musicianView.setSightVisible(this.showSightLines); }
     }
     for (const dog of snapshot.dogs ?? []) {
       const wrapper = this.instances.get(dog.id); const view = this.gameplayViews.get(dog.id);

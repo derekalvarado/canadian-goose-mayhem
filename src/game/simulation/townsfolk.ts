@@ -129,12 +129,7 @@ export class Townsfolk {
 
   constructor(definition: TownsfolkDefinition) {
     this.definition = definition;
-    const { nodes, edges } = definition.graph;
-    this.links = nodes.map(() => []);
-    for (const [a, b] of edges) {
-      if (!nodes[a] || !nodes[b]) continue;
-      const length = distance2d(nodes[a], nodes[b]); this.links[a].push([b, length]); this.links[b].push([a, length]);
-    }
+    this.links = graphLinks(definition.graph);
     const ids = [...definition.people.map((person) => person.id), ...definition.dogs.map((dog) => dog.id)];
     if (new Set(ids).size !== ids.length) throw new Error("Duplicate townsfolk ID");
     if (definition.graph.edges.some(([a, b]) => !definition.graph.nodes[a] || !definition.graph.nodes[b])) throw new Error("Town route edge points at a missing node");
@@ -478,56 +473,73 @@ export class Townsfolk {
     return person.path.length === 0 || distance2d(person.position, person.path[person.path.length - 1]) <= ARRIVE;
   }
 
-  /**
-   * Shortest path over the paving graph, entering at the node nearest each end;
-   * undefined when the destination cannot be reached from here.
-   */
+  /** Shortest walk over the paving graph; undefined when the destination cannot be reached from here. */
   private route(from: Readonly<Position>, to: Readonly<Position>): Position[] | undefined {
-    const { nodes } = this.definition.graph;
-    const end: Position = { x: to.x, y: from.y, z: to.z };
-    const canPass = (a: Readonly<Position>, b: Readonly<Position>) => this.definition.canPass(a, b);
-    if (distance2d(from, to) < 10 && canPass(from, to)) return [end];
-    if (nodes.length === 0) return undefined;
-    const nearest = (p: Readonly<Position>) => nodes.reduce((best, node, index) => distance2d(p, node) < distance2d(p, nodes[best]) ? index : best, 0);
-    const start = nearest(from); const goal = nearest(to);
-    if (start === goal) return [{ ...nodes[start], y: from.y }, end];
-    // Dijkstra over the neighbour lists, with a small binary heap.
-    const cost = new Float64Array(nodes.length).fill(Infinity); const previous = new Int32Array(nodes.length).fill(-1);
-    const heap: [number, number][] = [[0, start]]; cost[start] = 0;
-    const push = (item: [number, number]) => {
-      heap.push(item); let index = heap.length - 1;
-      while (index > 0) { const parent = (index - 1) >> 1; if (heap[parent][0] <= heap[index][0]) break; [heap[parent], heap[index]] = [heap[index], heap[parent]]; index = parent; }
-    };
-    const pop = (): [number, number] => {
-      const top = heap[0]; const last = heap.pop()!;
-      if (heap.length > 0) {
-        heap[0] = last; let index = 0;
-        for (;;) {
-          const left = index * 2 + 1; const right = left + 1; let smallest = index;
-          if (left < heap.length && heap[left][0] < heap[smallest][0]) smallest = left;
-          if (right < heap.length && heap[right][0] < heap[smallest][0]) smallest = right;
-          if (smallest === index) break;
-          [heap[smallest], heap[index]] = [heap[index], heap[smallest]]; index = smallest;
-        }
-      }
-      return top;
-    };
-    while (heap.length > 0) {
-      const [spent, current] = pop();
-      if (current === goal) break;
-      if (spent > cost[current]) continue;
-      for (const [other, length] of this.links[current]) {
-        const next = spent + length;
-        if (next < cost[other]) { cost[other] = next; previous[other] = current; push([next, other]); }
+    return routeOverGraph(this.definition.graph, this.links, (a, b) => this.definition.canPass(a, b), from, to);
+  }
+}
+
+/** Neighbours of each graph point, with the distance to them. */
+export function graphLinks(graph: TownGraph): (readonly [number, number])[][] {
+  const { nodes, edges } = graph;
+  const links: (readonly [number, number])[][] = nodes.map(() => []);
+  for (const [a, b] of edges) {
+    if (!nodes[a] || !nodes[b]) continue;
+    const length = distance2d(nodes[a], nodes[b]); links[a].push([b, length]); links[b].push([a, length]);
+  }
+  return links;
+}
+
+/**
+ * Shortest path over a paving graph, entering at the node nearest each end;
+ * undefined when the destination cannot be reached from here. Shared by everyone
+ * who walks the square.
+ */
+export function routeOverGraph(graph: TownGraph, links: readonly (readonly (readonly [number, number])[])[],
+  canPass: (a: Readonly<Position>, b: Readonly<Position>) => boolean, from: Readonly<Position>, to: Readonly<Position>): Position[] | undefined {
+  const { nodes } = graph;
+  const end: Position = { x: to.x, y: from.y, z: to.z };
+  if (distance2d(from, to) < 10 && canPass(from, to)) return [end];
+  if (nodes.length === 0) return undefined;
+  const nearest = (p: Readonly<Position>) => nodes.reduce((best, node, index) => distance2d(p, node) < distance2d(p, nodes[best]) ? index : best, 0);
+  const start = nearest(from); const goal = nearest(to);
+  if (start === goal) return [{ ...nodes[start], y: from.y }, end];
+  // Dijkstra over the neighbour lists, with a small binary heap.
+  const cost = new Float64Array(nodes.length).fill(Infinity); const previous = new Int32Array(nodes.length).fill(-1);
+  const heap: [number, number][] = [[0, start]]; cost[start] = 0;
+  const push = (item: [number, number]) => {
+    heap.push(item); let index = heap.length - 1;
+    while (index > 0) { const parent = (index - 1) >> 1; if (heap[parent][0] <= heap[index][0]) break; [heap[parent], heap[index]] = [heap[index], heap[parent]]; index = parent; }
+  };
+  const pop = (): [number, number] => {
+    const top = heap[0]; const last = heap.pop()!;
+    if (heap.length > 0) {
+      heap[0] = last; let index = 0;
+      for (;;) {
+        const left = index * 2 + 1; const right = left + 1; let smallest = index;
+        if (left < heap.length && heap[left][0] < heap[smallest][0]) smallest = left;
+        if (right < heap.length && heap[right][0] < heap[smallest][0]) smallest = right;
+        if (smallest === index) break;
+        [heap[smallest], heap[index]] = [heap[index], heap[smallest]]; index = smallest;
       }
     }
-    if (cost[goal] === Infinity) return undefined;
-    const path: Position[] = [];
-    for (let index = goal; index >= 0; index = previous[index]) path.unshift({ ...nodes[index], y: from.y });
-    // Skip an entry node behind us, and the last node when the destination is nearer, when the way is clear.
-    if (path.length > 1 && distance2d(from, path[1]) < distance2d(nodes[start], path[1]) && canPass(from, path[1])) path.shift();
-    if (path.length > 1 && distance2d(to, path[path.length - 2]) < distance2d(nodes[goal], path[path.length - 2]) && canPass(path[path.length - 2], to)) path.pop();
-    path.push(end);
-    return path;
+    return top;
+  };
+  while (heap.length > 0) {
+    const [spent, current] = pop();
+    if (current === goal) break;
+    if (spent > cost[current]) continue;
+    for (const [other, length] of links[current]) {
+      const next = spent + length;
+      if (next < cost[other]) { cost[other] = next; previous[other] = current; push([next, other]); }
+    }
   }
+  if (cost[goal] === Infinity) return undefined;
+  const path: Position[] = [];
+  for (let index = goal; index >= 0; index = previous[index]) path.unshift({ ...nodes[index], y: from.y });
+  // Skip an entry node behind us, and the last node when the destination is nearer, when the way is clear.
+  if (path.length > 1 && distance2d(from, path[1]) < distance2d(nodes[start], path[1]) && canPass(from, path[1])) path.shift();
+  if (path.length > 1 && distance2d(to, path[path.length - 2]) < distance2d(nodes[goal], path[path.length - 2]) && canPass(path[path.length - 2], to)) path.pop();
+  path.push(end);
+  return path;
 }

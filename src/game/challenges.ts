@@ -1,6 +1,7 @@
 import type { WorldSnapshot } from "./simulation/Simulation.ts";
 import type { ObjectiveDefinition } from "./simulation/Objectives.ts";
 import { SPILLED_DRINK_FACT_ID } from "./simulation/cafeCrew.ts";
+import { GUITAR_DISTRACTION_FACT_ID, GUITAR_HIDDEN_FACT_ID, GUITAR_TWANG_FACT_ID } from "./simulation/musician.ts";
 import { CENTRAL_PLAZA_AREA_ID, COFFEE_SHOP_AREA_ID } from "./worldLayout.ts";
 
 /**
@@ -23,8 +24,17 @@ export const CAFE_TASK_IDS = {
   coffeeBreak: "cafe.coffee-break",
   tipJarOutside: "cafe.tip-jar-outside",
 } as const;
+export const GUITAR_TASK_IDS = {
+  steal: "oldtown.steal-guitar",
+  hide: "oldtown.hide-guitar",
+  elsewhere: "oldtown.guitar-elsewhere",
+  twang: "oldtown.guitar-twang",
+  distraction: "oldtown.guitar-distraction",
+} as const;
 
 const held = (world: WorldSnapshot) => world.entities.find((entity) => entity.id === world.player.heldEntityId);
+const guitarHeldByGoose = (world: WorldSnapshot) => world.entities.some((entity) => entity.tags.includes("guitar")
+  && (entity.holderId === "goose" || entity.holderId === "goose-2"));
 
 /** A table nobody sits at with a drink and a pastry both set down on it. */
 function hasCoffeeBreak(world: WorldSnapshot): boolean {
@@ -46,4 +56,14 @@ export const VILLAGE_TASKS: readonly ObjectiveDefinition<WorldSnapshot>[] = [
   { id: CAFE_TASK_IDS.tipJarOutside, areaId: COFFEE_SHOP_AREA_ID, description: "Take the tip jar outside",
     isSatisfied: (world) => world.areaId !== "" && world.entities.some((entity) => entity.tags.includes("tip-jar")
       && entity.homeAreaId !== undefined && entity.homeAreaId !== world.areaId) },
+  { id: GUITAR_TASK_IDS.steal, areaId: CENTRAL_PLAZA_AREA_ID, description: "Steal the musician's guitar", isSatisfied: guitarHeldByGoose },
+  { id: GUITAR_TASK_IDS.twang, areaId: CENTRAL_PLAZA_AREA_ID, description: "Honk with the guitar to make it twang",
+    isSatisfied: (world) => world.durableFacts.includes(GUITAR_TWANG_FACT_ID) },
+  { id: GUITAR_TASK_IDS.hide, areaId: CENTRAL_PLAZA_AREA_ID, description: "Hide the guitar where the musician can't find it",
+    isSatisfied: (world) => world.durableFacts.includes(GUITAR_HIDDEN_FACT_ID) },
+  { id: GUITAR_TASK_IDS.elsewhere, areaId: CENTRAL_PLAZA_AREA_ID, description: "Drag the guitar into another area",
+    isSatisfied: (world) => world.areaId !== "" && world.entities.some((entity) => entity.tags.includes("guitar")
+      && entity.homeAreaId !== undefined && entity.homeAreaId !== world.areaId) },
+  { id: GUITAR_TASK_IDS.distraction, areaId: CENTRAL_PLAZA_AREA_ID, needsTwoGeese: true, description: "Two geese: steal the guitar while the other distracts the musician",
+    isSatisfied: (world) => world.durableFacts.includes(GUITAR_DISTRACTION_FACT_ID) },
 ];

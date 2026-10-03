@@ -182,6 +182,106 @@ export class GameAudio {
     this.music = music;
   }
 
+  private street?: { gain: GainNode; timer: number; nextBeat: number; beat: number };
+
+  /**
+   * The street musician's guitar: a plucked folk progression, louder the closer
+   * the goose is (`loudness` 0–1, 0 stops it). Follows the musician's playing state.
+   */
+  setStreetMusic(loudness: number): void {
+    const context = this.context;
+    if (loudness <= 0.001) {
+      if (!this.street) return;
+      const { gain, timer } = this.street; this.street = undefined;
+      window.clearInterval(timer);
+      if (context) { gain.gain.setTargetAtTime(0, context.currentTime, 0.08); window.setTimeout(() => gain.disconnect(), 600); }
+      return;
+    }
+    if (this.street) { if (context) this.street.gain.gain.setTargetAtTime(loudness, context.currentTime, 0.25); return; }
+    const running = this.runningContext(); if (!running) return;
+    const gain = running.createGain(); gain.gain.value = 0; gain.connect(running.destination);
+    gain.gain.setTargetAtTime(loudness, running.currentTime, 0.4);
+    const street = { gain, timer: 0, nextBeat: running.currentTime + 0.1, beat: 0 };
+    const beatSeconds = 60 / 104 / 2;
+    // G – Em – C – D, picked as a rolling eighth-note pattern.
+    const chords = [[98, 146.8, 196, 246.9, 293.7], [82.4, 123.5, 164.8, 196, 246.9], [130.8, 164.8, 196, 261.6, 329.6], [146.8, 220, 293.7, 370, 440]];
+    const pattern = [0, 2, 3, 4, 3, 2, 1, 3];
+    const schedule = () => {
+      const now = running.currentTime;
+      if (this.paused || running.state !== "running") { street.nextBeat = now + 0.1; return; }
+      while (street.nextBeat < now + 0.3) {
+        const chord = chords[Math.floor(street.beat / 8) % chords.length];
+        const string = chord[pattern[street.beat % pattern.length]];
+        this.pluck(running, gain, string, street.nextBeat, street.beat % 8 === 0 ? 0.07 : 0.045);
+        street.beat += 1; street.nextBeat += beatSeconds;
+      }
+    };
+    street.timer = window.setInterval(schedule, 100);
+    schedule();
+    this.street = street;
+  }
+
+  /** A short plucked string: bright attack, quick decay. */
+  private pluck(context: AudioContext, output: AudioNode, frequency: number, at: number, volume: number): void {
+    const oscillator = context.createOscillator(); const filter = context.createBiquadFilter(); const gain = context.createGain();
+    oscillator.type = "sawtooth"; oscillator.frequency.value = frequency;
+    filter.type = "lowpass"; filter.frequency.setValueAtTime(frequency * 8, at); filter.frequency.exponentialRampToValueAtTime(frequency * 1.5, at + 0.35);
+    gain.gain.setValueAtTime(0.0001, at); gain.gain.exponentialRampToValueAtTime(volume, at + 0.006); gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.9);
+    oscillator.connect(filter); filter.connect(gain); gain.connect(output);
+    oscillator.start(at); oscillator.stop(at + 0.95);
+    oscillator.onended = () => { oscillator.disconnect(); filter.disconnect(); gain.disconnect(); };
+  }
+
+  /** A goose honking into a guitar: a jangled chord that sags out of tune. */
+  playTwang(): void {
+    const context = this.runningContext(); if (!context) return;
+    const now = context.currentTime;
+    for (const [index, frequency] of [98, 146.8, 196, 247, 330].entries()) {
+      const oscillator = context.createOscillator(); const gain = context.createGain();
+      oscillator.type = "sawtooth";
+      oscillator.frequency.setValueAtTime(frequency * 1.03, now + index * 0.018);
+      oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.86, now + 0.9);
+      gain.gain.setValueAtTime(0.0001, now + index * 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.05, now + index * 0.018 + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+      oscillator.connect(gain); gain.connect(context.destination);
+      oscillator.start(now + index * 0.018); oscillator.stop(now + 1.15);
+      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+    }
+  }
+
+  private scrape?: { source: AudioBufferSourceNode; filter: BiquadFilterNode; gain: GainNode };
+
+  /** Wood scraping on paving while a goose drags the guitar (`loudness` 0–1, 0 stops it). */
+  setScrape(loudness: number): void {
+    const context = this.context;
+    if (loudness <= 0.001) {
+      if (!this.scrape || !context) return;
+      const { source, gain } = this.scrape; this.scrape = undefined;
+      gain.gain.setTargetAtTime(0, context.currentTime, 0.05);
+      window.setTimeout(() => { try { source.stop(); } catch { /* already stopped */ } source.disconnect(); gain.disconnect(); }, 400);
+      return;
+    }
+    if (this.scrape) {
+      if (!context) return;
+      // A rough, uneven grind: the level wobbles a little as it catches on the paving.
+      this.scrape.gain.gain.setTargetAtTime(loudness * (0.14 + Math.random() * 0.06), context.currentTime, 0.04);
+      this.scrape.filter.frequency.setTargetAtTime(700 + Math.random() * 500, context.currentTime, 0.05);
+      return;
+    }
+    const running = this.runningContext(); if (!running) return;
+    const length = running.sampleRate * 2; const buffer = running.createBuffer(1, length, running.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let index = 0; index < length; index += 1) data[index] = (Math.random() * 2 - 1) * (0.6 + 0.4 * Math.sin(index / 900));
+    const source = running.createBufferSource(); source.buffer = buffer; source.loop = true;
+    const filter = running.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 900; filter.Q.value = 0.9;
+    const gain = running.createGain(); gain.gain.value = 0;
+    source.connect(filter); filter.connect(gain); gain.connect(running.destination);
+    source.start();
+    gain.gain.setTargetAtTime(loudness * 0.16, running.currentTime, 0.05);
+    this.scrape = { source, filter, gain };
+  }
+
   async playHonk(): Promise<void> {
     await this.play(HONK_URL, 0.72);
   }

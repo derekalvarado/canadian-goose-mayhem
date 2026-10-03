@@ -1,6 +1,7 @@
 import { Objectives, type ObjectiveDefinition } from "./Objectives.ts";
 import { CafeCrew, type CafeCrewDefinition, type CafePersonState, type CafeWorld } from "./cafeCrew.ts";
 import { Townsfolk, type DogState, type TownsfolkDefinition, type TownspersonState } from "./townsfolk.ts";
+import { GUITAR_TWANG_FACT_ID, Musician, type HeardNoise, type MusicianDefinition, type MusicianState, type MusicianWorld } from "./musician.ts";
 
 export interface Position { x: number; y: number; z: number }
 export type PlayerId = "goose" | "goose-2";
@@ -9,6 +10,8 @@ export interface PlayerState {
   readonly heading: number; readonly speed: number; readonly turnAmount: number;
   readonly wingsSpread: boolean; readonly sneaking: boolean; readonly threatening: boolean; readonly spooked: boolean;
   readonly heldEntityId?: string;
+  /** Hauling something too big to lift (the guitar): head down, backing away from it in slow tugs, no hurrying. */
+  readonly dragging: boolean;
 }
 export interface GoosePoop { readonly id: string; readonly position: Readonly<Position> }
 export interface PlayerCommand {
@@ -20,6 +23,11 @@ export interface CarryableDefinition {
   readonly stealableWhileHeld?: boolean;
   /** Heavy items keep the goose from hurrying while it carries them. */
   readonly maxCarrySpeed?: number;
+  /**
+   * Too big to lift: whoever grabs it by one end drags the rest along the ground,
+   * `length` metres behind, scraping loudly enough to be heard `scrapeRadius` away.
+   */
+  readonly drag?: Readonly<{ length: number; scrapeRadius: number }>;
 }
 export interface ControllerDefinition {
   readonly targetId: string; readonly interactionPoint: Readonly<Position>; readonly interactionRange: number;
@@ -29,7 +37,7 @@ export interface ControllerDefinition {
   readonly verb?: string;
 }
 /** Capabilities that tasks and people look for instead of hard-coded object IDs. */
-export type EntityTag = "drink" | "pastry" | "tip-jar" | "music" | "order-cup" | "house" | "bell";
+export type EntityTag = "drink" | "pastry" | "tip-jar" | "music" | "order-cup" | "house" | "bell" | "guitar";
 export type EntityCondition = "clean" | "full" | "empty" | "spilled";
 /** A flat top (table, counter, shelf) that dropped or placed items rest on. */
 export interface PlacementSurface {
@@ -63,6 +71,8 @@ export interface WorldEntityState {
   readonly tags: readonly EntityTag[]; readonly homeAreaId?: string;
   readonly condition?: EntityCondition; readonly orderFor?: string;
   readonly restingOn?: string; readonly restingKind?: PlacementSurface["kind"];
+  /** For a dragged item, the far end on the ground; `position` is the end it is grabbed by. */
+  readonly trail?: Readonly<Position>;
 }
 export type CleanupPhase = "trash" | "litter";
 export type JanitorActivity =
@@ -120,6 +130,8 @@ export interface WorldSnapshot {
   /** Parents, passers-by, and their dog in the square; empty elsewhere. */
   readonly townsfolk?: readonly TownspersonState[];
   readonly dogs?: readonly DogState[];
+  /** The street musician on the square's stage, when there is one. */
+  readonly musician?: MusicianState;
 }
 export type GameplayEvent =
   | { readonly type: "goose-honked"; readonly actorId: PlayerId; readonly position: Readonly<Position> }
@@ -137,6 +149,7 @@ export type GameplayEvent =
   | { readonly type: "dog-barked"; readonly actorId: string; readonly position: Readonly<Position> }
   | { readonly type: "drink-spilled"; readonly actorId: string; readonly entityId: string; readonly position: Readonly<Position> }
   | { readonly type: "order-called"; readonly actorId: string; readonly entityId: string; readonly forActorId: string; readonly position: Readonly<Position> }
+  | { readonly type: "instrument-twanged"; readonly actorId: PlayerId; readonly entityId: string; readonly position: Readonly<Position> }
   | { readonly type: "area-transition-requested"; readonly transitionId: string; readonly toAreaId: string; readonly targetPosition: Readonly<Position>; readonly targetHeading: number }
   | { readonly type: "objective-completed"; readonly objectiveId: string };
 export interface WorldRules {
@@ -150,6 +163,7 @@ export interface WorldRules {
   readonly surfaces?: readonly PlacementSurface[];
   readonly cafe?: CafeCrewDefinition;
   readonly townsfolk?: TownsfolkDefinition;
+  readonly musician?: MusicianDefinition;
   resolveMovement(current: Readonly<Position>, proposed: Readonly<Position>, output: Position): void;
 }
 
@@ -169,6 +183,7 @@ export interface SimulationEntityState {
   readonly condition?: EntityCondition;
   readonly orderFor?: string;
   readonly restingOn?: string;
+  readonly trail?: Readonly<Position>;
 }
 export interface SimulationSessionState {
   readonly durableFacts: readonly string[];
@@ -182,6 +197,7 @@ interface MutableEntity {
   readonly definition: WorldEntityDefinition; readonly position: Position; heading: number;
   active?: boolean; holderId?: string; containedBy?: string; serviceCount: number;
   condition?: EntityCondition; orderFor?: string; restingOn?: string;
+  trail?: Position;
 }
 type JanitorResume = Readonly<{ activity: JanitorActivity; targetEntityId?: string }>;
 interface MutableJanitor {
@@ -212,6 +228,7 @@ interface MutableSecondPlayer {
   heldEntityId?: string;
   honkQueued: boolean;
   interactionQueued: boolean;
+  dragPhase: number;
 }
 interface PlayerActorView {
   readonly id: PlayerId;
@@ -231,6 +248,14 @@ const MAX_STEPS_PER_FRAME = 8;
 const SHOO_PUSH_SECONDS = 0.72;
 const SHOO_PUSH_SPEED = 3.25;
 const SHOO_COOLDOWN_SECONDS = 1.2;
+/** A dragging goose moves in tugs: one heave every this many seconds. */
+const DRAG_TUG_SECONDS = 0.85;
+/** The slowest part of a tug, as a fraction of the dragged item's top speed. */
+const DRAG_TUG_SLACK = 0.3;
+/** Dragging only scrapes audibly above this speed. */
+const DRAG_SCRAPE_SPEED = 0.3;
+/** How far a honk carries. */
+const HONK_NOISE_RADIUS = 16;
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 const distance2d = (left: Readonly<Position>, right: Readonly<Position>): number => Math.hypot(left.x - right.x, left.z - right.z);
 
@@ -253,6 +278,8 @@ export class Simulation {
   private janitor?: MutableJanitor;
   private readonly cafe?: CafeCrew;
   private readonly town?: Townsfolk;
+  private readonly musician?: Musician;
+  private dragPhase = 0;
   private heading = 0; private turnAmount = 0; private wingsSpread = false; private sneaking = false; private threatening = false;
   private accumulator = 0; private honkQueued = false; private interactionQueued = false;
   private tickCount = 0; private idleSeconds = 0; private poopSequence = 0;
@@ -300,6 +327,10 @@ export class Simulation {
     }
     if (rules.cafe) this.cafe = new CafeCrew(rules.cafe);
     if (rules.townsfolk) this.town = new Townsfolk(rules.townsfolk);
+    if (rules.musician) {
+      if (!this.entitiesById.get(rules.musician.guitarId)?.definition.carryable) throw new Error(`Musician has no guitar: ${rules.musician.guitarId}`);
+      this.musician = new Musician(rules.musician);
+    }
     this.reset();
     if (sessionState) this.restoreSessionState(sessionState);
   }
@@ -314,7 +345,7 @@ export class Simulation {
     return { id: "goose", position: { ...this.position }, velocity: { ...this.velocity }, heading: this.heading,
       speed: Math.hypot(this.velocity.x, this.velocity.z), turnAmount: this.turnAmount,
       wingsSpread: this.wingsSpread, sneaking: this.sneaking, threatening: this.threatening, spooked: this.spookedSeconds > 0,
-      heldEntityId: this.heldEntityId };
+      heldEntityId: this.heldEntityId, dragging: this.isDragging(this.heldEntityId) };
   }
   get secondaryPlayer(): PlayerState | undefined {
     const player = this.secondPlayer;
@@ -322,7 +353,7 @@ export class Simulation {
     return { id: player.id, position: { ...player.position }, velocity: { ...player.velocity }, heading: player.heading,
       speed: Math.hypot(player.velocity.x, player.velocity.z), turnAmount: player.turnAmount,
       wingsSpread: player.wingsSpread, sneaking: player.sneaking, threatening: player.threatening, spooked: false,
-      heldEntityId: player.heldEntityId };
+      heldEntityId: player.heldEntityId, dragging: this.isDragging(player.heldEntityId) };
   }
   get players(): readonly PlayerState[] {
     const second = this.secondaryPlayer;
@@ -342,6 +373,7 @@ export class Simulation {
       tags: entity.definition.tags ?? [], homeAreaId: entity.definition.homeAreaId,
       condition: entity.condition, orderFor: entity.orderFor,
       restingOn: entity.restingOn, restingKind: entity.restingOn ? this.surface(entity.restingOn)?.kind : undefined,
+      trail: entity.trail ? { ...entity.trail } : undefined,
     })), janitor: this.janitor ? { id: this.janitor.definition.id, position: { ...this.janitor.position },
       heading: this.janitor.heading, activity: this.janitor.activity,
       activitySecondsRemaining: this.janitor.activitySecondsRemaining, cleanupPhase: this.janitor.cleanupPhase,
@@ -351,11 +383,11 @@ export class Simulation {
       splashKids: this.splashKids.map((child) => ({ id: child.definition.id, position: { ...child.position }, heading: child.heading,
         activity: child.activity, activitySecondsRemaining: child.activitySecondsRemaining })),
       durableFacts: [...this.durableFacts], cafePeople: this.cafe?.snapshot() ?? [],
-      townsfolk: this.town?.snapshot() ?? [], dogs: this.town?.dogSnapshot() ?? [] };
+      townsfolk: this.town?.snapshot() ?? [], dogs: this.town?.dogSnapshot() ?? [], musician: this.musician?.snapshot() };
   }
-  get objectiveList(): readonly Readonly<{ id: string; description: string; areaId?: string; completed: boolean }>[] {
+  get objectiveList(): readonly Readonly<{ id: string; description: string; areaId?: string; needsTwoGeese?: boolean; completed: boolean }>[] {
     return this.rules.objectives.map((objective) => ({ id: objective.id, description: objective.description, areaId: objective.areaId,
-      completed: this.objectives.isComplete(objective.id) }));
+      needsTwoGeese: objective.needsTwoGeese, completed: this.objectives.isComplete(objective.id) }));
   }
   get goosePoops(): readonly GoosePoop[] { return this.poopRecords.map((poop) => ({ id: poop.id, position: { ...poop.position } })); }
   get sessionState(): SimulationSessionState {
@@ -374,6 +406,7 @@ export class Simulation {
         condition: entity.condition,
         orderFor: entity.orderFor,
         restingOn: entity.restingOn,
+        trail: entity.trail ? { ...entity.trail } : undefined,
       });
     }
     const areaStates = new Map(this.persistedAreaStates);
@@ -434,6 +467,7 @@ export class Simulation {
         threatening: false,
         honkQueued: false,
         interactionQueued: false,
+        dragPhase: 0,
       };
       this.secondPlayer.heldEntityId = [...this.entitiesById.values()].find((entity) => entity.holderId === "goose-2")?.definition.id;
     }
@@ -490,23 +524,25 @@ export class Simulation {
     Object.assign(this.pushDirection, { x: 0, y: 0, z: 0 }); this.heading = this.rules.spawnHeading;
     Object.assign(this.previousPosition, this.position); this.previousHeading = this.heading;
     this.turnAmount = 0; this.wingsSpread = false; this.sneaking = false; this.threatening = false; this.tickCount = 0;
-    this.idleSeconds = 0; this.poopSequence = 0; this.heldEntityId = undefined; this.spookedSeconds = 0;
+    this.idleSeconds = 0; this.poopSequence = 0; this.heldEntityId = undefined; this.spookedSeconds = 0; this.dragPhase = 0;
     if (this.secondPlayer) {
       const player = this.secondPlayer;
       Object.assign(player.position, player.spawn); Object.assign(player.previousPosition, player.spawn);
       Object.assign(player.velocity, { x: 0, y: 0, z: 0 });
       player.heading = this.rules.spawnHeading; player.previousHeading = player.heading; player.turnAmount = 0;
       player.wingsSpread = false; player.sneaking = false; player.threatening = false;
-      player.heldEntityId = undefined; player.honkQueued = false; player.interactionQueued = false;
+      player.heldEntityId = undefined; player.honkQueued = false; player.interactionQueued = false; player.dragPhase = 0;
     }
     this.poopRecords.length = 0; this.durableFacts.clear();
     for (const entity of this.entitiesById.values()) {
       Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0;
       entity.active = entity.definition.active; entity.holderId = undefined; entity.containedBy = undefined; entity.serviceCount = 0;
       entity.condition = entity.definition.condition; entity.orderFor = undefined; entity.restingOn = this.surfaceAt(entity.position)?.id;
+      entity.trail = undefined;
     }
     this.cafe?.reset();
     this.town?.reset();
+    this.musician?.reset();
     if (this.janitor) {
       const janitor = this.janitor;
       Object.assign(janitor.position, janitor.definition.position); janitor.heading = janitor.definition.heading;
@@ -542,7 +578,8 @@ export class Simulation {
     const acceptingMovement = this.spookedSeconds <= 0;
     const hasInput = acceptingMovement && length * length > 0.001;
     const heldMaxSpeed = this.heldEntityId ? this.entitiesById.get(this.heldEntityId)?.definition.carryable?.maxCarrySpeed : undefined;
-    const speed = Math.min(command.hurry ? HURRY_SPEED : WALK_SPEED, heldMaxSpeed ?? Infinity);
+    this.dragPhase = this.isDragging(this.heldEntityId) && hasInput ? (this.dragPhase + FIXED_STEP / DRAG_TUG_SECONDS) % 1 : 0;
+    const speed = Math.min(command.hurry ? HURRY_SPEED : WALK_SPEED, heldMaxSpeed ?? Infinity) * this.tugFactor(this.heldEntityId, this.dragPhase);
     const smoothing = 1 - Math.exp(-(hasInput ? 11 : 16) * FIXED_STEP);
     this.velocity.x += ((hasInput ? requestedX * scale * speed : 0) - this.velocity.x) * smoothing;
     this.velocity.z += ((hasInput ? requestedZ * scale * speed : 0) - this.velocity.z) * smoothing;
@@ -555,7 +592,8 @@ export class Simulation {
     Object.assign(this.position, resolved); this.spookedSeconds = Math.max(0, this.spookedSeconds - FIXED_STEP);
     this.turnAmount = 0;
     if (Math.hypot(this.velocity.x, this.velocity.z) > 0.08 && this.spookedSeconds <= 0) {
-      const target = Math.atan2(-this.velocity.x, -this.velocity.z);
+      // Dragging, the goose backs away facing what it pulls; otherwise it faces where it goes.
+      const target = this.isDragging(this.heldEntityId) ? Math.atan2(this.velocity.x, this.velocity.z) : Math.atan2(-this.velocity.x, -this.velocity.z);
       const difference = Math.atan2(Math.sin(target - this.heading), Math.cos(target - this.heading));
       const previous = this.heading; this.heading += difference * Math.min(1, FIXED_STEP * 10.5);
       const angularVelocity = (this.heading - previous) / FIXED_STEP;
@@ -570,12 +608,15 @@ export class Simulation {
       events.push({ type: "goose-honked", actorId: "goose-2", position: { ...this.secondPlayer.position } });
       this.secondPlayer.honkQueued = false;
     }
+    if (honked) this.twang(events, "goose");
+    if (secondHonked) this.twang(events, "goose-2");
     this.updateSplashKids(events);
     this.updateJanitor(events, honked || secondHonked);
     this.cafe?.update(this.cafeWorld(events, honked || secondHonked), events, FIXED_STEP);
     this.town?.update(([this.playerActor("goose"), this.playerActor("goose-2")].filter((player): player is PlayerActorView => Boolean(player)))
       .map((player) => ({ position: player.position, startling: honked || secondHonked || player.wingsSpread || player.threatening })), events, FIXED_STEP,
       this.splashKids.filter((child) => child.activity === "frightened" || child.activity === "crying").map((child) => child.position));
+    this.musician?.update(this.musicianWorld(events, [...(honked ? ["goose" as const] : []), ...(secondHonked ? ["goose-2" as const] : [])]), events, FIXED_STEP);
     this.syncOwnedEntities();
     for (const zone of this.rules.objectiveZones ?? []) {
       const guarded = zone.guardedBy === this.janitor?.definition.id
@@ -613,7 +654,8 @@ export class Simulation {
     const length = Math.hypot(requestedX, requestedZ); const scale = 1 / Math.max(1, length);
     const hasInput = length * length > 0.001;
     const heldMaxSpeed = player.heldEntityId ? this.entitiesById.get(player.heldEntityId)?.definition.carryable?.maxCarrySpeed : undefined;
-    const speed = Math.min(command.hurry ? HURRY_SPEED : WALK_SPEED, heldMaxSpeed ?? Infinity);
+    player.dragPhase = this.isDragging(player.heldEntityId) && hasInput ? (player.dragPhase + FIXED_STEP / DRAG_TUG_SECONDS) % 1 : 0;
+    const speed = Math.min(command.hurry ? HURRY_SPEED : WALK_SPEED, heldMaxSpeed ?? Infinity) * this.tugFactor(player.heldEntityId, player.dragPhase);
     const smoothing = 1 - Math.exp(-(hasInput ? 11 : 16) * FIXED_STEP);
     player.velocity.x += ((hasInput ? requestedX * scale * speed : 0) - player.velocity.x) * smoothing;
     player.velocity.z += ((hasInput ? requestedZ * scale * speed : 0) - player.velocity.z) * smoothing;
@@ -629,7 +671,7 @@ export class Simulation {
     else Object.assign(player.velocity, { x: 0, y: 0, z: 0 });
     player.turnAmount = 0;
     if (Math.hypot(player.velocity.x, player.velocity.z) > 0.08) {
-      const target = Math.atan2(-player.velocity.x, -player.velocity.z);
+      const target = this.isDragging(player.heldEntityId) ? Math.atan2(player.velocity.x, player.velocity.z) : Math.atan2(-player.velocity.x, -player.velocity.z);
       const difference = Math.atan2(Math.sin(target - player.heading), Math.cos(target - player.heading));
       const previous = player.heading;
       player.heading += difference * Math.min(1, FIXED_STEP * 10.5);
@@ -688,11 +730,12 @@ export class Simulation {
       entity.condition = entityState.condition;
       entity.orderFor = entityState.orderFor;
       entity.restingOn = entityState.restingOn && this.surface(entityState.restingOn) ? entityState.restingOn : undefined;
+      entity.trail = entityState.trail ? { ...entityState.trail } : undefined;
       // People other than the janitor restart their routine on entry, so nothing may stay in their hands.
       if (entity.holderId && entity.holderId !== "goose" && entity.holderId !== "goose-2" && entity.holderId !== this.janitor?.definition.id) {
         entity.holderId = undefined;
         const home = entity.definition.homeAreaId === currentAreaId;
-        if (home) { Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0; }
+        if (home) { Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0; entity.trail = undefined; }
         entity.restingOn = this.surfaceAt(entity.position)?.id;
       }
       if (entity.holderId === "goose") this.heldEntityId = entity.definition.id;
@@ -743,6 +786,9 @@ export class Simulation {
   private acquireEntity(entity: MutableEntity, actorId: string): boolean {
     if (entity.holderId || entity.containedBy || !entity.definition.carryable) return false;
     entity.holderId = actorId; entity.restingOn = undefined;
+    // A dragged item's far end starts wherever it lies and is pulled out behind the goose; people simply lift it.
+    if (entity.definition.carryable.drag && (actorId === "goose" || actorId === "goose-2")) entity.trail ??= { ...entity.position };
+    else entity.trail = undefined;
     if (actorId === "goose") this.heldEntityId = entity.definition.id;
     else if (actorId === "goose-2" && this.secondPlayer) this.secondPlayer.heldEntityId = entity.definition.id;
     return true;
@@ -752,7 +798,7 @@ export class Simulation {
     if (entity.holderId === "goose-2" && this.secondPlayer?.heldEntityId === entity.definition.id) this.secondPlayer.heldEntityId = undefined;
     entity.holderId = undefined;
     if (placeAtHome) {
-      Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0;
+      Object.assign(entity.position, entity.definition.position); entity.heading = entity.definition.heading ?? 0; entity.trail = undefined;
       entity.restingOn = this.surfaceAt(entity.position)?.id;
     }
   }
@@ -780,7 +826,13 @@ export class Simulation {
     for (const entity of this.entitiesById.values()) {
       const carryable = entity.definition.carryable;
       if (!carryable) continue;
-      if (entity.holderId === "goose") {
+      if (carryable.drag && (entity.holderId === "goose" || entity.holderId === "goose-2")) {
+        const player = entity.holderId === "goose" ? { position: this.position, heading: this.heading } : this.secondPlayer;
+        if (player) this.dragAlong(entity, carryable, player.position, player.heading);
+      } else if (this.musician && entity.holderId === this.musician.id) {
+        const hold = this.musician.holdPoint();
+        Object.assign(entity.position, hold.position); entity.heading = hold.heading;
+      } else if (entity.holderId === "goose") {
         entity.position.x = this.position.x - Math.sin(this.heading) * carryable.carryDistance;
         entity.position.y = this.position.y + carryable.carryHeight;
         entity.position.z = this.position.z - Math.cos(this.heading) * carryable.carryDistance;
@@ -809,9 +861,84 @@ export class Simulation {
     if (!player?.heldEntityId) return;
     const entity = this.entitiesById.get(player.heldEntityId); if (!entity) return;
     this.releaseEntity(entity, false);
+    if (entity.definition.carryable?.drag && entity.trail) {
+      // Let go where it lies: the grabbed end drops to the ground and the rest stays put behind.
+      entity.position.y = player.position.y;
+      const length = entity.definition.carryable.drag.length;
+      const dx = entity.trail.x - entity.position.x; const dz = entity.trail.z - entity.position.z; const reach = Math.hypot(dx, dz) || 1;
+      entity.trail.x = entity.position.x + dx / reach * length; entity.trail.z = entity.position.z + dz / reach * length;
+      entity.restingOn = undefined;
+      events.push({ type: "entity-dropped", actorId: playerId, entityId: entity.definition.id, position: { ...entity.position } });
+      return;
+    }
     this.placeEntity(entity, { x: player.position.x - Math.sin(player.heading) * 0.62, z: player.position.z - Math.cos(player.heading) * 0.62 },
       player.heading, player.position.y);
     events.push({ type: "entity-dropped", actorId: playerId, entityId: entity.definition.id, position: { ...entity.position } });
+  }
+
+  private isDragging(entityId: string | undefined): boolean {
+    return entityId !== undefined && this.entitiesById.get(entityId)?.definition.carryable?.drag !== undefined;
+  }
+  /** Dragging moves in heaves: quick on the pull, nearly stopped between them. */
+  private tugFactor(entityId: string | undefined, phase: number): number {
+    if (!this.isDragging(entityId)) return 1;
+    return DRAG_TUG_SLACK + (1 - DRAG_TUG_SLACK) * Math.sin(Math.PI * phase) ** 2;
+  }
+  /** The grabbed end follows the bill; the far end slides along the ground after it like a rod on a tether. */
+  private dragAlong(entity: MutableEntity, carryable: CarryableDefinition, from: Readonly<Position>, heading: number): void {
+    const drag = carryable.drag!;
+    const grip = { x: from.x - Math.sin(heading) * carryable.carryDistance, y: from.y + carryable.carryHeight, z: from.z - Math.cos(heading) * carryable.carryDistance };
+    const reach = Math.sqrt(Math.max(0.01, drag.length ** 2 - carryable.carryHeight ** 2));
+    const trail = entity.trail ?? { x: from.x + Math.sin(heading) * reach, y: from.y, z: from.z + Math.cos(heading) * reach };
+    let dx = trail.x - grip.x; let dz = trail.z - grip.z; const length = Math.hypot(dx, dz);
+    if (length < 1e-4) { dx = Math.sin(heading); dz = Math.cos(heading); } else { dx /= length; dz /= length; }
+    entity.trail = { x: grip.x + dx * reach, y: from.y, z: grip.z + dz * reach };
+    Object.assign(entity.position, grip);
+    entity.heading = Math.atan2(dx, dz);
+  }
+  /** Honking with an instrument in the bill plays it, after a fashion. */
+  private twang(events: GameplayEvent[], playerId: PlayerId): void {
+    const heldId = playerId === "goose" ? this.heldEntityId : this.secondPlayer?.heldEntityId;
+    const held = heldId ? this.entitiesById.get(heldId) : undefined;
+    if (!held?.definition.tags?.includes("guitar")) return;
+    this.durableFacts.add(GUITAR_TWANG_FACT_ID);
+    events.push({ type: "instrument-twanged", actorId: playerId, entityId: held.definition.id, position: { ...held.position } });
+  }
+  /** What the musician can notice this step: the geese, honks, and the scrape of anything being dragged. */
+  private musicianWorld(events: GameplayEvent[], honkers: readonly PlayerId[]): MusicianWorld {
+    const players = [this.playerActor("goose"), this.playerActor("goose-2")].filter((player): player is PlayerActorView => Boolean(player));
+    const noises: HeardNoise[] = honkers.flatMap((id) => {
+      const player = this.playerActor(id); return player ? [{ kind: "honk" as const, sourceId: id, position: { ...player.position }, radius: HONK_NOISE_RADIUS }] : [];
+    });
+    for (const player of players) {
+      const held = player.heldEntityId ? this.entitiesById.get(player.heldEntityId) : undefined;
+      const drag = held?.definition.carryable?.drag;
+      if (!held || !drag || Math.hypot(player.velocity.x, player.velocity.z) < DRAG_SCRAPE_SPEED) continue;
+      noises.push({ kind: "scrape", sourceId: player.id, position: { ...(held.trail ?? held.position) }, radius: drag.scrapeRadius });
+    }
+    const guitarId = this.rules.musician!.guitarId;
+    return {
+      geese: players.map((player) => ({ id: player.id, position: { ...player.position }, heldEntityId: player.heldEntityId })),
+      noises,
+      guitar: () => {
+        const entity = this.entitiesById.get(guitarId);
+        return entity ? { id: guitarId, position: { ...entity.position }, holderId: entity.holderId } : undefined;
+      },
+      acquire: (entityId, actorId) => {
+        const entity = this.entitiesById.get(entityId);
+        if (!entity || !this.acquireEntity(entity, actorId)) return false;
+        events.push({ type: "entity-grabbed", actorId, entityId });
+        return true;
+      },
+      returnToStand: (entityId, actorId) => {
+        const entity = this.entitiesById.get(entityId); if (!entity || entity.holderId !== actorId) return false;
+        this.releaseEntity(entity, true);
+        events.push({ type: "entity-dropped", actorId, entityId, position: { ...entity.position } });
+        return true;
+      },
+      pushGoose: (actorId, from, playerId) => this.pushGooseAway(actorId, from, events, playerId),
+      recordFact: (factId) => { this.durableFacts.add(factId); },
+    };
   }
 
   private route(role: CleanupRole): readonly string[] { return this.cleanupRoutes.get(role) ?? []; }

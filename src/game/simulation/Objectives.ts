@@ -3,6 +3,8 @@ export interface ObjectiveDefinition<State> {
   readonly description: string;
   /** The level whose to-do list shows this task. Completion is still checked wherever the goose is. */
   readonly areaId?: string;
+  /** Only listed when two geese are playing; one goose alone cannot do it. */
+  readonly needsTwoGeese?: boolean;
   /** Observe authoritative state; never move objects or script a solution here. */
   readonly isSatisfied: (state: State) => boolean;
 }

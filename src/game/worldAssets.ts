@@ -24,6 +24,13 @@ export interface WorldAssetDefinition {
   readonly halfDepth: number;
   readonly colliders: readonly WorldAssetCollider[];
   readonly occludesCamera?: boolean;
+  /**
+   * People cannot see through it (walls, buildings, the brewery tank). Sight is its
+   * own property, separate from walking and camera fading: a low bench blocks the
+   * goose but not anyone's view. Uses `sightBlockers` when given, else `colliders`.
+   */
+  readonly blocksSight?: boolean;
+  readonly sightBlockers?: readonly WorldAssetCollider[];
   /** Local visual pivot offset used when an asset's authored transform is not its mesh center. */
   readonly pivotOffset?: Readonly<{ x: number; z: number }>;
   /** Large compositional layers should not create meaningless overlap warnings. */
@@ -37,7 +44,8 @@ export interface WorldAssetDefinition {
   /** Local handle point and reach used by the common interaction resolver. */
   readonly controller?: Readonly<{ interactionOffset: Readonly<{ x: number; y: number; z: number }>; range: number; momentary?: boolean; verb?: string }>;
   /** Common grab/drop capability; the renderer never decides ownership. */
-  readonly carryable?: Readonly<{ interactionRange: number; carryHeight: number; carryDistance: number; stealableWhileHeld?: boolean; maxCarrySpeed?: number }>;
+  readonly carryable?: Readonly<{ interactionRange: number; carryHeight: number; carryDistance: number; stealableWhileHeld?: boolean; maxCarrySpeed?: number;
+    drag?: Readonly<{ length: number; scrapeRadius: number }> }>;
   /** Capabilities tasks and people look for (a drink, a pastry, the tip jar…). */
   readonly tags?: readonly EntityTag[];
   /** Starting state for drinks: a customer's mug starts full, a barista's cup starts clean. */
@@ -51,7 +59,7 @@ export interface WorldAssetDefinition {
   /** How close a worker gets before using this cleanup affordance. */
   readonly cleanupRange?: number;
   readonly gameplayRole?: "janitor" | "splash-kid" | "shop-entrance" | "barista" | "cafe-customer" | "cafe-worker"
-    | "town-parent" | "town-walker" | "town-dog" | "cafe-patron";
+    | "town-parent" | "town-walker" | "town-dog" | "cafe-patron" | "musician";
 }
 
 /** Evenly spaced circle colliders tracing a diagonal wall or fence, ends included. */
@@ -67,9 +75,9 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.paving-patch-large", label: "Large paving patch", category: "ground", halfWidth: 8, halfDepth: 8, colliders: [], surfaceHeight: 0, surfacePriority: 1 },
   { assetId: "plaza.paving-base", label: "Plaza paving base", category: "ground", halfWidth: 22, halfDepth: 18, colliders: [], warnForOverlap: false, surfaceHeight: 0, surfacePriority: 1 },
   { assetId: "coffee.shop-floor", label: "Coffee shop floor", category: "ground", halfWidth: 9, halfDepth: 7, colliders: [], warnForOverlap: false, surfaceHeight: 0, surfacePriority: 10 },
-  { assetId: "coffee.wall-long", label: "Coffee shop long wall", category: "architecture", halfWidth: 8.8, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 8.8, halfDepth: 0.18 }], occludesCamera: true, warnForOverlap: false },
-  { assetId: "coffee.wall-side", label: "Coffee shop side wall", category: "architecture", halfWidth: 0.18, halfDepth: 6.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.18, halfDepth: 6.8 }], occludesCamera: true, warnForOverlap: false },
-  { assetId: "coffee.wall-door-wing", label: "Coffee shop front wall", category: "architecture", halfWidth: 3.5, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.5, halfDepth: 0.18 }], occludesCamera: true, warnForOverlap: false },
+  { assetId: "coffee.wall-long", label: "Coffee shop long wall", category: "architecture", halfWidth: 8.8, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 8.8, halfDepth: 0.18 }], occludesCamera: true, blocksSight: true, warnForOverlap: false },
+  { assetId: "coffee.wall-side", label: "Coffee shop side wall", category: "architecture", halfWidth: 0.18, halfDepth: 6.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.18, halfDepth: 6.8 }], occludesCamera: true, blocksSight: true, warnForOverlap: false },
+  { assetId: "coffee.wall-door-wing", label: "Coffee shop front wall", category: "architecture", halfWidth: 3.5, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.5, halfDepth: 0.18 }], occludesCamera: true, blocksSight: true, warnForOverlap: false },
   { assetId: "coffee.front-door", label: "Coffee shop front door", category: "architecture", halfWidth: 2.1, halfDepth: 0.18, colliders: [], warnForOverlap: false },
   { assetId: "coffee.wall-board", label: "Coffee shop menu board", category: "furniture", halfWidth: 1.7, halfDepth: 0.08, colliders: [], occludesCamera: true, warnForOverlap: false },
   { assetId: "coffee.counter", label: "Coffee shop counter", category: "furniture", halfWidth: 3.1, halfDepth: 0.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.1, halfDepth: 0.68 }], occludesCamera: true,
@@ -108,8 +116,8 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "coffee.wall-side-doorway", label: "Retired side wall with doorway", category: "architecture", halfWidth: 0.18, halfDepth: 6.8,
     colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.18, halfDepth: 6.8 }], occludesCamera: true, warnForOverlap: false },
   { assetId: "coffee.kitchen-floor", label: "Kitchen tile floor", category: "ground", halfWidth: 4.2, halfDepth: 3.5, colliders: [], warnForOverlap: false, surfaceHeight: 0, surfacePriority: 10 },
-  { assetId: "coffee.kitchen-wall", label: "Kitchen long wall", category: "architecture", halfWidth: 4.2, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 4.2, halfDepth: 0.18 }], occludesCamera: true, warnForOverlap: false },
-  { assetId: "coffee.kitchen-wall-short", label: "Kitchen short wall", category: "architecture", halfWidth: 3.68, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.68, halfDepth: 0.18 }], occludesCamera: true, warnForOverlap: false },
+  { assetId: "coffee.kitchen-wall", label: "Kitchen long wall", category: "architecture", halfWidth: 4.2, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 4.2, halfDepth: 0.18 }], occludesCamera: true, blocksSight: true, warnForOverlap: false },
+  { assetId: "coffee.kitchen-wall-short", label: "Kitchen short wall", category: "architecture", halfWidth: 3.68, halfDepth: 0.18, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.68, halfDepth: 0.18 }], occludesCamera: true, blocksSight: true, warnForOverlap: false },
   { assetId: "coffee.kitchen-oven", label: "Deck oven", category: "furniture", halfWidth: 0.95, halfDepth: 0.65, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.95, halfDepth: 0.62 }], occludesCamera: true },
   { assetId: "coffee.pastry-rack", label: "Pastry rack", category: "furniture", halfWidth: 0.42, halfDepth: 0.34, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.42, halfDepth: 0.34 }], occludesCamera: true },
   { assetId: "coffee.kitchen-sink", label: "Industrial sink", category: "furniture", halfWidth: 1.2, halfDepth: 0.42, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.2, halfDepth: 0.4 }], occludesCamera: true },
@@ -126,13 +134,13 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "street.road-tile", label: "Lowered road tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: -0.15, surfacePriority: 2 },
   { assetId: "street.curb-straight", label: "Straight curb", category: "ground", halfWidth: 4, halfDepth: 0.2, colliders: [] },
   { assetId: "plaza.building-frontage", label: "Building frontage", category: "architecture", halfWidth: 22, halfDepth: 22, colliders: [], occludesCamera: true, pivotOffset: { x: 0, z: -20 }, warnForOverlap: false },
-  { assetId: "street.building1", label: "Building 1 — arched brick storefront", category: "architecture", halfWidth: 3.45, halfDepth: 3.45, colliders: [{ shape: "box", x: 0, z: -0.184, halfWidth: 3.289, halfDepth: 3.197 }], occludesCamera: true },
-  { assetId: "street.building2", label: "Café with striped awning", category: "architecture", halfWidth: 3.45, halfDepth: 3.72, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.35, halfDepth: 3.16 }], occludesCamera: true },
-  { assetId: "street.building3", label: "Paired-window shop", category: "architecture", halfWidth: 3.45, halfDepth: 3.42, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.35, halfDepth: 3.16 }], occludesCamera: true },
-  { assetId: "street.building4", label: "Brick arcade", category: "architecture", halfWidth: 3.85, halfDepth: 3.72, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.75, halfDepth: 3.16 }], occludesCamera: true },
-  { assetId: "street.building5", label: "Sage townhouse", category: "architecture", halfWidth: 3.15, halfDepth: 3.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.05, halfDepth: 3.16 }], occludesCamera: true },
-  { assetId: "oldtown.miller-block", label: "Miller Block — historic brick corner", category: "architecture", halfWidth: 8.2, halfDepth: 5.1, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.99, halfDepth: 4.07 }], occludesCamera: true },
-  { assetId: "oldtown.coopersmith-block", label: "CooperSmith’s — glazed canopy block", category: "architecture", halfWidth: 8.9, halfDepth: 5.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 8.69, halfDepth: 4.07 }], occludesCamera: true },
+  { assetId: "street.building1", label: "Building 1 — arched brick storefront", category: "architecture", halfWidth: 3.45, halfDepth: 3.45, colliders: [{ shape: "box", x: 0, z: -0.184, halfWidth: 3.289, halfDepth: 3.197 }], occludesCamera: true, blocksSight: true },
+  { assetId: "street.building2", label: "Café with striped awning", category: "architecture", halfWidth: 3.45, halfDepth: 3.72, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.35, halfDepth: 3.16 }], occludesCamera: true, blocksSight: true },
+  { assetId: "street.building3", label: "Paired-window shop", category: "architecture", halfWidth: 3.45, halfDepth: 3.42, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.35, halfDepth: 3.16 }], occludesCamera: true, blocksSight: true },
+  { assetId: "street.building4", label: "Brick arcade", category: "architecture", halfWidth: 3.85, halfDepth: 3.72, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.75, halfDepth: 3.16 }], occludesCamera: true, blocksSight: true },
+  { assetId: "street.building5", label: "Sage townhouse", category: "architecture", halfWidth: 3.15, halfDepth: 3.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.05, halfDepth: 3.16 }], occludesCamera: true, blocksSight: true },
+  { assetId: "oldtown.miller-block", label: "Miller Block — historic brick corner", category: "architecture", halfWidth: 8.2, halfDepth: 5.1, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.99, halfDepth: 4.07 }], occludesCamera: true, blocksSight: true },
+  { assetId: "oldtown.coopersmith-block", label: "CooperSmith’s — glazed canopy block", category: "architecture", halfWidth: 8.9, halfDepth: 5.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 8.69, halfDepth: 4.07 }], occludesCamera: true, blocksSight: true },
   { assetId: "oldtown.coopersmith-pub", label: "CooperSmith’s — tapered pub & umbrella patio", category: "architecture", halfWidth: 6.1, halfDepth: 10.8, colliders: [
     // Brick block: the full-width rear, then boxes stepping in under the
     // diagonal facade, with small circles sealing the sawtooth along it.
@@ -154,9 +162,17 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
     { shape: "circle", x: 2.9715, z: 6.4277, radius: 0.08 },
     { shape: "circle", x: 5.4593, z: 4.1103, radius: 0.08 },
     ...[[-4.1, 9.6], [-1.7, 9.6], [0.7, 9.6], [3.1, 9.6], [1, 7.1], [3.4, 7.1], [4, 4.8]].map(([x, z]) => ({ shape: "circle" as const, x, z, radius: 0.4 })),
-  ], occludesCamera: true },
+  ], occludesCamera: true, blocksSight: true, sightBlockers: [
+    // The brick block hides what is behind it; the patio fence and umbrellas do not.
+    { shape: "box", x: 0.5, z: -5, halfWidth: 5.5, halfDepth: 5.6 },
+    { shape: "box", x: -0.4125, z: 1.45, halfWidth: 4.5875, halfDepth: 0.85 },
+    { shape: "box", x: -1.325, z: 3.15, halfWidth: 3.675, halfDepth: 0.85 },
+    { shape: "box", x: -2.2375, z: 4.85, halfWidth: 2.7625, halfDepth: 0.85 },
+    { shape: "box", x: -3.15, z: 6.55, halfWidth: 1.85, halfDepth: 0.85 },
+    ...circlesAlong(-1.3, 7.4, 5.8, 0.786, 17, 0.25),
+  ] },
   { assetId: "oldtown.stage", label: "Old Town performance stage", category: "landmark", halfWidth: 7, halfDepth: 3.65, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 6.3, halfDepth: 2.7 }], occludesCamera: true },
-  { assetId: "oldtown.brewery-tank", label: "Brewery fermentation tank", category: "landmark", halfWidth: 2.5, halfDepth: 2.5, colliders: [{ shape: "circle", x: 0, z: 0, radius: 2.5 }], occludesCamera: true },
+  { assetId: "oldtown.brewery-tank", label: "Brewery fermentation tank", category: "landmark", halfWidth: 2.5, halfDepth: 2.5, colliders: [{ shape: "circle", x: 0, z: 0, radius: 2.5 }], occludesCamera: true, blocksSight: true },
   { assetId: "oldtown.bench", label: "Old Town bench", category: "furniture", halfWidth: 1.125, halfDepth: 0.35, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.125, halfDepth: 0.35 }], occludesCamera: false },
   { assetId: "oldtown.flower-bed", label: "Stone-edged flower bed", category: "planting", halfWidth: 2.375, halfDepth: 0.925, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 2.375, halfDepth: 0.925 }], occludesCamera: false },
   { assetId: "oldtown.lamp", label: "Old Town banner lamp", category: "lighting", halfWidth: 1, halfDepth: 0.24, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 0.17, halfDepth: 0.17 }], occludesCamera: false },
@@ -168,7 +184,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "oldtown.shade-tree", label: "Old Town shade tree", category: "planting", halfWidth: 3.6, halfDepth: 2.736, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.4824 }], occludesCamera: true },
   { assetId: "oldtown.oval-inlay", label: "Oval plaza paving inlay", category: "ground", halfWidth: 13.76, halfDepth: 8, colliders: [], warnForOverlap: false },
   { assetId: "oldtown.light-span", label: "Old Town festoon span", category: "lighting", halfWidth: 0.1, halfDepth: 8.1, colliders: [], warnForOverlap: false },
-  { assetId: "plaza.corner-market-building", label: "Corner market building", category: "architecture", halfWidth: 7.8, halfDepth: 6.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.25, halfDepth: 6.1 }], occludesCamera: true },
+  { assetId: "plaza.corner-market-building", label: "Corner market building", category: "architecture", halfWidth: 7.8, halfDepth: 6.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.25, halfDepth: 6.1 }], occludesCamera: true, blocksSight: true },
   { assetId: "plaza.goose-fountain", label: "Goose fountain", category: "landmark", halfWidth: 3.45, halfDepth: 3.45, colliders: [{ shape: "circle", x: 0, z: 0, radius: 3.35 }] },
   { assetId: "plaza.splash-pad", label: "Splash pad", category: "landmark", halfWidth: 4.9, halfDepth: 4.9, colliders: [], activeTarget: { initialActive: true } },
   { assetId: "plaza.play-area", label: "Play area", category: "landmark", halfWidth: 6.75, halfDepth: 3.25, colliders: [
@@ -195,8 +211,12 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.walker-teen", label: "Passer-by — teen with headphones", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-walker" },
   { assetId: "plaza.walker-commuter", label: "Passer-by — commuter in a blazer", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-walker" },
   { assetId: "plaza.walker-artist", label: "Passer-by — sketcher in a long coat", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-walker" },
+  { assetId: "plaza.street-musician", label: "Street musician (plays the stage, takes guitar breaks)", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "musician" },
   { assetId: "plaza.small-white-dog", label: "Small white dog (sits with the nearest parent)", category: "character", halfWidth: 0.25, halfDepth: 0.4, colliders: [], warnForOverlap: false, gameplayRole: "town-dog" },
   { assetId: "plaza.splash-faucet", label: "Splash-pad faucet", category: "gameplay", halfWidth: 0.4, halfDepth: 0.28, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.2 }], warnForOverlap: false, controller: { interactionOffset: { x: 0, y: 0.58, z: -0.19 }, range: 1.05 } },
+  { assetId: "oldtown.guitar-stand", label: "Guitar stand", category: "prop", halfWidth: 0.22, halfDepth: 0.22, colliders: [], warnForOverlap: false },
+  { assetId: "prop.guitar", label: "Musician's guitar", category: "prop", halfWidth: 0.2, halfDepth: 0.5, colliders: [], warnForOverlap: false, tags: ["guitar"], essential: true,
+    carryable: { interactionRange: 1.15, carryHeight: 0.42, carryDistance: 0.58, maxCarrySpeed: 1.9, drag: { length: 1.02, scrapeRadius: 9 } } },
   { assetId: "prop.beer-can", label: "Little beer can", category: "prop", halfWidth: 0.09, halfDepth: 0.09, colliders: [], warnForOverlap: false, tags: ["drink"], carryable: { interactionRange: 0.95, carryHeight: 0.72, carryDistance: 0.54 } },
   { assetId: "prop.trash-bag", label: "Janitor's trash bag", category: "prop", halfWidth: 0.24, halfDepth: 0.18, colliders: [], warnForOverlap: false, cleanupRole: "trash-bag", essential: true, carryable: { interactionRange: 1, carryHeight: 0.68, carryDistance: 0.48, stealableWhileHeld: true } },
   { assetId: "prop.litter-picker", label: "Janitor's litter picker", category: "prop", halfWidth: 0.12, halfDepth: 0.78, colliders: [], warnForOverlap: false, cleanupRole: "litter-picker", essential: true, carryable: { interactionRange: 1.5, carryHeight: 0.16, carryDistance: 0.45, stealableWhileHeld: true } },
