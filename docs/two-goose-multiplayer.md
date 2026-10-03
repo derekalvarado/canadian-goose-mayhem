@@ -23,10 +23,15 @@ implemented.
   their installed PWA.
 - Tapping Join sends the paired player an in-game request with **Host game** and
   **Not now** choices, so the host does not have to discover the request manually.
-- If the guest disconnects, Goose 2 stands still and drops nothing. Closing the
-  host still ends the authoritative session. Host migration and durable shared
-  saves remain future work. A guest can reopen the paired app and tap Join while
-  the host remains open.
+- If the guest disconnects, Goose 2 stands still and drops nothing, and the host
+  is told. The disconnected guest can tap **Join again** or **Play on my own**
+  (back to their own saved game). The host's **End shared game** sends Goose 2
+  home; it drops whatever it carries. Closing the host still ends the
+  authoritative session. Host migration and durable shared saves remain future
+  work.
+- Connecting never waits silently: if the two devices cannot reach each other
+  within about 20 seconds, both players are told to check that they share the
+  same Wi‑Fi (not a guest network or VPN).
 
 ## Architectural boundaries
 
@@ -73,6 +78,12 @@ Every checkpoint must keep single-player working and pass `npm test` and
   IDs, actor-aware interactions, two-controller assignment, iPad diagnostics,
   same-area host/guest snapshots, presentation smoothing, PWA/GitHub Pages
   support, Cloudflare rooms, and remembered pairing.
+- Connection audit (October 2026) fixed: a duplicate "connected" report that could
+  leave a guest frozen after a successful handshake, endless "Connecting…" waits,
+  messages that said "lost" when a link never formed, a guest stranded on a frozen
+  screen after a drop, stale Join requests that reappeared as popups, Goose 2
+  vanishing when the host changed areas, and menus that still asked for codes
+  after pairing. First-time pairing now carries straight on into the game.
 - Remaining: independently occupied area sessions, real two-iPad verification of
   the new code flow, broader network traversal, and host migration/shared saves.
 
@@ -96,18 +107,24 @@ Every checkpoint must keep single-player working and pass `npm test` and
 - The WebRTC data channel is wired into the game loop for same-area play: Goose 2
   commands are authenticated and rate-limited at the host; the guest renders
   bounded-rate authoritative host snapshots and never writes local progress.
+- The guest's to-do list follows the host's shared list (and is never saved on
+  the guest), and the guest is told when the host pauses.
 - Still required: support independently occupied areas online, replicate
-  one-shot presentation events and the guest to-do UI, and perform complete
+  one-shot presentation events such as honk sounds, and perform complete
   two-iPad/Joy-Con playtests of the code flow.
 - The signaling Worker is configured under `cloudflare/signaling`; Wrangler owns
   provisioning and deployment. Pairing requires explicit approval and long random
   credentials; rooms accept one host and one guest, expire after twenty minutes,
   restrict browser origins, and retain only WebRTC setup messages.
-- Latest automated checkpoint: all 240 tests pass; the game and Worker TypeScript
+- Latest automated checkpoint: all tests pass; the game and Worker TypeScript
   builds are clean. The local Worker passed both the room relay smoke test and the
   full pair/approve/first-host/join-before-host/private-room/forget smoke test.
-- Browser acceptance checkpoint: two isolated local app origins paired by code
-  and completed the automatic Host/Join WebRTC connection.
+- Browser acceptance checkpoint: two isolated local app origins paired by code and
+  carried straight on into a connected game; repeated joins against a deliberately
+  busy host page stayed in sync; blocked device-to-device links gave both players
+  the Wi‑Fi message after about 20 seconds; host-leaves, guest-leaves, End shared
+  game, Cancel join, and stale-request cases behaved as described above. These
+  fixes live in the game; the pairing service needs no redeploy for them.
 - Deployment checkpoint: Worker version `8fa4c5d8-fa3c-4596-b9e9-73ee9ca7a59e`
   is live at `https://goose-game-signaling.goose-game-2.workers.dev`; its health,
   room-relay, and full family-pairing smoke tests pass.

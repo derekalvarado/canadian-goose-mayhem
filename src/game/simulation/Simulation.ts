@@ -474,6 +474,15 @@ export class Simulation {
     return this.secondaryPlayer!;
   }
 
+  /** Ends a shared game: Goose 2 lets go of anything it carries where it stands, then leaves. */
+  disableSecondPlayer(): GameplayEvent[] {
+    const events: GameplayEvent[] = [];
+    if (!this.secondPlayer) return events;
+    this.dropHeldEntity(events, "goose-2");
+    this.secondPlayer = undefined;
+    return events;
+  }
+
   setSecondPlayerTransform(position: Readonly<Position>, heading = this.rules.spawnHeading): void {
     const player = this.secondPlayer;
     if (!player) throw new Error("Goose 2 is not active.");

@@ -8,6 +8,7 @@ import {
   GuestCommandGate,
   MAX_GUEST_MESSAGES_PER_SECOND,
   MULTIPLAYER_PROTOCOL_VERSION,
+  readSharedObjectives,
   type GuestMessage,
 } from "../src/game/multiplayer/protocol.ts";
 
@@ -49,4 +50,23 @@ test("command gate rejects replays and rate floods", () => {
 test("small host control messages round-trip", () => {
   const message = { type: "error", version: 1, code: "session", message: "Wrong host session." } as const;
   assert.deepEqual(decodeHostMessage(encodeHostMessage(message)), message);
+});
+
+test("goodbye and pause messages round-trip so each player can be told what happened", () => {
+  const paused = { type: "status", version: 1, paused: true } as const;
+  assert.deepEqual(decodeHostMessage(encodeHostMessage(paused)), paused);
+  assert.deepEqual(decodeHostMessage(encodeHostMessage({ type: "bye", version: 1 })), { type: "bye", version: 1 });
+  assert.deepEqual(decodeGuestMessage(encodeGuestMessage({ type: "bye", version: 1 })), { type: "bye", version: 1 });
+  assert.throws(() => decodeHostMessage(JSON.stringify({ type: "status", version: 1, paused: "yes" })), /Unknown host message/);
+});
+
+test("the guest shows the host's to-do list only when every entry is well formed", () => {
+  const list = [
+    { id: "steal-croissant", description: "Steal a croissant", areaId: "old-town-square.coffee-shop", completed: true },
+    { id: "two-geese", description: "Two geese: distract and steal", needsTwoGeese: true, completed: false },
+  ];
+  assert.deepEqual(readSharedObjectives(list), list);
+  assert.equal(readSharedObjectives([{ ...list[0], completed: "yes" }]), undefined);
+  assert.equal(readSharedObjectives([{ ...list[0], description: "" }]), undefined);
+  assert.equal(readSharedObjectives({ length: 1 }), undefined);
 });

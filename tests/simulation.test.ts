@@ -231,3 +231,22 @@ test("simultaneous grabs are deterministic and an item can have only one goose h
   assert.equal(secondOnly.world.entities[0]?.holderId, "goose-2", "disconnect must not drop Goose 2's item");
   assert.deepEqual(secondOnly.world.entities[0]?.position, heldPosition);
 });
+
+test("ending a shared game drops what Goose 2 carries where it stands and removes it", () => {
+  const simulation = new Simulation({
+    ...openWorld,
+    entities: [{ id: "test.apple", label: "apple", position: { x: 0.5, y: 0, z: 0 },
+      carryable: { interactionRange: 2, carryHeight: 0.5, carryDistance: 0.4 } }],
+  });
+  simulation.enableSecondPlayer({ x: 1, y: 0.02, z: 0 });
+  simulation.advancePlayers(FIXED_STEP, idle, { ...idle, interactPressed: true });
+  assert.equal(simulation.world.entities[0]?.holderId, "goose-2");
+
+  const events = simulation.disableSecondPlayer();
+  assert.deepEqual(events.map((event) => event.type), ["entity-dropped"]);
+  assert.equal(simulation.world.entities[0]?.holderId, undefined);
+  assert.equal(simulation.secondaryPlayer, undefined);
+  assert.deepEqual(simulation.disableSecondPlayer(), [], "ending twice is harmless");
+  simulation.advancePlayers(FIXED_STEP, idle, { ...idle, moveX: 1 });
+  assert.equal(simulation.players.length, 1, "a late command from the departed guest is ignored");
+});

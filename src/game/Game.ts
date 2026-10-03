@@ -30,8 +30,10 @@ import {
   encodeHostMessage,
   GuestCommandGate,
   MULTIPLAYER_PROTOCOL_VERSION,
+  readSharedObjectives,
   type AuthoritativeGameSnapshot,
   type NetworkPlayerCommand,
+  type SharedObjective,
 } from "./multiplayer/protocol.ts";
 import { NetworkMotionSmoother } from "./multiplayer/networkMotion.ts";
 
@@ -46,6 +48,10 @@ const CAMERA_TRACK_RESPONSE = 3.2;
 // iPads. Movement is continuous between these updates, while button edges send
 // immediately so honks and interactions still feel responsive.
 const GUEST_COMMAND_SEND_INTERVAL = 1 / 30;
+// The guest repeats its hello until the host welcomes it; one hello can arrive before the host is listening.
+const GUEST_HELLO_RETRY_MS = 1_000;
+// Long enough for a guest's goodbye to leave before the page reloads into its own game.
+const GUEST_GOODBYE_RELOAD_MS = 350;
 
 function createPoopView(): THREE.Group {
   const poop = new THREE.Group();
@@ -191,6 +197,10 @@ export class Game {
   private guestCommandSendAccumulator = 0;
   private guestHonkQueued = false;
   private guestInteractionQueued = false;
+  private guestHelloSentAt = 0;
+  // The host's to-do list while this device is a guest; its own saved list stays untouched.
+  private remoteObjectives?: readonly SharedObjective[];
+  private multiplayerMenu?: MultiplayerMenu;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -249,12 +259,13 @@ export class Game {
 
     if (!this.editorMode && !this.overviewMode) this.setupMobileControls();
     if (!this.editorMode && !this.overviewMode) {
-      new MultiplayerMenu({
+      this.multiplayerMenu = new MultiplayerMenu({
         onOpenChange: (open) => this.setPauseReason("multiplayer", open),
         onLocalStart: this.startLocalMultiplayer,
         onConnected: this.handleOnlineConnected,
         onDisconnected: this.handleOnlineDisconnected,
         onMessage: this.handleOnlineMessage,
+        onSessionEnd: this.handleOnlineSessionEnd,
       });
     }
     this.canvasResizeObserver = new ResizeObserver(this.resize);
@@ -430,6 +441,10 @@ export class Game {
   }
 
   private readonly handleOnlineConnected = (role: MultiplayerRole, peer: WebRtcPeer, identity: MultiplayerConnectionIdentity): void => {
+    // A repeated report for the same link must not undo a finished handshake.
+    if (this.onlinePeer === peer && this.onlineRole === role && this.onlineIdentity?.sessionId === identity.sessionId) return;
+    // The guest's own game stops advancing while it shows the host's world; keep its list safe first.
+    if (role === "guest" && this.onlineRole !== "guest" && !this.progressCleared) saveProgress(this.simulation.sessionState);
     this.onlineRole = role;
     this.onlinePeer = peer;
     this.onlineIdentity = identity;
@@ -451,11 +466,47 @@ export class Game {
       this.syncPlayerView();
       this.renderObjectives();
     } else {
-      peer.send(encodeGuestMessage({ type: "hello", version: MULTIPLAYER_PROTOCOL_VERSION,
-        sessionId: identity.sessionId, reconnectToken: identity.reconnectToken }));
+      this.sendGuestHello();
       this.goose2.visible = true;
+      // Until the host's list arrives, show none rather than this device's own saved list.
+      this.remoteObjectives ??= [];
       this.renderObjectives();
     }
+    this.updateTouchControlsVisibility();
+  };
+
+  private sendGuestHello(): void {
+    const identity = this.onlineIdentity;
+    if (!identity || !this.onlinePeer) return;
+    this.guestHelloSentAt = performance.now();
+    this.onlinePeer.send(encodeGuestMessage({ type: "hello", version: MULTIPLAYER_PROTOCOL_VERSION,
+      sessionId: identity.sessionId, reconnectToken: identity.reconnectToken }));
+  }
+
+  private sendHostPauseStatus(): void {
+    if (this.onlineRole !== "host" || !this.onlineAuthenticated) return;
+    this.onlinePeer?.send(encodeHostMessage({ type: "status", version: 1, paused: this.paused }));
+  }
+
+  /** The player ended (host) or left (guest) the shared game on purpose. */
+  private readonly handleOnlineSessionEnd = (role: MultiplayerRole): void => {
+    if (role === "host") this.onlinePeer?.send(encodeHostMessage({ type: "bye", version: 1 }));
+    else this.onlinePeer?.send(encodeGuestMessage({ type: "bye", version: 1 }));
+    if (role === "guest") {
+      // The guest's own game sat untouched behind the host's world; reopening restores it exactly.
+      window.setTimeout(() => window.location.reload(), GUEST_GOODBYE_RELOAD_MS);
+      return;
+    }
+    this.simulation.disableSecondPlayer();
+    this.onlineRole = undefined;
+    this.onlinePeer = undefined;
+    this.onlineIdentity = undefined;
+    this.onlineAuthenticated = false;
+    this.remoteCommand = undefined;
+    this.goose2.visible = false;
+    this.syncPlayerView();
+    this.world.syncGameplay(this.simulation.world, this.goose.getMouthSocket(), this.goose2.getMouthSocket());
+    this.renderObjectives();
     this.updateTouchControlsVisibility();
   };
 
@@ -499,9 +550,12 @@ export class Game {
           }
           this.onlineAuthenticated = true;
           this.onlinePeer?.send(encodeHostMessage({ type: "welcome", version: 1, sessionId: message.sessionId, playerId: "goose-2" }));
+          this.sendHostPauseStatus();
         } else if (message.type === "command" && this.onlineAuthenticated) {
           const command = this.guestCommandGate.accept(message, performance.now());
           if (command) { this.remoteCommand = command; this.remoteCommandReceivedAt = performance.now(); }
+        } else if (message.type === "bye") {
+          this.multiplayerMenu?.handlePeerGoodbye();
         } else if (message.type === "pong") {
           // Reserved for latency display; the ordered channel is already alive.
         }
@@ -512,7 +566,14 @@ export class Game {
       if (message.type === "welcome") {
         this.onlineAuthenticated = message.sessionId === this.onlineIdentity?.sessionId;
       } else if (message.type === "snapshot" && this.onlineAuthenticated) {
-        if (!this.remoteSnapshot || message.sequence > this.remoteSnapshot.tick) this.remoteSnapshot = message.snapshot;
+        if (!this.remoteSnapshot || message.sequence > this.remoteSnapshot.tick) {
+          this.remoteSnapshot = message.snapshot;
+          this.syncRemoteObjectives(readSharedObjectives(message.snapshot.objectiveList));
+        }
+      } else if (message.type === "status") {
+        this.multiplayerMenu?.setHostPaused(message.paused);
+      } else if (message.type === "bye") {
+        this.multiplayerMenu?.handlePeerGoodbye();
       } else if (message.type === "ping") {
         this.onlinePeer?.send(encodeGuestMessage({ type: "pong", version: 1, nonce: message.nonce }));
       }
@@ -520,6 +581,22 @@ export class Game {
       console.warn("Ignored an invalid multiplayer message.", error);
     }
   };
+
+  /** Follows the host's to-do list on a guest, crossing off tasks the shared game finished. */
+  private syncRemoteObjectives(objectives: readonly SharedObjective[] | undefined): void {
+    if (!objectives) return;
+    const previous = this.remoteObjectives;
+    this.remoteObjectives = objectives;
+    const finished = previous && previous.length > 0
+      ? objectives.filter((objective) => objective.completed && previous.some((old) => old.id === objective.id && !old.completed))
+      : [];
+    if (finished.length > 0) {
+      for (const objective of finished) this.celebrateTask(objective.id);
+    } else if (!previous || previous.length !== objectives.length
+      || objectives.some((objective, index) => objective.id !== previous[index]?.id || objective.completed !== previous[index]?.completed)) {
+      this.renderObjectives();
+    }
+  }
 
   private consumeRemoteCommand(): PlayerCommand | undefined {
     if (this.onlineRole !== "host" || !this.onlineAuthenticated || !this.remoteCommand
@@ -549,6 +626,9 @@ export class Game {
   }
 
   private animateOnlineGuest(delta: number, frame: InputFrame): void {
+    if (!this.onlineAuthenticated && this.onlinePeer && performance.now() - this.guestHelloSentAt >= GUEST_HELLO_RETRY_MS) {
+      this.sendGuestHello();
+    }
     let command: PlayerCommand | undefined;
     if (delta > 0 && this.onlineAuthenticated) {
       command = this.commandForFrame(frame, this.controlHeading2, this.moveDirection2, delta);
@@ -670,11 +750,13 @@ export class Game {
       if (this.disposed) return;
       const sessionState = this.simulation.sessionState;
       saveProgress(sessionState);
+      // Goose 2 comes along, whether its player shares this device or joined from another one.
+      const bringSecondGoose = this.simulation.secondaryPlayer !== undefined;
       this.worldArea = nextArea;
       this.rules = createWorldRules(this.worldArea, this.worldLayout.transitions);
       this.simulation = new Simulation(this.rules, sessionState);
       this.simulation.setPlayerTransform(event.targetPosition, event.targetHeading);
-      if (this.localMultiplayer) {
+      if (bringSecondGoose) {
         this.simulation.enableSecondPlayer({ x: event.targetPosition.x + 0.9, y: event.targetPosition.y, z: event.targetPosition.z }, event.targetHeading);
       }
       this.world.applyArea(this.worldArea);
@@ -852,7 +934,8 @@ export class Game {
   private celebrateTask(objectiveId: string): void {
     this.highlightedObjectiveId = objectiveId;
     this.renderObjectives();
-    saveProgress(this.simulation.sessionState);
+    // Shared progress is saved on the host only; a guest just sees the tick.
+    if (this.onlineRole !== "guest") saveProgress(this.simulation.sessionState);
     this.audio.playTaskComplete();
     const task = this.listedObjectives().find((objective) => objective.id === objectiveId);
     this.revealTodoList();
@@ -918,9 +1001,11 @@ export class Game {
   private progressCleared = false;
 
   /** Tasks on the to-do list: two-goose tasks appear only while a second goose is playing. */
-  private listedObjectives() {
-    const twoGeese = this.simulation.secondaryPlayer !== undefined || this.onlineRole === "guest";
-    return this.simulation.objectiveList.filter((objective) => twoGeese || !objective.needsTwoGeese);
+  private listedObjectives(): readonly SharedObjective[] {
+    const guest = this.onlineRole === "guest";
+    const twoGeese = this.simulation.secondaryPlayer !== undefined || guest;
+    const objectives = guest && this.remoteObjectives ? this.remoteObjectives : this.simulation.objectiveList;
+    return objectives.filter((objective) => twoGeese || !objective.needsTwoGeese);
   }
 
   /** The normal list is local to this level; a just-finished remote task is briefly included for its completion reveal. */
@@ -1137,6 +1222,8 @@ export class Game {
       this.touchControls?.syncPoseState(false, false, false);
       this.audio.setPaused(this.paused);
       this.clock.getDelta();
+      // A paused host stops sending the world; tell the guest why it froze.
+      this.sendHostPauseStatus();
     }
     this.updateTouchControlsVisibility();
   }

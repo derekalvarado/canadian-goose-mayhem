@@ -1,4 +1,6 @@
-export type WebRtcPeerStatus = "new" | "pairing" | "connected" | "disconnected" | "failed" | "closed";
+import { PeerStatusTracker, type PeerStatus, type PeerTransportEvent } from "./peerStatus.ts";
+
+export type WebRtcPeerStatus = PeerStatus;
 
 export interface WebRtcPeerOptions {
   readonly iceServers?: readonly RTCIceServer[];
@@ -15,6 +17,7 @@ const DEFAULT_ICE_TIMEOUT_MS = 12_000;
  */
 export class WebRtcPeer {
   private readonly connection: RTCPeerConnection;
+  private readonly tracker = new PeerStatusTracker();
   private channel?: RTCDataChannel;
   private closed = false;
 
@@ -22,12 +25,16 @@ export class WebRtcPeer {
     // No third-party ICE service is silently assumed. Host candidates support
     // the intended nearby/same-network play; a future server can inject STUN/TURN.
     this.connection = new RTCPeerConnection({ iceServers: [...(options.iceServers ?? [])] });
-    this.connection.addEventListener("connectionstatechange", this.handleConnectionState);
+    this.connection.addEventListener("connectionstatechange", () => {
+      this.forward({ type: "connection-state", state: this.connection.connectionState });
+    });
   }
+
+  /** True once game messages could flow, so a later loss means "lost" rather than "never reached". */
+  get everConnected(): boolean { return this.tracker.everConnected; }
 
   async createHostOffer(): Promise<RTCSessionDescriptionInit> {
     this.ensureOpen();
-    this.setStatus("pairing");
     this.attachChannel(this.connection.createDataChannel("goose-game", { ordered: true }));
     await this.connection.setLocalDescription(await this.connection.createOffer());
     await this.waitForIceGathering();
@@ -37,7 +44,6 @@ export class WebRtcPeer {
 
   async acceptOfferAndCreateAnswer(offer: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit> {
     this.ensureOpen();
-    this.setStatus("pairing");
     this.connection.addEventListener("datachannel", (event) => this.attachChannel(event.channel), { once: true });
     await this.connection.setRemoteDescription(offer);
     await this.connection.setLocalDescription(await this.connection.createAnswer());
@@ -53,8 +59,13 @@ export class WebRtcPeer {
 
   send(message: string): boolean {
     if (this.channel?.readyState !== "open") return false;
-    this.channel.send(message);
-    return true;
+    try {
+      this.channel.send(message);
+      return true;
+    } catch {
+      // A full or closing channel must not break the caller's frame loop.
+      return false;
+    }
   }
 
   close(): void {
@@ -62,26 +73,33 @@ export class WebRtcPeer {
     this.closed = true;
     this.channel?.close();
     this.connection.close();
-    this.setStatus("closed");
+  }
+
+  /** Stops reporting now, but lets an already-sent goodbye reach the other device before closing. */
+  closeSoon(delayMs = 300): void {
+    if (this.closed) return;
+    this.closed = true;
+    window.setTimeout(() => {
+      this.channel?.close();
+      this.connection.close();
+    }, delayMs);
   }
 
   private attachChannel(channel: RTCDataChannel): void {
     this.channel = channel;
-    channel.addEventListener("open", () => this.setStatus("connected"));
-    channel.addEventListener("close", () => { if (!this.closed) this.setStatus("disconnected"); });
-    channel.addEventListener("error", () => this.setStatus("failed"));
+    channel.addEventListener("open", () => this.forward({ type: "channel-open" }));
+    channel.addEventListener("close", () => this.forward({ type: "channel-closed" }));
+    channel.addEventListener("error", () => this.forward({ type: "channel-error" }));
     channel.addEventListener("message", (event) => {
-      if (typeof event.data === "string") this.options.onMessage?.(event.data);
+      if (!this.closed && typeof event.data === "string") this.options.onMessage?.(event.data);
     });
   }
 
-  private readonly handleConnectionState = (): void => {
-    const state = this.connection.connectionState;
-    if (state === "connected") this.setStatus("connected");
-    else if (state === "disconnected") this.setStatus("disconnected");
-    else if (state === "failed") this.setStatus("failed");
-    else if (state === "closed") this.setStatus("closed");
-  };
+  private forward(event: PeerTransportEvent): void {
+    if (this.closed) return;
+    const status = this.tracker.next(event);
+    if (status) this.options.onStatus?.(status);
+  }
 
   private async waitForIceGathering(): Promise<void> {
     if (this.connection.iceGatheringState === "complete") return;
@@ -104,5 +122,4 @@ export class WebRtcPeer {
   }
 
   private ensureOpen(): void { if (this.closed) throw new Error("WebRTC connection is closed."); }
-  private setStatus(status: WebRtcPeerStatus): void { this.options.onStatus?.(status); }
 }

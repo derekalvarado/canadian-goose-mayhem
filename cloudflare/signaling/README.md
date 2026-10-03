@@ -154,7 +154,8 @@ npm run signaling:smoke:pairing -- https://goose-game-signaling.goose-game-2.wor
 - **The Worker health check passes, but WebRTC never connects.** Signaling only
   introduces the browsers. The current peer transport has no STUN/TURN service,
   so use the same ordinary Wi-Fi, avoid guest-network client isolation and VPNs,
-  keep the host page open, and create a fresh room.
+  keep the host page open, and create a fresh room. The game gives up after about
+  20 seconds and shows both players this advice.
 - **A room says the host is missing or closes before connection.** Rooms are
   temporary, the host must remain open, and a newer connection for the same role
   replaces the older one. Tap Host and Join again.
