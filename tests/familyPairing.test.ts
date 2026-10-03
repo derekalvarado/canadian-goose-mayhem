@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  FAMILY_HANDLED_JOINS_STORAGE_KEY,
   FAMILY_PAIRING_STORAGE_KEY,
   clearStoredFamilyPairing,
   familyPairingForDevice,
   joinRequestVisibleToDevice,
+  loadHandledJoinRequests,
   loadStoredFamilyPairing,
   normalizeFamilyPlayerName,
   peerJoinRequestToPrompt,
   pairingWithUpdatedDevices,
   parseFamilyPairingCode,
+  rememberHandledJoinRequest,
   saveStoredFamilyPairing,
   type FamilyPairingCredential,
 } from "../src/game/multiplayer/familyPairingProtocol.ts";
@@ -96,4 +99,32 @@ test("only the other paired device sees and prompts for a waiting join request",
   assert.deepEqual(peerJoinRequestToPrompt(status, hostPairing), request);
   assert.equal(peerJoinRequestToPrompt(status, hostPairing, request.requestId), undefined);
   assert.equal(peerJoinRequestToPrompt({ ...status, joinRequest: { ...request, deviceId: deviceOne } }, hostPairing), undefined);
+});
+
+test("a join request this device already answered is never offered again, even after a reload", () => {
+  const storage = memoryStorage();
+  const answered = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  assert.deepEqual(loadHandledJoinRequests(storage), []);
+  rememberHandledJoinRequest(answered, storage);
+  const reopened = loadHandledJoinRequests(storage);
+  assert.deepEqual(reopened, [answered]);
+
+  const hostPairing = familyPairingForDevice(credential, deviceOne);
+  const stale = { deviceId: deviceTwo, requestId: answered, expiresAt: Date.now() + 60_000 };
+  assert.equal(peerJoinRequestToPrompt({ devices: credential.devices, joinRequest: stale }, hostPairing, undefined, reopened), undefined);
+  const fresh = { ...stale, requestId: "cccccccccccccccccccccccccccccccc" };
+  assert.deepEqual(peerJoinRequestToPrompt({ devices: credential.devices, joinRequest: fresh }, hostPairing, undefined, reopened), fresh);
+});
+
+test("answered join requests are remembered newest first without growing forever", () => {
+  const storage = memoryStorage();
+  const ids = Array.from({ length: 20 }, (_, index) => String(index).padStart(32, "d"));
+  for (const id of ids) rememberHandledJoinRequest(id, storage);
+  rememberHandledJoinRequest(ids[5]!, storage);
+  const remembered = loadHandledJoinRequests(storage);
+  assert.equal(remembered[0], ids[5]);
+  assert.equal(new Set(remembered).size, remembered.length);
+  assert.ok(remembered.length < ids.length);
+  storage.setItem(FAMILY_HANDLED_JOINS_STORAGE_KEY, "not json");
+  assert.deepEqual(loadHandledJoinRequests(storage), []);
 });

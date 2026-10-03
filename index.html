@@ -91,6 +91,8 @@
         </div>
       </section>
 
+      <aside id="multiplayer-toast" class="multiplayer-toast" role="status" aria-live="polite" hidden></aside>
+
       <aside id="multiplayer-join-notice" class="multiplayer-join-notice" hidden aria-live="polite" aria-labelledby="multiplayer-join-notice-title">
         <div>
           <strong id="multiplayer-join-notice-title">Your paired player wants to join</strong>
@@ -152,29 +154,36 @@
         <div class="settings-card multiplayer-card">
           <p class="complete-kicker">Play together</p>
           <h2 id="multiplayer-title" tabindex="-1">How will you play?</h2>
-          <p id="multiplayer-status" class="settings-help" role="status" aria-live="polite" aria-atomic="true">Pair these two devices once. After that, either player can host.</p>
+          <p id="multiplayer-status" class="settings-help" role="status" aria-live="polite" aria-atomic="true" hidden></p>
           <p id="multiplayer-join-debug" class="settings-help multiplayer-join-debug" hidden></p>
           <div id="multiplayer-main-controls">
             <section id="multiplayer-choice-panel" class="multiplayer-choice-panel">
-              <p class="settings-help">Choose how the second player joins.</p>
+              <p id="multiplayer-choice-intro" class="settings-help">Choose how the second player joins.</p>
               <p class="multiplayer-choice-label">Two devices</p>
-              <button id="multiplayer-choose-host" class="multiplayer-choice" type="button"><span><strong>Host another player</strong><small>Create a code for the other player</small></span><span aria-hidden="true">›</span></button>
-              <button id="multiplayer-choose-join" class="multiplayer-choice" type="button"><span><strong>Join another player</strong><small>Enter the code shown by the host</small></span><span aria-hidden="true">›</span></button>
-              <div class="multiplayer-choice-local">
+              <section id="multiplayer-family-paired" class="multiplayer-family-panel" hidden>
+                <p id="multiplayer-family-label" class="multiplayer-family-label"></p>
+                <p id="multiplayer-family-presence" class="multiplayer-family-presence" hidden></p>
+                <div id="multiplayer-family-actions" class="multiplayer-family-actions">
+                  <button id="multiplayer-host" type="button">Host game</button>
+                  <button id="multiplayer-family-join" type="button">Join game</button>
+                </div>
+                <div id="multiplayer-session-actions" class="multiplayer-family-actions" hidden>
+                  <button id="multiplayer-session-end" type="button">End shared game</button>
+                  <button id="multiplayer-play-solo" type="button" hidden>Play on my own</button>
+                </div>
+                <button id="multiplayer-pair-different" class="multiplayer-secondary" type="button">Pair a different device</button>
+              </section>
+              <div id="multiplayer-pairing-choices">
+                <button id="multiplayer-choose-host" class="multiplayer-choice" type="button"><span><strong>Host another player</strong><small>Create a code for the other player</small></span><span aria-hidden="true">›</span></button>
+                <button id="multiplayer-choose-join" class="multiplayer-choice" type="button"><span><strong>Join another player</strong><small>Enter the code shown by the host</small></span><span aria-hidden="true">›</span></button>
+              </div>
+              <div id="multiplayer-choice-local" class="multiplayer-choice-local">
                 <p class="multiplayer-choice-label">One device</p>
                 <button id="multiplayer-choose-local" class="multiplayer-choice" type="button"><span><strong>Two controllers</strong><small>Play side by side on this device</small></span><span aria-hidden="true">›</span></button>
               </div>
             </section>
             <button id="multiplayer-back-options" class="multiplayer-back-options" type="button" hidden>‹ All play options</button>
             <p id="multiplayer-flow-help" class="settings-help" hidden></p>
-            <section id="multiplayer-family-paired" class="multiplayer-family-panel" hidden>
-              <p id="multiplayer-family-label" class="multiplayer-family-label"></p>
-              <div class="multiplayer-family-actions">
-                <button id="multiplayer-host" type="button">Host game</button>
-                <button id="multiplayer-family-join" type="button">Join game</button>
-              </div>
-              <button id="multiplayer-pair-different" class="multiplayer-secondary" type="button">Pair a different device</button>
-            </section>
             <section id="multiplayer-family-setup" class="multiplayer-family-panel" hidden>
               <h3>1. Your player name</h3>
               <label for="multiplayer-family-name">Your player name
@@ -182,12 +191,12 @@
               </label>
               <div id="multiplayer-host-setup" class="multiplayer-flow-step" hidden>
                 <h3>2. Pair the devices</h3>
-                <p class="settings-help">Show a code, then have the other player enter it on their device. It lasts five minutes.</p>
+                <p class="settings-help">A code lasts five minutes.</p>
                 <button id="multiplayer-family-create" type="button">Show a 4-digit code</button>
                 <div id="multiplayer-code-panel" class="multiplayer-code-panel" hidden>
                   <span>Tell the other player this code:</span>
                   <strong id="multiplayer-family-code-display">0000</strong>
-                  <span>It expires in 5 minutes.</span>
+                  <span id="multiplayer-code-expiry">Expires in 5:00</span>
                   <button id="multiplayer-family-cancel" class="multiplayer-secondary" type="button">Cancel code</button>
                 </div>
                 <div id="multiplayer-approval" class="multiplayer-approval" hidden>
@@ -205,7 +214,7 @@
                 </label>
                 <button id="multiplayer-family-request" type="button">Pair devices</button>
               </div>
-              <p id="multiplayer-replacement-note" class="settings-help" hidden>Pairing a new device will replace the current paired player on this device.</p>
+              <p id="multiplayer-replacement-note" class="settings-help" hidden>The new pairing replaces the current paired player on this device.</p>
             </section>
             <section id="multiplayer-local-panel" class="multiplayer-family-panel" hidden>
               <h3>Both players are here</h3>
@@ -213,7 +222,7 @@
               <button id="multiplayer-local" type="button">Start local game</button>
             </section>
           </div>
-          <p id="multiplayer-game-help" class="settings-help" hidden>The host uses their saved game. Keep both games open while playing. Nearby devices on the same Wi-Fi work best.</p>
+          <p id="multiplayer-game-help" class="settings-help" hidden>Both devices need to be on the same Wi‑Fi network; guest networks and VPNs can block it. The host's saved game is used, so keep both games open while you play.</p>
           <button id="multiplayer-close" type="button">Back to game</button>
         </div>
       </section>

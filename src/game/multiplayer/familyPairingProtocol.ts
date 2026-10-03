@@ -4,6 +4,8 @@ export const FAMILY_PAIRING_VERSION = 1;
 export const FAMILY_PAIRING_STORAGE_KEY = "goose-game-two:family-pairing";
 export const FAMILY_PLAYER_NAME_STORAGE_KEY = "goose-game-two:family-player-name";
 export const FAMILY_DEVICE_ID_STORAGE_KEY = "goose-game-two:family-device-id";
+export const FAMILY_HANDLED_JOINS_STORAGE_KEY = "goose-game-two:family-handled-joins";
+const MAX_HANDLED_JOIN_REQUESTS = 12;
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{24,128}$/u;
 const CODE_PATTERN = /^\d{4}$/u;
@@ -65,23 +67,51 @@ export function joinRequestVisibleToDevice(
   return request?.deviceId === deviceId ? undefined : request;
 }
 
-/** Selects a new peer request that should be offered to the local player. */
+/**
+ * Selects a new peer request that should be offered to the local player. A request
+ * this device already answered stays on the server for a while after the game it
+ * started; offering it again would invite a player who is not asking.
+ */
 export function peerJoinRequestToPrompt(
   status: FamilyPairStatus,
   pairing: Pick<StoredFamilyPairing, "peerDeviceId">,
   dismissedRequestId?: string,
+  handledRequestIds: readonly string[] = [],
 ): FamilyJoinRequest | undefined {
   const request = status.joinRequest;
   return request?.deviceId === pairing.peerDeviceId && request.requestId !== dismissedRequestId
+    && !handledRequestIds.includes(request.requestId)
     ? request
     : undefined;
+}
+
+/** Join requests this device already answered (connected, failed, or timed out), newest first. */
+export function loadHandledJoinRequests(storage: Pick<Storage, "getItem"> = window.localStorage): string[] {
+  try {
+    const decoded: unknown = JSON.parse(storage.getItem(FAMILY_HANDLED_JOINS_STORAGE_KEY) ?? "[]");
+    return Array.isArray(decoded)
+      ? decoded.filter((value): value is string => typeof value === "string" && TOKEN_PATTERN.test(value)).slice(0, MAX_HANDLED_JOIN_REQUESTS)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Remembers an answered join request across reloads; keeps only the most recent few. */
+export function rememberHandledJoinRequest(
+  requestId: string,
+  storage: Pick<Storage, "getItem" | "setItem"> = window.localStorage,
+): string[] {
+  const handled = [requestId, ...loadHandledJoinRequests(storage).filter((id) => id !== requestId)].slice(0, MAX_HANDLED_JOIN_REQUESTS);
+  try { storage.setItem(FAMILY_HANDLED_JOINS_STORAGE_KEY, JSON.stringify(handled)); } catch { /* Optional storage. */ }
+  return handled;
 }
 
 export function normalizeFamilyPlayerName(value: unknown): string {
   if (typeof value !== "string") throw new Error("Enter a player name.");
   const name = value.trim().replace(/\s+/gu, " ");
   if (!name || name.length > 24 || CONTROL_CHARACTERS.test(name)) {
-    throw new Error("Enter a player name from 1 to 24 characters. Control characters aren't allowed.");
+    throw new Error("Enter a player name, up to 24 letters long.");
   }
   return name;
 }

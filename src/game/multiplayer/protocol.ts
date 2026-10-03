@@ -22,23 +22,33 @@ export interface ReplicatedArea {
   readonly world: WorldSnapshot;
 }
 
+export type SharedObjective = Readonly<{ id: string; description: string; areaId?: string; needsTwoGeese?: boolean; completed: boolean }>;
+
 export interface AuthoritativeGameSnapshot {
   readonly tick: number;
   readonly players: readonly ReplicatedPlayer[];
   readonly areas: readonly ReplicatedArea[];
-  readonly objectiveList: readonly Readonly<{ id: string; description: string; areaId?: string; needsTwoGeese?: boolean; completed: boolean }>[];
+  readonly objectiveList: readonly SharedObjective[];
 }
 
 export type GuestMessage =
   | { readonly type: "hello"; readonly version: 1; readonly sessionId: string; readonly reconnectToken: string }
   | { readonly type: "command"; readonly version: 1; readonly playerId: "goose-2"; readonly command: NetworkPlayerCommand }
-  | { readonly type: "pong"; readonly version: 1; readonly nonce: number };
+  | { readonly type: "pong"; readonly version: 1; readonly nonce: number }
+  // The guest is leaving on purpose, so the host can say so instead of "disconnected".
+  | { readonly type: "bye"; readonly version: 1 };
 
 export type HostMessage =
   | { readonly type: "welcome"; readonly version: 1; readonly sessionId: string; readonly playerId: "goose-2" }
   | { readonly type: "snapshot"; readonly version: 1; readonly sequence: number; readonly sentAt: number; readonly snapshot: AuthoritativeGameSnapshot }
   | { readonly type: "ping"; readonly version: 1; readonly nonce: number }
-  | { readonly type: "error"; readonly version: 1; readonly code: "version" | "session" | "rate" | "message"; readonly message: string };
+  | { readonly type: "error"; readonly version: 1; readonly code: "version" | "session" | "rate" | "message"; readonly message: string }
+  // A paused host sends no snapshots; this tells the guest why the world stopped.
+  | { readonly type: "status"; readonly version: 1; readonly paused: boolean }
+  // The host ended the shared game on purpose.
+  | { readonly type: "bye"; readonly version: 1 };
+
+const MAX_SHARED_OBJECTIVES = 200;
 
 const encoder = new TextEncoder();
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -96,6 +106,7 @@ export function decodeGuestMessage(raw: string): GuestMessage {
     return { type: "command", version: 1, playerId: "goose-2", command: parseCommand(value.command) };
   }
   if (value.type === "pong" && isSafeSequence(value.nonce)) return { type: "pong", version: 1, nonce: value.nonce };
+  if (value.type === "bye") return { type: "bye", version: 1 };
   throw new Error("Unknown guest message type.");
 }
 
@@ -107,6 +118,8 @@ export function decodeHostMessage(raw: string): HostMessage {
     return { type: "welcome", version: 1, sessionId: boundedText(value.sessionId, "session ID"), playerId: "goose-2" };
   }
   if (value.type === "ping" && isSafeSequence(value.nonce)) return { type: "ping", version: 1, nonce: value.nonce };
+  if (value.type === "status" && isBoolean(value.paused)) return { type: "status", version: 1, paused: value.paused };
+  if (value.type === "bye") return { type: "bye", version: 1 };
   if (value.type === "error") {
     const code = value.code;
     if (code !== "version" && code !== "session" && code !== "rate" && code !== "message") throw new Error("Invalid host error code.");
@@ -120,6 +133,23 @@ export function decodeHostMessage(raw: string): HostMessage {
       snapshot: value.snapshot as unknown as AuthoritativeGameSnapshot };
   }
   throw new Error("Unknown host message type.");
+}
+
+/** The host's to-do list as the guest may show it, or undefined if any entry is malformed. */
+export function readSharedObjectives(value: unknown): readonly SharedObjective[] | undefined {
+  if (!Array.isArray(value) || value.length > MAX_SHARED_OBJECTIVES) return undefined;
+  const objectives: SharedObjective[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry) || !isBoolean(entry.completed)) return undefined;
+    if (typeof entry.id !== "string" || entry.id.length === 0 || entry.id.length > 128) return undefined;
+    if (typeof entry.description !== "string" || entry.description.length === 0 || entry.description.length > 256) return undefined;
+    if (entry.areaId !== undefined && (typeof entry.areaId !== "string" || entry.areaId.length > 128)) return undefined;
+    if (entry.needsTwoGeese !== undefined && !isBoolean(entry.needsTwoGeese)) return undefined;
+    objectives.push({ id: entry.id, description: entry.description, completed: entry.completed,
+      ...(entry.areaId !== undefined ? { areaId: entry.areaId } : {}),
+      ...(entry.needsTwoGeese !== undefined ? { needsTwoGeese: entry.needsTwoGeese } : {}) });
+  }
+  return objectives;
 }
 
 /** Rejects replays and floods before a guest command reaches the simulation. */
