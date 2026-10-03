@@ -54,14 +54,25 @@ function required<T extends HTMLElement>(selector: string): T {
 
 export class MultiplayerMenu {
   private readonly menu = required<HTMLElement>("#multiplayer-menu");
+  private readonly title = required<HTMLElement>("#multiplayer-title");
   private readonly status = required<HTMLElement>("#multiplayer-status");
   private readonly joinDebug = required<HTMLElement>("#multiplayer-join-debug");
+  private readonly choicePanel = required<HTMLElement>("#multiplayer-choice-panel");
+  private readonly chooseHostButton = required<HTMLButtonElement>("#multiplayer-choose-host");
+  private readonly chooseJoinButton = required<HTMLButtonElement>("#multiplayer-choose-join");
+  private readonly chooseLocalButton = required<HTMLButtonElement>("#multiplayer-choose-local");
+  private readonly backOptionsButton = required<HTMLButtonElement>("#multiplayer-back-options");
+  private readonly flowHelp = required<HTMLElement>("#multiplayer-flow-help");
+  private readonly gameHelp = required<HTMLElement>("#multiplayer-game-help");
   private readonly hostButton = required<HTMLButtonElement>("#multiplayer-host");
   private readonly joinButton = required<HTMLButtonElement>("#multiplayer-family-join");
   private readonly pairedPanel = required<HTMLElement>("#multiplayer-family-paired");
   private readonly pairedLabel = required<HTMLElement>("#multiplayer-family-label");
   private readonly pairDifferentButton = required<HTMLButtonElement>("#multiplayer-pair-different");
   private readonly setupPanel = required<HTMLElement>("#multiplayer-family-setup");
+  private readonly hostSetup = required<HTMLElement>("#multiplayer-host-setup");
+  private readonly joinSetup = required<HTMLElement>("#multiplayer-join-setup");
+  private readonly localPanel = required<HTMLElement>("#multiplayer-local-panel");
   private readonly setupName = required<HTMLInputElement>("#multiplayer-family-name");
   private readonly createCodeButton = required<HTMLButtonElement>("#multiplayer-family-create");
   private readonly codeInput = required<HTMLInputElement>("#multiplayer-family-code");
@@ -75,7 +86,7 @@ export class MultiplayerMenu {
   private readonly denyButton = required<HTMLButtonElement>("#multiplayer-family-deny");
   private readonly replacementNote = required<HTMLElement>("#multiplayer-replacement-note");
   private readonly localButton = required<HTMLButtonElement>("#multiplayer-local");
-  private readonly openButton = required<HTMLButtonElement>("#multiplayer-button");
+  private readonly openButton = required<HTMLButtonElement>("#settings-play-together");
   private readonly closeButton = required<HTMLButtonElement>("#multiplayer-close");
   private readonly settingsPairing = required<HTMLElement>("#settings-family-pairing");
   private readonly settingsPeer = required<HTMLElement>("#settings-family-peer");
@@ -91,6 +102,7 @@ export class MultiplayerMenu {
   private readonly deviceId = loadOrCreateFamilyDeviceId();
   private readonly familyClient = ROOM_SIGNALING_URL ? new FamilyPairingClient(ROOM_SIGNALING_URL) : undefined;
   private pairing = loadStoredFamilyPairing();
+  private flowView: "choose" | "host" | "join" | "local" = "choose";
   private showReplacementSetup = false;
   private codeSession?: PairingCodeSession;
   private joinSession?: PairingJoinSession;
@@ -122,6 +134,10 @@ export class MultiplayerMenu {
   constructor(private readonly options: MultiplayerMenuOptions = {}) {
     this.openButton.addEventListener("click", this.open);
     this.closeButton.addEventListener("click", this.close);
+    this.chooseHostButton.addEventListener("click", () => this.showFlow("host"));
+    this.chooseJoinButton.addEventListener("click", () => this.showFlow("join"));
+    this.chooseLocalButton.addEventListener("click", () => this.showFlow("local"));
+    this.backOptionsButton.addEventListener("click", this.backToChoices);
     this.hostButton.addEventListener("click", () => { void this.startFamilyHost(); });
     this.joinButton.addEventListener("click", () => { void this.startFamilyJoin(); });
     this.pairDifferentButton.addEventListener("click", this.showReplacementPairing);
@@ -169,6 +185,7 @@ export class MultiplayerMenu {
   send(message: string): boolean { return this.peer?.send(message) ?? false; }
 
   private readonly open = (): void => {
+    this.updateFamilyUi();
     this.menu.hidden = false;
     this.options.onOpenChange?.(true);
     if (this.pairing && this.familyClient) {
@@ -178,19 +195,62 @@ export class MultiplayerMenu {
         void this.pollIdleFamilyStatus();
       }
     }
-    this.closeButton.focus({ preventScroll: true });
+    this.title.focus({ preventScroll: true });
   };
 
   private readonly close = (): void => {
     this.menu.hidden = true;
     this.options.onOpenChange?.(false);
-    this.openButton.focus({ preventScroll: true });
+    required<HTMLButtonElement>("#settings-button").focus({ preventScroll: true });
+  };
+
+  private showFlow(flow: "host" | "join" | "local"): void {
+    this.flowView = flow;
+    this.clearStatusError();
+    this.status.textContent = !this.familyClient
+      ? "Online pairing is not configured in this build. Local two-controller play is still available."
+      : this.pairing
+      ? `Paired with ${this.pairing.peerName}. Either player can host now.`
+      : "Pair these two devices once. After that, either player can host.";
+    this.updateFamilyUi();
+    this.backOptionsButton.focus({ preventScroll: true });
+  }
+
+  private readonly backToChoices = (): void => {
+    if (this.codeSession || this.joinSession) {
+      void this.abandonPairingSetup();
+      this.stopPairingSetupUi();
+    }
+    this.showReplacementSetup = false;
+    this.flowView = "choose";
+    this.clearStatusError();
+    this.updateFamilyUi();
+    this.title.focus({ preventScroll: true });
   };
 
   private updateFamilyUi(): void {
     const pairing = this.pairing;
-    this.pairedPanel.hidden = !pairing;
-    this.setupPanel.hidden = Boolean(pairing && !this.showReplacementSetup);
+    const isOnlineFlow = this.flowView === "host" || this.flowView === "join";
+    this.title.textContent = this.flowView === "choose" ? "How will you play?"
+      : this.flowView === "host" ? "Host another player"
+        : this.flowView === "join" ? "Join another player" : "Two controllers";
+    this.choicePanel.hidden = this.flowView !== "choose";
+    this.backOptionsButton.hidden = this.flowView === "choose";
+    this.flowHelp.hidden = this.flowView === "choose";
+    this.flowHelp.textContent = this.flowView === "host"
+      ? "Create a code, then have the other player enter it on their device."
+      : this.flowView === "join" ? "Ask the host to show a code, then enter it here."
+        : this.flowView === "local" ? "Connect two controllers to this device, then start a shared game." : "";
+    this.status.hidden = !isOnlineFlow;
+    this.joinDebug.hidden = !import.meta.env.DEV || !isOnlineFlow;
+    this.gameHelp.hidden = !isOnlineFlow;
+    this.localPanel.hidden = this.flowView !== "local";
+    this.pairedPanel.hidden = !pairing || !isOnlineFlow || this.showReplacementSetup;
+    this.setupPanel.hidden = !isOnlineFlow || Boolean(pairing && !this.showReplacementSetup);
+    this.hostSetup.hidden = this.flowView !== "host";
+    this.joinSetup.hidden = this.flowView !== "join";
+    this.hostButton.hidden = this.flowView !== "host";
+    this.joinButton.hidden = this.flowView !== "join";
     this.replacementNote.hidden = !pairing;
     this.pairDifferentButton.hidden = this.showReplacementSetup;
     this.settingsPairing.hidden = !pairing;
@@ -223,6 +283,7 @@ export class MultiplayerMenu {
   }
 
   private async startPairingCode(): Promise<void> {
+    this.clearStatusError();
     if (!this.familyClient) return this.fail(new Error("Family pairing is unavailable in this build."));
     this.createCodeButton.disabled = true;
     try {
@@ -230,6 +291,7 @@ export class MultiplayerMenu {
       await this.abandonPairingSetup();
       this.codeSession = await this.familyClient.createCode(device);
       this.codeDisplay.textContent = this.codeSession.code;
+      this.createCodeButton.hidden = true;
       this.codePanel.hidden = false;
       this.approvalPanel.hidden = true;
       this.status.textContent = "Enter this code on the other device, then approve the player here.";
@@ -242,6 +304,7 @@ export class MultiplayerMenu {
   }
 
   private async requestFamilyPairing(): Promise<void> {
+    this.clearStatusError();
     if (!this.familyClient) return this.fail(new Error("Family pairing is unavailable in this build."));
     this.requestPairingButton.disabled = true;
     try {
@@ -376,6 +439,7 @@ export class MultiplayerMenu {
     this.joinSession = undefined;
     this.pendingCandidate = undefined;
     this.codePanel.hidden = true;
+    this.createCodeButton.hidden = false;
     this.approvalPanel.hidden = true;
   }
 
@@ -466,6 +530,7 @@ export class MultiplayerMenu {
     if (!this.pendingJoinRequestId) return;
     this.hideJoinNotice();
     this.open();
+    this.showFlow("host");
     await this.startFamilyHost();
   }
 
@@ -713,6 +778,7 @@ export class MultiplayerMenu {
     clearStoredFamilyPairing();
     this.pairing = undefined;
     this.showReplacementSetup = false;
+    this.flowView = "choose";
     this.updateFamilyUi();
     this.status.textContent = "Paired player forgotten. Open Play together to pair again.";
     this.settingsForget.disabled = false;
@@ -849,5 +915,14 @@ export class MultiplayerMenu {
 
   private fail(error: unknown): void {
     this.status.textContent = error instanceof Error ? error.message : "Pairing could not be completed.";
+    this.status.classList.add("multiplayer-status--error");
+    this.status.setAttribute("role", "alert");
+    this.status.setAttribute("aria-live", "assertive");
+  }
+
+  private clearStatusError(): void {
+    this.status.classList.remove("multiplayer-status--error");
+    this.status.setAttribute("role", "status");
+    this.status.setAttribute("aria-live", "polite");
   }
 }

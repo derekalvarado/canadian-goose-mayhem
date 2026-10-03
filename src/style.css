@@ -371,6 +371,10 @@ kbd,
 .settings-card select, .settings-card input, .settings-card button { min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--goose-white); background: rgb(13 34 24 / 72%); font: inherit; }
 .settings-card input::placeholder { color: rgb(243 242 233 / 42%); }
 .settings-card button { margin-top: 16px; cursor: pointer; }
+.settings-card .settings-row { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 14px; margin: 10px 0; padding: 11px 12px; text-align: left; }
+.settings-row span:first-child { display: grid; gap: 2px; }
+.settings-row small { color: var(--ink-muted); font-size: .78rem; line-height: 1.3; }
+.settings-card .settings-back { margin: 0 0 7px; padding: 0; border: 0; color: var(--ink-muted); background: transparent; }
 .settings-help { color: var(--ink-muted); font-size: .86rem; line-height: 1.45; }
 .settings-family-pairing { margin: 1rem 0; padding-top: .8rem; border-top: 1px solid var(--line); }
 .settings-family-pairing h3 { margin: 0 0 .5rem; font: 600 1rem/1.3 Georgia, serif; }
@@ -393,8 +397,22 @@ kbd,
   color: var(--goose-white);
   font: .72rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
-.hud-action--multiplayer { left: max(24px, env(safe-area-inset-left)); top: max(24px, env(safe-area-inset-top)); }
 .multiplayer-card { width: min(92vw, 34rem); }
+.multiplayer-status--error { margin: .75rem 0 1rem; padding: .8rem .9rem; border: 1px solid rgb(241 211 139 / 75%); border-left: 4px solid var(--sun); border-radius: .6rem; color: var(--goose-white) !important; background: rgb(158 79 67 / 48%); font-size: 1rem; font-weight: 700; line-height: 1.4; }
+.multiplayer-choice-panel[hidden], .multiplayer-flow-step[hidden], .multiplayer-back-options[hidden] { display: none; }
+.multiplayer-choice-panel > .settings-help { margin: 0 0 1rem; }
+.multiplayer-choice-label { margin: 1rem 0 .5rem; color: var(--sun); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.settings-card .multiplayer-choice { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; margin: .55rem 0; padding: .75rem .9rem; text-align: left; }
+.multiplayer-choice span:first-child { display: grid; gap: .2rem; }
+.multiplayer-choice strong { font-size: 1rem; }
+.multiplayer-choice small { color: var(--ink-muted); font-size: .82rem; line-height: 1.3; }
+.multiplayer-choice span:last-child { color: var(--sun); font-size: 1.5rem; line-height: 1; }
+.multiplayer-choice-local { margin-top: 1.2rem; padding-top: .2rem; border-top: 1px solid var(--line); }
+.settings-card .multiplayer-back-options { margin: 0 0 .65rem; padding: 0; min-height: 30px; border: 0; color: var(--sun); background: transparent; }
+.multiplayer-flow-step { display: grid; gap: .55rem; margin-top: .7rem; padding-top: .75rem; border-top: 1px solid var(--line); }
+.multiplayer-flow-step h3 { margin: 0; }
+.multiplayer-flow-step .settings-help { margin: 0; }
+.multiplayer-flow-step button { margin-top: 0; }
 .multiplayer-family-panel { display: grid; gap: .65rem; margin: .85rem 0; padding: .85rem; border: 1px solid var(--line); border-radius: .7rem; }
 .multiplayer-family-panel[hidden] { display: none; }
 .multiplayer-family-panel label { gap: .4rem; }
@@ -402,10 +420,9 @@ kbd,
 .multiplayer-family-panel input { width: 100%; font-size: 1rem; letter-spacing: normal; text-transform: none; }
 .multiplayer-family-panel button { width: 100%; margin-top: 0; }
 .multiplayer-family-label { margin: 0; font-size: 1rem; font-weight: 700; text-align: center; }
-.multiplayer-family-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
-.multiplayer-code-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .55rem; }
-.multiplayer-code-entry button { width: auto; min-width: 5rem; }
-.multiplayer-code-entry input { font: 700 1.35rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2em; text-align: center; }
+.multiplayer-family-actions { display: flex; gap: .55rem; }
+.multiplayer-family-actions button { flex: 1; }
+#multiplayer-family-code { font: 700 1.35rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2em; text-align: center; }
 .multiplayer-code-panel, .multiplayer-approval { display: grid; justify-items: center; gap: .5rem; padding: .75rem; border-radius: .55rem; background: rgb(13 34 24 / 48%); text-align: center; }
 .multiplayer-code-panel[hidden], .multiplayer-approval[hidden] { display: none; }
 .multiplayer-code-panel strong { color: var(--sun); font: 700 2.6rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .22em; }

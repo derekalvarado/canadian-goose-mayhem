@@ -81,7 +81,7 @@ export function normalizeFamilyPlayerName(value: unknown): string {
   if (typeof value !== "string") throw new Error("Enter a player name.");
   const name = value.trim().replace(/\s+/gu, " ");
   if (!name || name.length > 24 || CONTROL_CHARACTERS.test(name)) {
-    throw new Error("Player names must be 1–24 ordinary characters.");
+    throw new Error("Enter a player name from 1 to 24 characters. Control characters aren't allowed.");
   }
   return name;
 }
