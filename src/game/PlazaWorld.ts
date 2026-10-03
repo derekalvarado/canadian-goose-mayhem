@@ -30,6 +30,8 @@ import { toonMaterial } from "./toonMaterial.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { createCafeBackBar, createCafeCounter, createCafeRadio, createCroissant, createLaptop, createMug, createOrderCup, createPlate, createServiceBell, createTipJar } from "./CafePropsView.ts";
 import { CafePersonView } from "./CafePersonView.ts";
+import { DogView, TownspersonView } from "./TownsfolkView.ts";
+import { townsfolkLookOf } from "./townsfolkTuning.ts";
 import { createKitchenOven, createKitchenShelf, createKitchenSink, createPastryRack, createPrepTable } from "./KitchenView.ts";
 import { createCafeDoorwayWall, createCafeFloor, createCafeFrontDoor, createCafeWall, createKitchenFloor, createMenuBoard } from "./CafeRoomView.ts";
 
@@ -1155,6 +1157,7 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.splash-kid-runner": return new SplashKidView("runner");
     case "plaza.splash-kid-boots": return new SplashKidView("boots");
     case "plaza.splash-kid-floaties": return new SplashKidView("floaties");
+    case "plaza.small-white-dog": return new DogView();
     case "oldtown.shade-tree":
     case "nature.deciduous-tree": {
       const tree = new DeciduousTreeView(undefined, deciduousTreeVariantForId(instanceId));
@@ -1201,6 +1204,10 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.planter-south": return createSinglePlanter(3.5, 1.3);
     case "plaza.tree-cluster": return createTreeCluster(groups, instanceId);
     case "plaza.string-lights": return createStringLights();
-    default: throw new Error(`No renderer for world asset: ${assetId}`);
+    default: {
+      const look = townsfolkLookOf(assetId);
+      if (look) return new TownspersonView(look);
+      throw new Error(`No renderer for world asset: ${assetId}`);
+    }
   }
 }

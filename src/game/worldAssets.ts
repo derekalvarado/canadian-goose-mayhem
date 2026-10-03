@@ -50,7 +50,8 @@ export interface WorldAssetDefinition {
   readonly cleanupRole?: "trash-can" | "litter" | "trash-bag" | "litter-picker";
   /** How close a worker gets before using this cleanup affordance. */
   readonly cleanupRange?: number;
-  readonly gameplayRole?: "janitor" | "splash-kid" | "shop-entrance" | "barista" | "cafe-customer" | "cafe-worker";
+  readonly gameplayRole?: "janitor" | "splash-kid" | "shop-entrance" | "barista" | "cafe-customer" | "cafe-worker"
+    | "town-parent" | "town-walker" | "town-dog" | "cafe-patron";
 }
 
 /** Evenly spaced circle colliders tracing a diagonal wall or fence, ends included. */
@@ -116,6 +117,10 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
     placementSurface: { kind: "counter", height: 1.15, halfWidth: 1.3, halfDepth: 0.55 } },
   { assetId: "coffee.kitchen-shelf", label: "Dry goods shelf", category: "furniture", halfWidth: 1.0, halfDepth: 0.26, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 1.0, halfDepth: 0.26 }], occludesCamera: true },
   { assetId: "coffee.person-baker", label: "Baker", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-worker" },
+  { assetId: "coffee.patron-red-coat", label: "Café regular — red coat (comes and goes)", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-patron" },
+  { assetId: "coffee.patron-bucket-hat", label: "Café regular — bucket hat (comes and goes)", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-patron" },
+  { assetId: "coffee.patron-raincoat", label: "Café regular — yellow raincoat (comes and goes)", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-patron" },
+  { assetId: "coffee.patron-bow-tie", label: "Café regular — bow tie (comes and goes)", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-patron" },
   { assetId: "coffee.person-student", label: "Café customer — student", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "cafe-customer" },
   { assetId: "street.sidewalk-tile", label: "Sidewalk tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: 0, surfacePriority: 3 },
   { assetId: "street.road-tile", label: "Lowered road tile", category: "ground", halfWidth: 4, halfDepth: 4, colliders: [], surfaceHeight: -0.15, surfacePriority: 2 },
@@ -181,6 +186,16 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.splash-kid-runner", label: "Splash-pad kid — runner", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
   { assetId: "plaza.splash-kid-boots", label: "Splash-pad kid — yellow boots", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
   { assetId: "plaza.splash-kid-floaties", label: "Splash-pad kid — water wings", category: "character", halfWidth: 0.38, halfDepth: 0.38, colliders: [], warnForOverlap: false, gameplayRole: "splash-kid" },
+  { assetId: "plaza.parent-sunhat-mom", label: "Splash-pad parent — mom in a sun hat", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-parent" },
+  { assetId: "plaza.parent-cap-dad", label: "Splash-pad parent — dad in a red cap", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-parent" },
+  { assetId: "plaza.parent-phone-mom", label: "Splash-pad parent — mom filming on her phone", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-parent" },
+  { assetId: "plaza.parent-beard-dad", label: "Splash-pad parent — bearded dad with a coffee", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-parent" },
+  { assetId: "plaza.walker-jogger", label: "Passer-by — jogger", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-walker" },
+  { assetId: "plaza.walker-grandpa", label: "Passer-by — grandpa in a flat cap", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-walker" },
+  { assetId: "plaza.walker-teen", label: "Passer-by — teen with headphones", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-walker" },
+  { assetId: "plaza.walker-commuter", label: "Passer-by — commuter in a blazer", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-walker" },
+  { assetId: "plaza.walker-artist", label: "Passer-by — sketcher in a long coat", category: "character", halfWidth: 0.45, halfDepth: 0.45, colliders: [], warnForOverlap: false, gameplayRole: "town-walker" },
+  { assetId: "plaza.small-white-dog", label: "Small white dog (sits with the nearest parent)", category: "character", halfWidth: 0.25, halfDepth: 0.4, colliders: [], warnForOverlap: false, gameplayRole: "town-dog" },
   { assetId: "plaza.splash-faucet", label: "Splash-pad faucet", category: "gameplay", halfWidth: 0.4, halfDepth: 0.28, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.2 }], warnForOverlap: false, controller: { interactionOffset: { x: 0, y: 0.58, z: -0.19 }, range: 1.05 } },
   { assetId: "prop.beer-can", label: "Little beer can", category: "prop", halfWidth: 0.09, halfDepth: 0.09, colliders: [], warnForOverlap: false, tags: ["drink"], carryable: { interactionRange: 0.95, carryHeight: 0.72, carryDistance: 0.54 } },
   { assetId: "prop.trash-bag", label: "Janitor's trash bag", category: "prop", halfWidth: 0.24, halfDepth: 0.18, colliders: [], warnForOverlap: false, cleanupRole: "trash-bag", essential: true, carryable: { interactionRange: 1, carryHeight: 0.68, carryDistance: 0.48, stealableWhileHeld: true } },

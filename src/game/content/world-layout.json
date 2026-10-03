@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "worldId": "old-town-square",
-  "canonicalRevision": 23,
+  "canonicalRevision": 24,
   "units": "meters",
   "coordinateSystem": "right-handed-y-up",
   "areas": [
@@ -856,6 +856,116 @@
           }
         },
         {
+          "id": "plaza.parent-sunhat-mom",
+          "assetId": "plaza.parent-sunhat-mom",
+          "label": "Mom in a sun hat on the bench",
+          "transform": {
+            "x": 0.5,
+            "y": 0,
+            "z": -6.6,
+            "rotationY": 3.141592653589793
+          }
+        },
+        {
+          "id": "plaza.dog",
+          "assetId": "plaza.small-white-dog",
+          "label": "Biscuit the small white dog",
+          "transform": {
+            "x": -0.45,
+            "y": 0,
+            "z": -6.6,
+            "rotationY": 3.141592653589793
+          }
+        },
+        {
+          "id": "plaza.parent-beard-dad",
+          "assetId": "plaza.parent-beard-dad",
+          "label": "Bearded dad with a coffee on the bench",
+          "transform": {
+            "x": 0.5,
+            "y": 0,
+            "z": 6.6,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.parent-cap-dad",
+          "assetId": "plaza.parent-cap-dad",
+          "label": "Dad in a red cap by the splash pad",
+          "transform": {
+            "x": 2.8,
+            "y": 0,
+            "z": -2.2,
+            "rotationY": 1.5707963267948966
+          }
+        },
+        {
+          "id": "plaza.parent-phone-mom",
+          "assetId": "plaza.parent-phone-mom",
+          "label": "Mom filming the kids",
+          "transform": {
+            "x": -8.6,
+            "y": 0,
+            "z": -3.6,
+            "rotationY": -1.2
+          }
+        },
+        {
+          "id": "plaza.walker-jogger",
+          "assetId": "plaza.walker-jogger",
+          "label": "Jogger",
+          "transform": {
+            "x": 8,
+            "y": 0,
+            "z": 4.5,
+            "rotationY": 1.5707963267948966
+          }
+        },
+        {
+          "id": "plaza.walker-grandpa",
+          "assetId": "plaza.walker-grandpa",
+          "label": "Grandpa out for a stroll",
+          "transform": {
+            "x": -9.5,
+            "y": 0,
+            "z": -6.6,
+            "rotationY": 3.141592653589793
+          }
+        },
+        {
+          "id": "plaza.walker-teen",
+          "assetId": "plaza.walker-teen",
+          "label": "Teen with headphones",
+          "transform": {
+            "x": 10,
+            "y": 0,
+            "z": -4,
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "plaza.walker-commuter",
+          "assetId": "plaza.walker-commuter",
+          "label": "Commuter",
+          "transform": {
+            "x": -20,
+            "y": 0,
+            "z": 10,
+            "rotationY": -1.5707963267948966
+          }
+        },
+        {
+          "id": "plaza.walker-artist",
+          "assetId": "plaza.walker-artist",
+          "label": "Sketcher in a long coat",
+          "transform": {
+            "x": 14,
+            "y": 0,
+            "z": 5,
+            "rotationY": 0.8
+          }
+        },
+        {
           "id": "plaza.janitor-trash-bag",
           "assetId": "prop.trash-bag",
           "label": "Janitor's trash bag",
@@ -1246,6 +1356,30 @@
           "assetId": "coffee.person-student",
           "label": "Student",
           "transform": { "x": 1.8, "y": 0, "z": 0.1, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.patron-red-coat",
+          "assetId": "coffee.patron-red-coat",
+          "label": "Regular in a red coat",
+          "transform": { "x": -1.5, "y": 0, "z": 5.2, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.patron-bucket-hat",
+          "assetId": "coffee.patron-bucket-hat",
+          "label": "Regular in a bucket hat",
+          "transform": { "x": -0.5, "y": 0, "z": 5.2, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.patron-raincoat",
+          "assetId": "coffee.patron-raincoat",
+          "label": "Regular in a yellow raincoat",
+          "transform": { "x": 0.5, "y": 0, "z": 5.2, "rotationY": 3.141592653589793 }
+        },
+        {
+          "id": "coffee.patron-bow-tie",
+          "assetId": "coffee.patron-bow-tie",
+          "label": "Regular in a bow tie",
+          "transform": { "x": 1.5, "y": 0, "z": 5.2, "rotationY": 3.141592653589793 }
         },
         {
           "id": "coffee.kitchen-floor",

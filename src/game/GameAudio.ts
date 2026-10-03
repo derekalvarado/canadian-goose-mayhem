@@ -97,6 +97,25 @@ export class GameAudio {
     this.tones([[659, 0, 0.25], [523, 0.16, 0.35]], 0.07, "sine");
   }
 
+  /** Two quick yaps from the small white dog; quieter the further away it is (`loudness` 0–1). */
+  playDogBark(loudness = 1): void {
+    const context = this.runningContext(); if (!context) return;
+    const now = context.currentTime;
+    for (const [start, pitch] of [[0, 1], [0.17, 1.12]] as const) {
+      const oscillator = context.createOscillator(); const filter = context.createBiquadFilter(); const gain = context.createGain();
+      oscillator.type = "sawtooth";
+      oscillator.frequency.setValueAtTime(820 * pitch, now + start);
+      oscillator.frequency.exponentialRampToValueAtTime(430 * pitch, now + start + 0.09);
+      filter.type = "bandpass"; filter.frequency.value = 1300; filter.Q.value = 1.4;
+      gain.gain.setValueAtTime(0.0001, now + start);
+      gain.gain.exponentialRampToValueAtTime(0.11 * loudness, now + start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + start + 0.11);
+      oscillator.connect(filter); filter.connect(gain); gain.connect(context.destination);
+      oscillator.start(now + start); oscillator.stop(now + start + 0.14);
+      oscillator.onended = () => { oscillator.disconnect(); filter.disconnect(); gain.disconnect(); };
+    }
+  }
+
   private tones(notes: readonly (readonly [frequency: number, start: number, length: number])[], volume: number, type: OscillatorType): void {
     const context = this.runningContext(); if (!context) return;
     const now = context.currentTime;

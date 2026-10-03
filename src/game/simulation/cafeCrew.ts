@@ -1,4 +1,5 @@
 import type { EntityCondition, EntityTag, GameplayEvent, PlacementSurface, Position } from "./Simulation.ts";
+import { seeded } from "./townsfolk.ts";
 
 /**
  * Coffee-shop people: one barista with a work routine and several seated
@@ -72,9 +73,33 @@ export interface CustomerDefinition {
   readonly workSeconds: number; readonly sipSeconds: number; readonly sipsPerOrder: number;
   readonly startleRadius: number; readonly guardRadius: number; readonly walkSpeed: number;
 }
+/**
+ * Regulars who come and go: in through the front door, an order at the counter,
+ * a coffee at a free seat, then back out, and after a while the next one comes in.
+ * Their coffee is their own (it is not a shop item), and the goose only startles them.
+ */
+export interface PatronDefinition {
+  readonly id: string; readonly variant: string;
+  readonly walkSpeed: number; readonly startleRadius: number; readonly personalRadius: number;
+  readonly orderSeconds: number;
+  readonly staySeconds: Readonly<{ min: number; max: number }>; readonly awaySeconds: Readonly<{ min: number; max: number }>;
+  /** Seconds before their first visit; zero means they are already sitting when the shop opens. */
+  readonly firstVisitSeconds: number;
+}
+export interface PatronService {
+  /** Where they appear and leave from, just inside the front door. */
+  readonly door: Readonly<Position>;
+  /** Where they stand to order, facing the counter. */
+  readonly counter: CafeStation;
+  /** Free chairs, each facing its table. */
+  readonly seats: readonly CafeStation[];
+  readonly pastimeSeconds: Readonly<{ min: number; max: number }>;
+}
 export interface CafeCrewDefinition {
   readonly barista?: BaristaDefinition;
   readonly customers: readonly CustomerDefinition[];
+  readonly patrons?: readonly PatronDefinition[];
+  readonly patronService?: PatronService;
   /** Kitchen staff who work a loop of stations and keep the goose out of their way. */
   readonly workers?: readonly WorkerDefinition[];
   readonly routes: CafeRoutes;
@@ -91,6 +116,7 @@ export interface WorkerDefinition {
   readonly guardRadius: number; readonly startleRadius: number; readonly shooReach: number; readonly shooSeconds: number;
 }
 export type WorkerActivity = WorkerTask | "walking" | "shooing";
+export type PatronActivity = "away" | "entering" | "ordering" | "walking-to-seat" | "working" | "sipping" | "looking-up" | "startled" | "shooing" | "leaving";
 
 export type BaristaActivity =
   | "idle" | "walking" | "brewing" | "serving" | "calling" | "clearing" | "returning-item"
@@ -99,9 +125,9 @@ export type CustomerActivity =
   | "working" | "sipping" | "looking-up" | "startled" | "dabbing" | "waiting" | "shooing"
   | "walking-to-pickup" | "returning-to-seat" | "puzzled";
 export interface CafePersonState {
-  readonly id: string; readonly role: "barista" | "customer" | "worker"; readonly variant: string;
+  readonly id: string; readonly role: "barista" | "customer" | "worker" | "patron"; readonly variant: string;
   readonly position: Readonly<Position>; readonly heading: number;
-  readonly activity: BaristaActivity | CustomerActivity | WorkerActivity; readonly activitySecondsRemaining: number;
+  readonly activity: BaristaActivity | CustomerActivity | WorkerActivity | PatronActivity; readonly activitySecondsRemaining: number;
   readonly seated: boolean; readonly heldEntityId?: string; readonly tableSurfaceId?: string;
   /** True when they walked this tick; presentation uses it to pick a walk or a standing clip. */
   readonly moving: boolean;
@@ -118,6 +144,7 @@ type BaristaJob =
   | { kind: "shoo" }
   | { kind: "startled" }
   | { kind: "evict" }
+  | { kind: "welcome"; patronId: string }
   | { kind: "idle" };
 
 interface Walker { readonly position: Position; heading: number; path: Position[]; pathTarget?: Position; replanSeconds: number; moved: boolean }
@@ -130,12 +157,17 @@ interface MutableBarista extends Walker {
 interface MutableWorker extends Walker {
   readonly definition: WorkerDefinition; activity: WorkerActivity; timer: number; stationIndex: number; shooCooldown: number; heldEntityId?: string;
 }
+interface MutablePatron extends Walker {
+  readonly definition: PatronDefinition; activity: PatronActivity; timer: number; stay: number; seat?: CafeStation;
+  resume?: PatronActivity; startleCooldown: number; shooCooldown: number; random: () => number;
+}
 interface MutableCustomer extends Walker {
   readonly definition: CustomerDefinition; activity: CustomerActivity; timer: number; heldEntityId?: string;
   sipsLeft: number; startleCooldown: number; resumeActivity: CustomerActivity;
 }
 
 const ARRIVE = 0.06;
+const between = (random: () => number, range: Readonly<{ min: number; max: number }>) => range.min + (range.max - range.min) * random();
 const REPLAN_SECONDS = 0.4;
 const REACH = 1.05;
 const PICKUP_REACH = 1.6;
@@ -147,11 +179,13 @@ export class CafeCrew {
   private barista?: MutableBarista;
   private readonly customers: MutableCustomer[] = [];
   private readonly workers: MutableWorker[] = [];
+  private readonly patrons: MutablePatron[] = [];
 
   constructor(definition: CafeCrewDefinition) {
     this.definition = definition;
     const ids = [definition.barista?.id, ...definition.customers.map((customer) => customer.id),
-      ...(definition.workers ?? []).map((worker) => worker.id)].filter(Boolean);
+      ...(definition.workers ?? []).map((worker) => worker.id), ...(definition.patrons ?? []).map((patron) => patron.id)].filter(Boolean);
+    if ((definition.patrons ?? []).length > 0 && !definition.patronService) throw new Error("Café patrons need a door, a counter spot, and seats");
     if ((definition.workers ?? []).some((worker) => worker.stations.length === 0)) throw new Error("A café worker needs at least one station");
     if (new Set(ids).size !== ids.length) throw new Error("Duplicate café person ID");
     if (definition.routes.edges.some(([a, b]) => !definition.routes.nodes[a] || !definition.routes.nodes[b])) throw new Error("Café route edge points at a missing node");
@@ -173,6 +207,16 @@ export class CafeCrew {
       this.workers.push({ definition, position: { ...definition.position }, heading: definition.heading, path: [], replanSeconds: 0, moved: false,
         activity: "walking", timer: 0, stationIndex: 0, shooCooldown: 0 });
     }
+    this.patrons.length = 0;
+    const service = this.definition.patronService;
+    for (const definition of this.definition.patrons ?? []) {
+      const random = seeded(definition.id);
+      const patron: MutablePatron = { definition, position: { ...(service?.door ?? { x: 0, y: 0, z: 0 }) }, heading: 0, path: [], replanSeconds: 0, moved: false,
+        activity: "away", timer: definition.firstVisitSeconds, stay: 0, startleCooldown: 0, shooCooldown: 0, random };
+      this.patrons.push(patron);
+      const seat = definition.firstVisitSeconds <= 0 ? this.freeSeat(patron) : undefined;
+      if (seat) { patron.seat = seat; this.seatPatron(patron); patron.stay *= 0.5 + 0.5 * random(); }
+    }
   }
 
   snapshot(): CafePersonState[] {
@@ -191,6 +235,10 @@ export class CafeCrew {
     for (const worker of this.workers) {
       people.push({ id: worker.definition.id, role: "worker", variant: worker.definition.variant, position: { ...worker.position },
         heading: worker.heading, activity: worker.activity, activitySecondsRemaining: worker.timer, seated: false, moving: worker.moved });
+    }
+    for (const patron of this.patrons) {
+      people.push({ id: patron.definition.id, role: "patron", variant: patron.definition.variant, position: { ...patron.position },
+        heading: patron.heading, activity: patron.activity, activitySecondsRemaining: patron.timer, seated: this.patronSeated(patron), moving: patron.moved });
     }
     return people;
   }
@@ -213,8 +261,9 @@ export class CafeCrew {
   }
 
   update(world: CafeWorld, events: GameplayEvent[], dt: number): void {
-    for (const walker of [...this.customers, ...this.workers, ...(this.barista ? [this.barista] : [])]) walker.moved = false;
+    for (const walker of [...this.customers, ...this.workers, ...this.patrons, ...(this.barista ? [this.barista] : [])]) walker.moved = false;
     for (const customer of this.customers) this.updateCustomer(customer, world, events, dt);
+    for (const patron of this.patrons) this.updatePatron(patron, world, events, dt);
     for (const worker of this.workers) this.updateWorker(worker, world, dt);
     if (this.barista) this.updateBarista(this.barista, world, events, dt);
   }
@@ -227,6 +276,97 @@ export class CafeCrew {
   private nearestGoose(world: CafeWorld, position: Readonly<Position>): CafeWorld["goose"] {
     return [...(world.geese ?? [world.goose])].sort((left, right) => distance2d(left.position, position) - distance2d(right.position, position)
       || (left.id ?? "goose").localeCompare(right.id ?? "goose"))[0] ?? world.goose;
+  }
+
+  // --- Regulars who come and go ------------------------------------------------------------------
+
+  private patronSeated(patron: MutablePatron): boolean {
+    return patron.seat !== undefined && (["working", "sipping", "looking-up", "startled", "shooing"] as const).includes(patron.activity as never)
+      && distance2d(patron.position, patron.seat.position) < 0.05;
+  }
+  private freeSeat(asker: MutablePatron): CafeStation | undefined {
+    const seats = this.definition.patronService?.seats ?? [];
+    const free = seats.filter((seat) => !this.patrons.some((other) => other !== asker && other.seat === seat));
+    return free.length > 0 ? free[Math.floor(asker.random() * free.length)] : undefined;
+  }
+  private seatPatron(patron: MutablePatron): void {
+    const seat = patron.seat!;
+    Object.assign(patron.position, seat.position); patron.heading = seat.heading; patron.path = [];
+    patron.stay = between(patron.random, patron.definition.staySeconds);
+    this.nextPatronPastime(patron);
+  }
+  private nextPatronPastime(patron: MutablePatron): void {
+    const options: PatronActivity[] = ["sipping", "sipping", "working", "looking-up"];
+    patron.activity = options[Math.floor(patron.random() * options.length)];
+    patron.timer = between(patron.random, this.definition.patronService!.pastimeSeconds);
+  }
+
+  private updatePatron(patron: MutablePatron, world: CafeWorld, events: GameplayEvent[], dt: number): void {
+    const definition = patron.definition; const service = this.definition.patronService!; const goose = this.nearestGoose(world, patron.position);
+    patron.startleCooldown = Math.max(0, patron.startleCooldown - dt);
+    patron.shooCooldown = Math.max(0, patron.shooCooldown - dt);
+    if (patron.activity === "away") {
+      patron.timer -= dt;
+      if (patron.timer > 0) return;
+      // One at a time through the door and up to the counter.
+      const busy = this.patrons.some((other) => other !== patron && (other.activity === "entering" || other.activity === "ordering"));
+      const seat = busy ? undefined : this.freeSeat(patron);
+      if (!seat) { patron.timer = 2; return; }
+      patron.seat = seat; Object.assign(patron.position, service.door); patron.path = []; patron.pathTarget = undefined;
+      patron.activity = "entering";
+      return;
+    }
+    const gooseDistance = distance2d(patron.position, goose.position);
+    const seated = this.patronSeated(patron);
+    if (goose.startling && gooseDistance <= definition.startleRadius && patron.startleCooldown <= 0 && patron.activity !== "startled") {
+      if (patron.activity !== "shooing") patron.resume = patron.activity;
+      patron.activity = "startled"; patron.timer = 0.9; patron.startleCooldown = 2.1;
+      if (!seated) this.face(patron, goose.position);
+      events.push({ type: "person-startled", actorId: definition.id, position: { ...patron.position } });
+      return;
+    }
+    if (seated && gooseDistance <= definition.personalRadius && patron.shooCooldown <= 0 && patron.activity !== "startled" && patron.activity !== "shooing") {
+      patron.resume = patron.activity; patron.activity = "shooing"; patron.timer = 1.1; patron.shooCooldown = 2.6;
+      return;
+    }
+    switch (patron.activity) {
+      case "startled": case "shooing": {
+        patron.timer -= dt;
+        if (patron.timer > 0) break;
+        const resume = patron.resume ?? "working"; patron.resume = undefined;
+        patron.activity = resume === "startled" || resume === "shooing" ? "working" : resume;
+        if (seated) patron.timer = between(patron.random, service.pastimeSeconds);
+        else if (patron.activity === "ordering") patron.timer = definition.orderSeconds;
+        break;
+      }
+      case "entering":
+        if (this.walkTo(patron, service.counter.position, definition.walkSpeed, dt, ARRIVE)) {
+          patron.heading = service.counter.heading; patron.activity = "ordering"; patron.timer = definition.orderSeconds;
+          // A barista with nothing on greets them from the register.
+          const barista = this.barista;
+          if (barista && (!barista.job || barista.job.kind === "idle") && distance2d(barista.position, barista.definition.register.position) < 0.3) {
+            barista.job = { kind: "welcome", patronId: definition.id }; barista.timer = barista.definition.greetSeconds; barista.path = [];
+          }
+        }
+        break;
+      case "ordering":
+        patron.timer -= dt;
+        if (patron.timer <= 0) { patron.activity = "walking-to-seat"; patron.path = []; }
+        break;
+      case "walking-to-seat":
+        if (!patron.seat) { patron.activity = "leaving"; break; }
+        if (this.walkTo(patron, patron.seat.position, definition.walkSpeed, dt, ARRIVE)) this.seatPatron(patron);
+        break;
+      case "leaving":
+        if (this.walkTo(patron, service.door, definition.walkSpeed, dt, ARRIVE)) {
+          patron.activity = "away"; patron.seat = undefined; patron.timer = between(patron.random, definition.awaySeconds);
+        }
+        break;
+      default:
+        patron.stay -= dt; patron.timer -= dt;
+        if (patron.stay <= 0) { patron.activity = "leaving"; patron.path = []; break; }
+        if (patron.timer <= 0) this.nextPatronPastime(patron);
+    }
   }
 
   // --- Kitchen workers ---------------------------------------------------------------------------
@@ -281,6 +421,7 @@ export class CafeCrew {
       case "shoo": return "shooing";
       case "startled": return "startled";
       case "evict": return barista.shoveCooldown > 0.4 ? "shooing" : "chasing";
+      case "welcome": return "greeting";
       case "idle": return moving ? "walking" : "idle";
     }
   }
@@ -390,6 +531,14 @@ export class CafeCrew {
           barista.timer -= dt;
           if (barista.timer <= 0) { barista.spills.splice(barista.spills.indexOf(job.surfaceId), 1); this.finishJob(barista); }
         }
+        break;
+      }
+      case "welcome": {
+        // A wave and a hello from the register while a regular orders.
+        const patron = this.patrons.find((candidate) => candidate.definition.id === job.patronId);
+        barista.timer -= dt;
+        if (patron) this.face(barista, patron.position);
+        if (barista.timer <= 0 || patron?.activity !== "ordering") this.finishJob(barista);
         break;
       }
       case "idle":

@@ -351,6 +351,10 @@ export class Game {
         if (event.type === "objective-completed") this.celebrateTask(event.objectiveId);
         if (event.type === "device-state-changed" && event.active && this.simulation.world.entities.find((entity) => entity.id === event.targetId)?.tags.includes("bell")) this.audio.playBell();
         if (event.type === "order-called") this.audio.playOrderCalled();
+        if (event.type === "dog-barked") {
+          const away = Math.hypot(event.position.x - this.simulation.player.position.x, event.position.z - this.simulation.player.position.z);
+          this.audio.playDogBark(Math.max(0.25, 1 - away / 14));
+        }
         if (event.type === "area-transition-requested") {
           this.beginAreaTransition(event);
           return;
@@ -760,7 +764,11 @@ export class Game {
       ...(snapshot.janitor ? [{ id: snapshot.janitor.id,
         position: { ...snapshot.janitor.position, y: snapshot.janitor.position.y + 1.25 } }] : []),
       ...snapshot.splashKids.map((child) => ({ id: child.id, position: { ...child.position, y: child.position.y + 0.8 } })),
-      ...snapshot.cafePeople.map((person) => ({ id: person.id, position: { ...person.position, y: person.position.y + (person.seated ? 1.5 : 2.1) } })),
+      ...snapshot.cafePeople.filter((person) => person.activity !== "away")
+        .map((person) => ({ id: person.id, position: { ...person.position, y: person.position.y + (person.seated ? 1.5 : 2.1) } })),
+      ...(snapshot.townsfolk ?? []).filter((person) => !person.hidden)
+        .map((person) => ({ id: person.id, position: { ...person.position, y: person.position.y + (person.seated ? 1.5 : 2.1) } })),
+      ...(snapshot.dogs ?? []).map((dog) => ({ id: dog.id, position: { ...dog.position, y: dog.position.y + 0.6 } })),
     ].map((candidate) => ({ ...candidate,
       distance: Math.hypot(candidate.position.x - player.position.x, candidate.position.z - player.position.z),
       angle: Math.atan2(-(candidate.position.x - player.position.x), -(candidate.position.z - player.position.z)) - player.heading,

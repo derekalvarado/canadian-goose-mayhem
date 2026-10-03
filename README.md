@@ -247,7 +247,8 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/controlHeading.ts` — keeps a held movement direction steady while the camera swings
 - `src/game/simulation/Simulation.ts` — fixed-step gameplay state and typed commands/events
 - `src/game/simulation/Objectives.ts` — independent outcome-based task completion
-- `src/game/simulation/cafeCrew.ts` — coffee-shop barista and customer routines, acting through the shared grab/place rules
+- `src/game/simulation/cafeCrew.ts` — coffee-shop barista, customer, and come-and-go regular routines, acting through the shared grab/place rules
+- `src/game/simulation/townsfolk.ts` — splash-pad parents, plaza passers-by, and the small white dog: pastimes, walking the paving graph, and light reactions to the goose
 - `src/game/challenges.ts` — stable village tasks and the area whose HUD list shows each one
 - `src/game/progress.ts` — saving and loading crossed-off tasks in the browser
 - `src/game/simulation/plaza.ts` — legacy plaza-only rules retained for reference
@@ -259,10 +260,14 @@ The camera follows the goose from above. In areas with authored camera tracks, i
 - `src/game/splashKidMoves.ts` — kid pose builders: contact-planted skips and gallops, splashes, flee runs, and crying
 - `src/game/JanitorModel.ts` — procedural janitor mesh, rig, and exported clips
 - `src/game/janitorGaits.ts` — knob-driven walk/chase gaits with leg IK that keeps stance feet planted
+- `src/game/personRig.ts` — shared kit for adults on the janitor's rig (skeleton, skinned shapes, hair shells), used by café people and townsfolk
 - `src/game/CafePersonModel.ts`, `src/game/cafeMoves.ts` — the five coffee-shop people on the janitor's rig, and their clips
+- `src/game/TownsfolkModel.ts`, `src/game/townsfolkMoves.ts`, `src/game/townsfolkTuning.ts` — thirteen parents, passers-by, and café regulars, their clips, and their speeds and timings
+- `src/game/DogModel.ts` — the small white terrier, its rig and clips
+- `src/game/TownsfolkView.ts` — townsfolk and dog presentation (built at runtime, no GLB), with phone and takeaway-cup props
 - `src/game/CafePropsView.ts` — counter, espresso back bar, and café props (tip jar, croissants, cups, radio, bell)
 - `src/dev/animLab/` — shared runtime for the dev-only character animation labs
-- `src/dev/janitorLab/`, `src/dev/kidLab/`, `src/dev/cafeLab/` — janitor, splash-kid, and café-people lab variants
+- `src/dev/janitorLab/`, `src/dev/kidLab/`, `src/dev/cafeLab/`, `src/dev/townLab/` — janitor, splash-kid, café-people, and townsfolk lab variants
 - `assets/characters/goose/goose-animated.blend` — current editable Blender character and animation source
 - `src/game/WorldView.ts` — renders a selected authored world area from reusable asset instances
 - `src/game/WorldEditor.ts` — in-game multi-area world-building tools and asset placement workflow
@@ -309,7 +314,9 @@ and front views, frame stepping, and a treadmill floor that shows foot sliding. 
 builds the rig from source, so edits to `src/dev/janitorLab/variants.ts` or
 `JanitorModel.ts` reload in about a second. Use `?group=chase&zoom` to open a tab
 close up. `/assets/characters/kids/anim-lab.html` is the same lab for the splash-pad
-kids, and `/assets/characters/cafe/anim-lab.html` for the coffee-shop people. New character animation is prototyped in a lab like this before it ships;
+kids, `/assets/characters/cafe/anim-lab.html` for the coffee-shop people, and
+`/assets/characters/townsfolk/anim-lab.html` for the townsfolk and the dog (its **Options** tab
+holds alternatives to pick from). New character animation is prototyped in a lab like this before it ships;
 see [AGENTS.md](AGENTS.md#prototyping-character-animation).
 
 ## Coffee shop challenges
