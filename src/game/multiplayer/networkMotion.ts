@@ -70,7 +70,7 @@ export class NetworkMotionSmoother {
   update(deltaSeconds: number, input?: NetworkPredictionInput): SmoothedNetworkMotion | undefined {
     if (!this.initialized) return undefined;
     const delta = Math.max(0, Math.min(MAX_FRAME_SECONDS, finite(deltaSeconds)));
-    this.sampleAge = Math.min(MAX_EXTRAPOLATION_SECONDS, this.sampleAge + delta);
+    this.sampleAge += delta;
 
     let headingTarget = this.sampleHeading;
     if (input) {
@@ -94,12 +94,17 @@ export class NetworkMotionSmoother {
     this.position.y += this.velocity.y * delta;
     this.position.z += this.velocity.z * delta;
 
-    const targetX = this.samplePosition.x + this.sampleVelocity.x * this.sampleAge;
-    const targetY = this.samplePosition.y + this.sampleVelocity.y * this.sampleAge;
-    const targetZ = this.samplePosition.z + this.sampleVelocity.z * this.sampleAge;
+    const extrapolationAge = Math.min(MAX_EXTRAPOLATION_SECONDS, this.sampleAge);
+    const targetX = this.samplePosition.x + this.sampleVelocity.x * extrapolationAge;
+    const targetY = this.samplePosition.y + this.sampleVelocity.y * extrapolationAge;
+    const targetZ = this.samplePosition.z + this.sampleVelocity.z * extrapolationAge;
     const errorX = targetX - this.position.x; const errorY = targetY - this.position.y; const errorZ = targetZ - this.position.z;
     const error = Math.hypot(errorX, errorY, errorZ);
-    if (error > CORRECTION_DEAD_ZONE) {
+    // Once a guest's authoritative updates go stale, keep predicting its local
+    // input without pulling it back toward the final snapshot. Otherwise the
+    // correction spring feels like a small invisible box during a network stall.
+    // The next fresh snapshot still reconciles or hard-snaps the presentation.
+    if ((!input || this.sampleAge <= MAX_EXTRAPOLATION_SECONDS) && error > CORRECTION_DEAD_ZONE) {
       const correction = response(error > 0.5 ? 12 : 5, delta);
       this.position.x += errorX * correction;
       this.position.y += errorY * correction;

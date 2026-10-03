@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import {
   assertFamilyToken,
   FAMILY_PAIRING_VERSION,
+  joinRequestVisibleToDevice,
   normalizeFamilyPlayerName,
   type FamilyDeviceIdentity,
   type FamilyJoinRequest,
@@ -288,7 +289,7 @@ export class FamilyPairing extends DurableObject<FamilyPairingEnv> {
     return {
       devices: state.pairing.devices,
       activeHost: state.activeHost,
-      joinRequest: state.activeHost?.deviceId === deviceId ? state.joinRequest : undefined,
+      joinRequest: joinRequestVisibleToDevice(state.joinRequest, deviceId),
       room,
     };
   }

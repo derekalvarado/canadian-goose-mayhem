@@ -57,6 +57,26 @@ export interface PairingCodeStatus {
   readonly pairing?: FamilyPairingCredential;
 }
 
+/** A waiting request is private to the other authenticated device in the pair. */
+export function joinRequestVisibleToDevice(
+  request: FamilyJoinRequest | undefined,
+  deviceId: string,
+): FamilyJoinRequest | undefined {
+  return request?.deviceId === deviceId ? undefined : request;
+}
+
+/** Selects a new peer request that should be offered to the local player. */
+export function peerJoinRequestToPrompt(
+  status: FamilyPairStatus,
+  pairing: Pick<StoredFamilyPairing, "peerDeviceId">,
+  dismissedRequestId?: string,
+): FamilyJoinRequest | undefined {
+  const request = status.joinRequest;
+  return request?.deviceId === pairing.peerDeviceId && request.requestId !== dismissedRequestId
+    ? request
+    : undefined;
+}
+
 export function normalizeFamilyPlayerName(value: unknown): string {
   if (typeof value !== "string") throw new Error("Enter a player name.");
   const name = value.trim().replace(/\s+/gu, " ");

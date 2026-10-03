@@ -365,7 +365,7 @@ kbd,
 .pose-button--threat { grid-area: threat; border-color: rgb(241 211 139 / 78%); background: rgb(158 79 67 / 90%); }
 .settings-menu { position: absolute; inset: 0; z-index: 15; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: rgb(15 26 18 / 68%); }
 .settings-menu[hidden] { display: none; }
-.settings-card { width: min(360px, 100%); padding: 22px; border: 1px solid var(--line); border-radius: 8px 22px 8px 22px; background: var(--paper); box-shadow: 0 18px 48px rgb(5 13 8 / 32%); }
+.settings-card { width: min(360px, 100%); min-height: 0; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 22px; border: 1px solid var(--line); border-radius: 8px 22px 8px 22px; background: var(--paper); box-shadow: 0 18px 48px rgb(5 13 8 / 32%); }
 .settings-card h2 { margin: 0 0 18px; font-family: Georgia, serif; font-weight: 500; }
 .settings-card label { display: grid; gap: 7px; color: var(--ink-muted); font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .settings-card select, .settings-card input, .settings-card button { min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--goose-white); background: rgb(13 34 24 / 72%); font: inherit; }
@@ -394,7 +394,7 @@ kbd,
   font: .72rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 .hud-action--multiplayer { left: max(24px, env(safe-area-inset-left)); top: max(24px, env(safe-area-inset-top)); }
-.multiplayer-card { width: min(92vw, 34rem); max-height: min(92vh, 46rem); overflow-y: auto; }
+.multiplayer-card { width: min(92vw, 34rem); }
 .multiplayer-family-panel { display: grid; gap: .65rem; margin: .85rem 0; padding: .85rem; border: 1px solid var(--line); border-radius: .7rem; }
 .multiplayer-family-panel[hidden] { display: none; }
 .multiplayer-family-panel label { gap: .4rem; }
@@ -410,6 +410,30 @@ kbd,
 .multiplayer-code-panel strong { color: var(--sun); font: 700 2.6rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .22em; }
 .multiplayer-code-panel span { color: var(--ink-muted); font-size: .82rem; }
 .settings-card .multiplayer-secondary { border-color: var(--line); background: rgb(13 34 24 / 36%); }
+.multiplayer-join-notice {
+  position: absolute;
+  top: max(72px, calc(env(safe-area-inset-top) + 56px));
+  left: 50%;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .85rem;
+  align-items: center;
+  width: min(32rem, calc(100vw - 32px));
+  padding: .85rem 1rem;
+  transform: translateX(-50%);
+  border: 1px solid rgb(241 211 139 / 58%);
+  border-radius: .8rem;
+  background: rgb(32 63 49 / 96%);
+  box-shadow: 0 16px 40px rgb(5 13 8 / 38%);
+}
+.multiplayer-join-notice[hidden] { display: none; }
+.multiplayer-join-notice > div:first-child { display: grid; gap: .2rem; min-width: 0; }
+.multiplayer-join-notice strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multiplayer-join-notice span { color: var(--ink-muted); font-size: .82rem; }
+.multiplayer-join-notice__actions { display: flex; gap: .45rem; }
+.multiplayer-join-notice button { min-height: 38px; padding: .45rem .7rem; border: 1px solid var(--line); border-radius: .55rem; color: var(--goose-white); background: rgb(13 34 24 / 72%); font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+#multiplayer-join-accept { border-color: rgb(241 211 139 / 68%); background: rgb(158 79 67 / 90%); }
 .controller-lobby {
   position: absolute;
   left: 50%;
@@ -962,6 +986,14 @@ kbd,
 
   .controls-card {
     display: none;
+  }
+
+  .multiplayer-join-notice {
+    grid-template-columns: 1fr;
+  }
+
+  .multiplayer-join-notice__actions button {
+    flex: 1;
   }
 
 }
