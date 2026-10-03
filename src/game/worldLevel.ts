@@ -6,6 +6,8 @@ import { ENTER_SHOP_FACT_ID, ENTER_SHOP_OBJECTIVE_ID, VILLAGE_TASKS } from "./ch
 import type { AreaTransitionDefinition, PlacementSurface, Position, WorldEntityDefinition, WorldRules } from "./simulation/Simulation.ts";
 import type { BaristaDefinition, CafeCrewDefinition, CafeRoutes, CustomerDefinition, PatronDefinition, PatronService, WorkerDefinition, WorkerStation, WorkerTask } from "./simulation/cafeCrew.ts";
 import type { DogDefinition, TownGraph, TownSeat, TownsfolkDefinition, TownspersonDefinition, TownSpot } from "./simulation/townsfolk.ts";
+import type { MusicianDefinition } from "./simulation/musician.ts";
+import { MUSICIAN_STAGE_PLACES, MUSICIAN_TUNING } from "./musicianTuning.ts";
 import { BENCH_SEAT_HEIGHT, CAFE_PATRON, DOG_TUNING, TOWNSFOLK_PASTIME_SECONDS, TOWNSFOLK_PASTIMES, TOWNSFOLK_REACTIONS, TOWNSFOLK_RUNNERS, TOWNSFOLK_WALK_SPEEDS,
   TOWNSFOLK_WALKER, townsfolkLookOf } from "./townsfolkTuning.ts";
 
@@ -35,6 +37,8 @@ const PLAZA_CLEANUP_ORDER: Readonly<Record<string, number>> = {
 };
 
 function position(x: number, z: number): Position { return { x, y: 0, z }; }
+/** How far out in front of the stage the goose starts in the square. */
+const PLAZA_SPAWN_STAGE_DISTANCE = 8;
 
 function local(instance: WorldInstance, x: number, z: number): { x: number; z: number } {
   const dx = x - instance.transform.x; const dz = z - instance.transform.z;
@@ -44,6 +48,10 @@ function local(instance: WorldInstance, x: number, z: number): { x: number; z: n
 function worldPoint(instance: WorldInstance, x: number, z: number): Position {
   const c = Math.cos(instance.transform.rotationY); const s = Math.sin(instance.transform.rotationY);
   return { x: instance.transform.x + x * c + z * s, y: instance.transform.y, z: instance.transform.z - x * s + z * c };
+}
+function inside(localPoint: { x: number; z: number }, collider: WorldAssetCollider): boolean {
+  if (collider.shape === "circle") { const dx = localPoint.x - collider.x; const dz = localPoint.z - collider.z; const radius = collider.radius ?? 0; return dx * dx + dz * dz < radius * radius; }
+  return Math.abs(localPoint.x - collider.x) < (collider.halfWidth ?? 0) && Math.abs(localPoint.z - collider.z) < (collider.halfDepth ?? 0);
 }
 function overlaps(localPoint: { x: number; z: number }, collider: WorldAssetCollider): boolean {
   if (collider.shape === "circle") { const dx = localPoint.x - collider.x; const dz = localPoint.z - collider.z; const radius = (collider.radius ?? 0) + WORLD_GOOSE_RADIUS; return dx * dx + dz * dz < radius * radius; }
@@ -154,8 +162,11 @@ export function createAreaEntities(area: WorldArea, surfaces: readonly Placement
 }
 
 export function createCentralPlazaRules(area: WorldArea, transitions: readonly WorldAreaTransition[] = []): WorldRules {
-  // Preserve usable entry points when an older authored square is restored.
-  const entrance = [{ x: -24, z: -3 }, { x: 11.5, z: 10.5 }, { x: -12, z: -3 }]
+  // Start out front of the stage, facing it, so the musician is close by; the
+  // older entry points remain fallbacks when an authored square has no clear spot there.
+  const stage = area.instances.find((item) => item.assetId === "oldtown.stage");
+  const stageFront = stage ? worldPoint(stage, 0, PLAZA_SPAWN_STAGE_DISTANCE) : undefined;
+  const entrance = [...(stageFront ? [stageFront] : []), { x: -24, z: -3 }, { x: 11.5, z: 10.5 }, { x: -12, z: -3 }]
     .find(point => isWorldAreaPlayable(area, point.x, point.z));
   if (!entrance) throw new Error("Central plaza has no clear entrance; clear a spawn location in the world editor");
   const surfaces = createAreaSurfaces(area);
@@ -196,14 +207,17 @@ export function createCentralPlazaRules(area: WorldArea, transitions: readonly W
         disappointedSeconds: 2, crySeconds: 3, splashSeconds: [3.2, 2.6, 3.8][index % 3],
       };
     }) : [];
+  const walk = createWalkMap(area);
   const objectiveZones = entranceInstance ? [{ id: entranceInstance.id,
     position: { x: entranceInstance.transform.x, y: entranceInstance.transform.y, z: entranceInstance.transform.z },
     radius: 0.72, factId: ENTER_SHOP_FACT_ID, guardedBy: janitorInstance?.id }] : [];
   return {
     areaId: area.id,
-    spawn: { ...entrance, y: getWorldGroundHeight(area, entrance.x, entrance.z)! }, spawnHeading: 0,
+    spawn: { x: entrance.x, y: getWorldGroundHeight(area, entrance.x, entrance.z)!, z: entrance.z },
+    spawnHeading: stage && entrance === stageFront ? Math.atan2(-(stage.transform.x - entrance.x), -(stage.transform.z - entrance.z)) : 0,
     resolveMovement: (current, proposed, output) => { resolveWorldAreaMovement(area, current, proposed, output); },
-    entities, janitor, splashKids, objectiveZones, surfaces, townsfolk: createPlazaTownsfolk(area, splashPad, entranceInstance),
+    entities, janitor, splashKids, objectiveZones, surfaces, townsfolk: createPlazaTownsfolk(area, splashPad, entranceInstance, walk),
+    musician: createPlazaMusician(area, entities, walk),
     objectives: VILLAGE_TASKS,
     transitions: createAreaTransitions(area, transitions),
   };
@@ -352,12 +366,11 @@ function benchSeats(area: WorldArea, walk: WalkMap): TownSeat[] {
   }));
 }
 
-function createPlazaTownsfolk(area: WorldArea, splashPad?: WorldInstance, entrance?: WorldInstance): TownsfolkDefinition | undefined {
+function createPlazaTownsfolk(area: WorldArea, splashPad?: WorldInstance, entrance?: WorldInstance, walk = createWalkMap(area)): TownsfolkDefinition | undefined {
   const parents = area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "town-parent");
   const walkers = area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "town-walker");
   const dogInstances = area.instances.filter((item) => getWorldAsset(item.assetId)?.gameplayRole === "town-dog");
   if (parents.length + walkers.length + dogInstances.length === 0) return undefined;
-  const walk = createWalkMap(area);
   const seats = benchSeats(area, walk);
   const distance = (a: Readonly<{ x: number; z: number }>, b: Readonly<{ x: number; z: number }>) => Math.hypot(a.x - b.x, a.z - b.z);
   const at = (item: WorldInstance): Position => ({ x: item.transform.x, y: item.transform.y, z: item.transform.z });
@@ -422,6 +435,96 @@ function createPlazaTownsfolk(area: WorldArea, splashPad?: WorldInstance, entran
     canStand: walk.open, canPass: walk.segmentOpen,
     // Passers-by keep to the paved squares rather than the approaches behind the shops.
     roams: (x, z) => squares.length === 0 || squares.some((item) => isInsideAsset(item, x, z)),
+  };
+}
+
+// --- Sight ---------------------------------------------------------------------------------------
+
+const SIGHT_CELL = 0.25;
+/**
+ * Whether anything that blocks sight (walls, buildings, the brewery tank) stands
+ * between two points, rasterised once from the catalog's sight shapes. Separate
+ * from walking: a bench stops the goose but nobody's view.
+ */
+export function createSightMap(area: WorldArea): (a: Readonly<{ x: number; z: number }>, b: Readonly<{ x: number; z: number }>) => boolean {
+  const blockers = area.instances.flatMap((item) => {
+    const asset = getWorldAsset(item.assetId); if (!asset?.blocksSight) return [];
+    const shapes = asset.sightBlockers ?? asset.colliders;
+    return shapes.length > 0 ? [{ item, shapes }] : [];
+  });
+  if (blockers.length === 0) return () => true;
+  const reach = (shapes: readonly WorldAssetCollider[]) => Math.max(...shapes.map((shape) => Math.hypot(shape.x, shape.z)
+    + (shape.shape === "circle" ? shape.radius ?? 0 : Math.hypot(shape.halfWidth ?? 0, shape.halfDepth ?? 0))));
+  const minX = Math.min(...blockers.map(({ item, shapes }) => item.transform.x - reach(shapes)));
+  const maxX = Math.max(...blockers.map(({ item, shapes }) => item.transform.x + reach(shapes)));
+  const minZ = Math.min(...blockers.map(({ item, shapes }) => item.transform.z - reach(shapes)));
+  const maxZ = Math.max(...blockers.map(({ item, shapes }) => item.transform.z + reach(shapes)));
+  const width = Math.ceil((maxX - minX) / SIGHT_CELL) + 1; const depth = Math.ceil((maxZ - minZ) / SIGHT_CELL) + 1;
+  const blocked = new Uint8Array(width * depth);
+  for (const { item, shapes } of blockers) {
+    const radius = reach(shapes);
+    const i0 = Math.max(0, Math.floor((item.transform.x - radius - minX) / SIGHT_CELL)); const i1 = Math.min(width - 1, Math.ceil((item.transform.x + radius - minX) / SIGHT_CELL));
+    const j0 = Math.max(0, Math.floor((item.transform.z - radius - minZ) / SIGHT_CELL)); const j1 = Math.min(depth - 1, Math.ceil((item.transform.z + radius - minZ) / SIGHT_CELL));
+    for (let j = j0; j <= j1; j += 1) for (let i = i0; i <= i1; i += 1) {
+      const point = local(item, minX + i * SIGHT_CELL, minZ + j * SIGHT_CELL);
+      if (shapes.some((shape) => inside(point, shape))) blocked[j * width + i] = 1;
+    }
+  }
+  const solid = (x: number, z: number) => {
+    const i = Math.round((x - minX) / SIGHT_CELL); const j = Math.round((z - minZ) / SIGHT_CELL);
+    return i >= 0 && j >= 0 && i < width && j < depth && blocked[j * width + i] === 1;
+  };
+  return (a, b) => {
+    const length = Math.hypot(b.x - a.x, b.z - a.z); const steps = Math.max(1, Math.ceil(length / (SIGHT_CELL * 0.8)));
+    for (let step = 1; step < steps; step += 1) { const t = step / steps; if (solid(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t)) return false; }
+    return true;
+  };
+}
+
+// --- Street musician ------------------------------------------------------------------------------
+
+/**
+ * The musician plays on the stage nearest where they were placed, beside their
+ * guitar's stand; the way down the steps, the break spot, and the places they
+ * search all follow the stage, so moving it in the editor brings them along.
+ */
+function createPlazaMusician(area: WorldArea, entities: readonly WorldEntityDefinition[], walk: WalkMap): MusicianDefinition | undefined {
+  const item = area.instances.find((candidate) => getWorldAsset(candidate.assetId)?.gameplayRole === "musician");
+  if (!item) return undefined;
+  const near = (point: Readonly<{ x: number; z: number }>) => Math.hypot(point.x - item.transform.x, point.z - item.transform.z);
+  const guitar = entities.filter((entity) => entity.tags?.includes("guitar") && entity.carryable?.drag).sort((a, b) => near(a.position) - near(b.position))[0];
+  if (!guitar) return undefined;
+  const stage = area.instances.filter((candidate) => candidate.assetId === "oldtown.stage" && isInsideAsset(candidate, item.transform.x, item.transform.z))[0];
+  const places = MUSICIAN_STAGE_PLACES;
+  const ground = (point: Readonly<{ x: number; z: number }>): Position => position(point.x, point.z);
+  /** The nearest open paving to a point, so a moved stage never strands anyone. */
+  const openNear = (point: Position): Position => {
+    if (walk.clear(point.x, point.z)) return point;
+    for (let radius = 0.5; radius <= 4; radius += 0.5) for (let index = 0; index < 12; index += 1) {
+      const angle = index / 12 * Math.PI * 2; const x = point.x + Math.sin(angle) * radius; const z = point.z + Math.cos(angle) * radius;
+      if (walk.clear(x, z)) return position(x, z);
+    }
+    return point;
+  };
+  const homeY = stage ? stage.transform.y + places.stageTop : item.transform.y;
+  const home = { position: { x: item.transform.x, y: homeY, z: item.transform.z }, heading: item.transform.rotationY };
+  let stageExit: Position[] = [];
+  let breakAt: Position; let searchSpots: Position[];
+  if (stage) {
+    const at = local(stage, item.transform.x, item.transform.z);
+    const across = Math.max(-4.5, Math.min(4.5, at.x));
+    stageExit = [{ ...home.position }, { ...worldPoint(stage, across, places.stepsTop), y: homeY }, openNear(ground(worldPoint(stage, across, places.stepsFoot)))];
+    breakAt = openNear(ground(worldPoint(stage, places.breakSpot.x, places.breakSpot.z)));
+    searchSpots = places.searchSpots.map((spot) => ground(worldPoint(stage, spot.x, spot.z))).filter((spot) => walk.clear(spot.x, spot.z));
+  } else {
+    breakAt = openNear(position(item.transform.x - Math.sin(home.heading) * 8, item.transform.z - Math.cos(home.heading) * 8));
+    searchSpots = [];
+  }
+  const graph = createTownGraph(area, [...stageExit.slice(-1), breakAt, ...searchSpots], walk);
+  return {
+    id: item.id, home, stageExit, guitarId: guitar.id, standPosition: { ...guitar.position },
+    breakSpot: { position: breakAt, heading: Math.atan2(-(guitar.position.x - breakAt.x), -(guitar.position.z - breakAt.z)) },
+    searchSpots, graph, canPass: walk.segmentOpen, canSee: createSightMap(area), tuning: MUSICIAN_TUNING,
   };
 }
 

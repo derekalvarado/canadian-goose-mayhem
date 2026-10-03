@@ -380,6 +380,19 @@ export const PALETTE = {
     collar: 0xc4483e,
     tag: 0xe0b84e,
   },
+  /** Gray-box stand-ins for the street musician, their guitar, and its stand while gameplay is tuned. */
+  musicianGraybox: {
+    body: 0x9b9d9f,
+    bodyShade: 0x7d8083,
+    face: 0x56595c,
+    guitar: 0xb9b6b0,
+    guitarDark: 0x6e6b66,
+    stand: 0x4f5154,
+    cup: 0xe9e5dc,
+    alert: 0xf2c94c,
+    puzzled: 0xf4f1ea,
+    sightCone: 0xf6d76b,
+  },
   atmosphere: {
     sky: 0xa9b9ae,
     fog: 0x829b86,

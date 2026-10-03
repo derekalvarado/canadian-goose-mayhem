@@ -156,6 +156,7 @@ export class Goose extends THREE.Group {
     turnAmount: number,
     wingsSpread: boolean,
     sneakPose: boolean,
+    backward = false,
   ): void {
     if (!this.mixer || !Number.isFinite(delta) || delta <= 0) return;
     const dt = Math.min(delta, 0.1);
@@ -168,7 +169,7 @@ export class Goose extends THREE.Group {
       yaw = Math.atan2(-this.localTarget.x, -this.localTarget.z);
       pitch = Math.atan2(this.localTarget.y - 0.8, Math.hypot(this.localTarget.x, this.localTarget.z));
     }
-    this.animation.update(dt, speedRatio, turnAmount, wingsSpread, sneakPose, yaw, pitch);
+    this.animation.update(dt, speedRatio, turnAmount, wingsSpread, sneakPose, yaw, pitch, backward);
     for (const name of ["idle", "walk", "hurry", "sneak"] as GooseLocomotion[]) {
       const action = this.actions.get(name);
       if (!action) continue;

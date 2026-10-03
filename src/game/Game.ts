@@ -7,7 +7,7 @@ import { InputController, type GamepadLayout, type InputDevice, type InputFrame 
 import { TouchControls } from "./TouchControls";
 import { PauseReasons, parseTouchControlsPreference, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
-import { Simulation, FIXED_STEP, HURRY_SPEED, WALK_SPEED, type GameplayEvent, type PlayerCommand } from "./simulation/Simulation";
+import { Simulation, FIXED_STEP, HURRY_SPEED, WALK_SPEED, type GameplayEvent, type PlayerCommand, type WorldSnapshot } from "./simulation/Simulation";
 import { PALETTE } from "./palette";
 import { WorldEditor } from "./WorldEditor";
 import { COFFEE_SHOP_AREA_ID, getWorldArea, loadWorldLayout, resolveStartAreaId } from "./worldLayout";
@@ -216,6 +216,7 @@ export class Game {
     if (this.devMode) {
       // Dev-only handle for playtesting from the browser console.
       (window as unknown as { gooseGame?: Game }).gooseGame = this;
+      this.world.showSightLines = true;
       const banner = document.createElement("div");
       banner.className = "dev-mode-banner";
       banner.textContent = `DEV START · ${this.worldArea.label}`;
@@ -354,6 +355,7 @@ export class Game {
         if (event.type === "objective-completed") this.celebrateTask(event.objectiveId);
         if (event.type === "device-state-changed" && event.active && this.simulation.world.entities.find((entity) => entity.id === event.targetId)?.tags.includes("bell")) this.audio.playBell();
         if (event.type === "order-called") this.audio.playOrderCalled();
+        if (event.type === "instrument-twanged") this.audio.playTwang();
         if (event.type === "dog-barked") {
           const away = Math.hypot(event.position.x - this.simulation.player.position.x, event.position.z - this.simulation.player.position.z);
           this.audio.playDogBark(Math.max(0.25, 1 - away / 14));
@@ -374,16 +376,18 @@ export class Game {
       player.speed / HURRY_SPEED,
       player.turnAmount,
       player.wingsSpread || player.threatening,
-      player.sneaking || player.threatening,
+      player.sneaking || player.threatening || player.dragging,
+      player.dragging,
     );
     const secondPlayer = this.simulation.secondaryPlayer;
     if (secondPlayer) {
       this.goose2.update(delta, this.simulation.elapsed, secondPlayer.speed / HURRY_SPEED, secondPlayer.turnAmount,
-        secondPlayer.wingsSpread || secondPlayer.threatening, secondPlayer.sneaking || secondPlayer.threatening);
+        secondPlayer.wingsSpread || secondPlayer.threatening, secondPlayer.sneaking || secondPlayer.threatening || secondPlayer.dragging, secondPlayer.dragging);
     }
     if (this.goose.stepped) void this.audio.playFootstep();
     if (this.goose2.visible && this.goose2.stepped) void this.audio.playFootstep();
     this.audio.setCafeMusic(this.simulation.world.entities.some((entity) => entity.tags.includes("music") && entity.active === true));
+    this.updateStreetSounds(this.simulation.world, this.goose.visible ? this.goose.position : this.goose2.position);
     this.updateInteractionPrompt(frame.device, frame.gamepadLayout);
 
     if (performance.now() - this.lastInputTime > 6200) {
@@ -397,6 +401,16 @@ export class Game {
     this.sunShadow.update(this.camera);
     this.renderer.render(this.scene, this.camera);
   };
+
+  /** The musician's playing, and the scrape of a dragged guitar, both quieter with distance from the listening goose. */
+  private updateStreetSounds(world: WorldSnapshot, listener: Readonly<{ x: number; z: number }>): void {
+    const away = (point: Readonly<{ x: number; z: number }>) => Math.hypot(point.x - listener.x, point.z - listener.z);
+    const musician = world.musician;
+    this.audio.setStreetMusic(musician?.activity === "playing" ? Math.max(0, 1 - away(musician.position) / 26) ** 1.5 : 0);
+    const scraping = world.players.filter((player) => player.dragging && player.speed > 0.3)
+      .map((player) => Math.max(0, 1 - away(player.position) / 18));
+    this.audio.setScrape(scraping.length > 0 ? Math.max(...scraping) : 0);
+  }
 
   private commandForFrame(frame: InputFrame, headingLock: ControlHeadingLock, output: THREE.Vector3, delta: number): PlayerCommand {
     this.camera.getWorldDirection(this.cameraForward);
@@ -435,10 +449,12 @@ export class Game {
       this.simulation.enableSecondPlayer();
       this.goose2.visible = true;
       this.syncPlayerView();
+      this.renderObjectives();
     } else {
       peer.send(encodeGuestMessage({ type: "hello", version: MULTIPLAYER_PROTOCOL_VERSION,
         sessionId: identity.sessionId, reconnectToken: identity.reconnectToken }));
       this.goose2.visible = true;
+      this.renderObjectives();
     }
     this.updateTouchControlsVisibility();
   };
@@ -592,11 +608,12 @@ export class Game {
         this.velocity.set(0, 0, 0);
       }
       this.goose2.update(delta, snapshot.tick * FIXED_STEP, this.velocity2.length() / HURRY_SPEED, guest.state.turnAmount,
-        guest.state.wingsSpread || guest.state.threatening, guest.state.sneaking || guest.state.threatening);
+        guest.state.wingsSpread || guest.state.threatening, guest.state.sneaking || guest.state.threatening || guest.state.dragging === true, guest.state.dragging === true);
       if (host) this.goose.update(delta, snapshot.tick * FIXED_STEP, this.velocity.length() / HURRY_SPEED, host.state.turnAmount,
-        host.state.wingsSpread || host.state.threatening, host.state.sneaking || host.state.threatening);
+        host.state.wingsSpread || host.state.threatening, host.state.sneaking || host.state.threatening || host.state.dragging === true, host.state.dragging === true);
       this.world.syncGameplay(area.world, this.goose.getMouthSocket(), this.goose2.getMouthSocket());
       this.audio.setCafeMusic(area.world.entities.some((entity) => entity.tags.includes("music") && entity.active === true));
+      this.updateStreetSounds(area.world, this.goose2.position);
     }
     this.interactionPrompt.hidden = true;
     this.updateCamera(delta);
@@ -614,6 +631,7 @@ export class Game {
     this.input.resetLocalGamepads();
     this.simulation.enableSecondPlayer();
     this.goose2.visible = true;
+    this.renderObjectives();
     this.controllerLobby.hidden = false;
     this.controllerLobbyStatus.textContent = "Press any button on the first sideways Joy-Con.";
     this.touchControls?.clear();
@@ -647,6 +665,7 @@ export class Game {
     this.transitionCurtain.classList.remove("area-transition-curtain--revealing");
     this.transitionCurtain.classList.add("area-transition-curtain--covered");
     this.audio.setCafeMusic(false);
+    this.audio.setStreetMusic(0); this.audio.setScrape(0);
     window.setTimeout(() => {
       if (this.disposed) return;
       const sessionState = this.simulation.sessionState;
@@ -787,6 +806,7 @@ export class Game {
       ...(snapshot.townsfolk ?? []).filter((person) => !person.hidden)
         .map((person) => ({ id: person.id, position: { ...person.position, y: person.position.y + (person.seated ? 1.5 : 2.1) } })),
       ...(snapshot.dogs ?? []).map((dog) => ({ id: dog.id, position: { ...dog.position, y: dog.position.y + 0.6 } })),
+      ...(snapshot.musician ? [{ id: snapshot.musician.id, position: { ...snapshot.musician.position, y: snapshot.musician.position.y + 1.65 } }] : []),
     ].map((candidate) => ({ ...candidate,
       distance: Math.hypot(candidate.position.x - player.position.x, candidate.position.z - player.position.z),
       angle: Math.atan2(-(candidate.position.x - player.position.x), -(candidate.position.z - player.position.z)) - player.heading,
@@ -834,11 +854,11 @@ export class Game {
     this.renderObjectives();
     saveProgress(this.simulation.sessionState);
     this.audio.playTaskComplete();
-    const task = this.simulation.objectiveList.find((objective) => objective.id === objectiveId);
+    const task = this.listedObjectives().find((objective) => objective.id === objectiveId);
     this.revealTodoList();
     // Finishing a level's last task, wherever the goose happens to be, earns that level's card.
     const level = task?.areaId;
-    const levelTasks = this.simulation.objectiveList.filter((objective) => objective.areaId === level);
+    const levelTasks = this.listedObjectives().filter((objective) => objective.areaId === level);
     if (level && levelTasks.every((objective) => objective.completed)) {
       window.setTimeout(() => {
         this.allDoneLevel.textContent = LEVEL_NAMES[level] ?? "To-do list";
@@ -897,11 +917,17 @@ export class Game {
   };
   private progressCleared = false;
 
+  /** Tasks on the to-do list: two-goose tasks appear only while a second goose is playing. */
+  private listedObjectives() {
+    const twoGeese = this.simulation.secondaryPlayer !== undefined || this.onlineRole === "guest";
+    return this.simulation.objectiveList.filter((objective) => twoGeese || !objective.needsTwoGeese);
+  }
+
   /** The normal list is local to this level; a just-finished remote task is briefly included for its completion reveal. */
   private renderObjectives(): void {
-    const tasks = this.simulation.objectiveList.filter((objective) => !objective.areaId || objective.areaId === this.worldArea.id);
+    const tasks = this.listedObjectives().filter((objective) => !objective.areaId || objective.areaId === this.worldArea.id);
     const highlightedTask = this.highlightedObjectiveId
-      ? this.simulation.objectiveList.find((objective) => objective.id === this.highlightedObjectiveId)
+      ? this.listedObjectives().find((objective) => objective.id === this.highlightedObjectiveId)
       : undefined;
     const visibleTasks = highlightedTask && !tasks.some((objective) => objective.id === highlightedTask.id)
       ? [highlightedTask, ...tasks]
@@ -1104,6 +1130,7 @@ export class Game {
     window.clearTimeout(this.todoTimer);
     if (!this.progressCleared && !this.editorMode && !this.overviewMode && this.onlineRole !== "guest") saveProgress(this.simulation.sessionState);
     this.audio.setCafeMusic(false);
+    this.audio.setStreetMusic(0); this.audio.setScrape(0);
     this.renderer.setAnimationLoop(null);
     window.removeEventListener("resize", this.resize);
     window.visualViewport?.removeEventListener("resize", this.resize);

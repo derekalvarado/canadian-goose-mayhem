@@ -44,7 +44,7 @@ export class GooseAnimationState {
   private stepIndex: number | undefined;
 
   update(delta: number, speedRatio: number, turn: number, wings: boolean, sneakPose: boolean,
-    lookYaw = 0, lookPitch = 0): void {
+    lookYaw = 0, lookPitch = 0, backward = false): void {
     if (!Number.isFinite(delta) || delta <= 0) return;
     const dt = Math.min(delta, 0.1);
     const speed = clamp(Number.isFinite(speedRatio) ? speedRatio : 0);
@@ -66,7 +66,8 @@ export class GooseAnimationState {
     // The plaza's stylized movement speed is retained; cadence is intentionally
     // bounded so high speed cannot turn the legs into an unreadable blur.
     const cadence = (0.8 + 1.8 * this.speed) * GOOSE_ANIMATION.gaitCadenceScale;
-    this.phase = (this.phase + dt * cadence * smooth(this.speed, 0.01, 0.1)) % 1;
+    // Backing up (dragging something) runs the same gait in reverse.
+    this.phase = (this.phase + (backward ? -1 : 1) * dt * cadence * smooth(this.speed, 0.01, 0.1) + 1) % 1;
     // Each gait cycle has two foot contacts (phase 0 and 0.5); report a step
     // whenever the contact half crossed, including the wrap back to 0.
     const contactPhase = (this.phase + GOOSE_ANIMATION.footstepPhaseOffset + 1) % 1;

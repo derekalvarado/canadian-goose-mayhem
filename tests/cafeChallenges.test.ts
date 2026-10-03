@@ -3,7 +3,7 @@ import test from "node:test";
 import { CANONICAL_WORLD_LAYOUT, CENTRAL_PLAZA_AREA_ID, COFFEE_SHOP_AREA_ID, getWorldArea } from "../src/game/worldLayout.ts";
 import { createWorldRules } from "../src/game/worldLevel.ts";
 import { KITCHEN_DOORWAY } from "../src/game/CafeRoomView.ts";
-import { CAFE_TASK_IDS, ENTER_SHOP_OBJECTIVE_ID } from "../src/game/challenges.ts";
+import { CAFE_TASK_IDS, ENTER_SHOP_OBJECTIVE_ID, GUITAR_TASK_IDS } from "../src/game/challenges.ts";
 import { SPILLED_DRINK_FACT_ID, type CafePersonState } from "../src/game/simulation/cafeCrew.ts";
 import { FIXED_STEP, Simulation, type GameplayEvent, type PlayerCommand, type SimulationSessionState, type WorldEntityState } from "../src/game/simulation/Simulation.ts";
 
@@ -335,7 +335,7 @@ test("left alone, the coffee shop never crosses anything off by itself", () => {
 test("each level lists only its own tasks, but a task still counts wherever it is finished", () => {
   const byLevel = (simulation: Simulation, areaId: string) => simulation.objectiveList.filter((task) => task.areaId === areaId).map((task) => task.id);
   const simulation = cafe();
-  assert.deepEqual(byLevel(simulation, CENTRAL_PLAZA_AREA_ID), [ENTER_SHOP_OBJECTIVE_ID]);
+  assert.deepEqual([...byLevel(simulation, CENTRAL_PLAZA_AREA_ID)].sort(), [ENTER_SHOP_OBJECTIVE_ID, ...Object.values(GUITAR_TASK_IDS)].sort());
   assert.deepEqual([...byLevel(simulation, COFFEE_SHOP_AREA_ID)].sort(), Object.values(CAFE_TASK_IDS).sort());
   assert.ok(simulation.objectiveList.every((task) => task.areaId !== undefined), "every task belongs to a level");
 });

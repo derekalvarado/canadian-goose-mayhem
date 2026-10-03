@@ -31,6 +31,7 @@ import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { createCafeBackBar, createCafeCounter, createCafeRadio, createCroissant, createLaptop, createMug, createOrderCup, createPlate, createServiceBell, createTipJar } from "./CafePropsView.ts";
 import { CafePersonView } from "./CafePersonView.ts";
 import { DogView, TownspersonView } from "./TownsfolkView.ts";
+import { createGuitar, createGuitarStand, MusicianView } from "./MusicianView.ts";
 import { townsfolkLookOf } from "./townsfolkTuning.ts";
 import { createKitchenOven, createKitchenShelf, createKitchenSink, createPastryRack, createPrepTable } from "./KitchenView.ts";
 import { createCafeDoorwayWall, createCafeFloor, createCafeFrontDoor, createCafeWall, createKitchenFloor, createMenuBoard } from "./CafeRoomView.ts";
@@ -1144,6 +1145,9 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "plaza.splash-pad": return createSplashPad();
     case "plaza.splash-faucet": return createSplashFaucet();
     case "prop.beer-can": return createBeerCan();
+    case "prop.guitar": return createGuitar();
+    case "oldtown.guitar-stand": return createGuitarStand();
+    case "plaza.street-musician": return new MusicianView();
     case "prop.trash-bag": return createTrashBag();
     case "prop.litter-picker": return createLitterPicker();
     case "litter.chip-bag": return createChipBag();

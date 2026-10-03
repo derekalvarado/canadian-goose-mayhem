@@ -26,7 +26,7 @@ export interface AuthoritativeGameSnapshot {
   readonly tick: number;
   readonly players: readonly ReplicatedPlayer[];
   readonly areas: readonly ReplicatedArea[];
-  readonly objectiveList: readonly Readonly<{ id: string; description: string; areaId?: string; completed: boolean }>[];
+  readonly objectiveList: readonly Readonly<{ id: string; description: string; areaId?: string; needsTwoGeese?: boolean; completed: boolean }>[];
 }
 
 export type GuestMessage =
