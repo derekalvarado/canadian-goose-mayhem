@@ -2,11 +2,14 @@ import * as THREE from "three";
 import { PALETTE } from "./palette.ts";
 import { toonMaterial } from "./toonMaterial.ts";
 import { MUSICIAN_TUNING } from "./musicianTuning.ts";
+import { ACOUSTIC_GUITAR_LENGTH, createAcousticGuitar, createMusicianModel, GUITAR_COLORS, MUSICIAN_COLORS, type GuitarSlot } from "./MusicianModel.ts";
+import { RiggedCharacterView, type CharacterLoader } from "./RiggedCharacterView.ts";
+import { buildLater, createTakeawayCup } from "./TownsfolkView.ts";
 import type { MusicianState } from "./simulation/musician.ts";
 
 /**
- * Gray-box stand-ins for the street musician, the guitar, and its stand, so the
- * stealing game can be tuned before real models exist. Presentation only.
+ * The street musician (a folk singer on the townsfolk rig), her acoustic guitar,
+ * and its stand. Presentation only: clips follow what the simulation says she is doing.
  */
 const C = PALETTE.musicianGraybox;
 function box(w: number, h: number, d: number, color: number, x = 0, y = h / 2, z = 0): THREE.Mesh {
@@ -15,25 +18,25 @@ function box(w: number, h: number, d: number, color: number, x = 0, y = h / 2, z
 }
 
 /** Guitar length from the end of the headstock (the origin, where the goose bites) to the bottom of the body. */
-export const GUITAR_LENGTH = 1.02;
+export const GUITAR_LENGTH = ACOUSTIC_GUITAR_LENGTH;
 
-/** A flat guitar: headstock at the origin, the neck and body running along +z, the strings facing +y. */
+/** The musician's guitar: headstock at the origin, the neck and body running along +z, the strings facing +y. */
 export function createGuitar(): THREE.Group {
-  const group = new THREE.Group();
-  group.add(box(0.09, 0.03, 0.16, C.guitarDark, 0, 0, 0.08));
-  group.add(box(0.055, 0.035, 0.46, C.guitarDark, 0, 0, 0.39));
-  group.add(box(0.3, 0.09, 0.2, C.guitar, 0, 0, 0.66));
-  group.add(box(0.38, 0.09, 0.26, C.guitar, 0, 0, 0.88));
-  group.add(box(0.09, 0.012, 0.09, C.guitarDark, 0, 0.05, 0.72));
-  return group;
+  const guitar = createAcousticGuitar();
+  guitar.traverse((object) => {
+    if (object instanceof THREE.Mesh) object.material = toonMaterial(GUITAR_COLORS[(object.material as THREE.Material).name as GuitarSlot]);
+  });
+  return guitar;
 }
 
-/** A low A-frame stand the guitar leans in. */
+/** A low A-frame stand the guitar leans in, sized to the guitar. */
 export function createGuitarStand(): THREE.Group {
   const group = new THREE.Group();
-  group.add(box(0.36, 0.04, 0.3, C.stand, 0, 0.02, 0));
-  const back = box(0.05, 0.62, 0.05, C.stand, 0, 0.31, 0.1); back.rotation.x = -0.18; group.add(back);
-  group.add(box(0.34, 0.05, 0.08, C.stand, 0, 0.1, -0.06));
+  const frame = new THREE.Group(); frame.scale.setScalar(GUITAR_LENGTH / 1.02);
+  frame.add(box(0.36, 0.04, 0.3, C.stand, 0, 0.02, 0));
+  const back = box(0.05, 0.62, 0.05, C.stand, 0, 0.31, 0.1); back.rotation.x = -0.18; frame.add(back);
+  frame.add(box(0.34, 0.05, 0.08, C.stand, 0, 0.1, -0.06));
+  group.add(frame);
   return group;
 }
 
@@ -55,45 +58,63 @@ function sightFan(halfAngle: number, opacity: number): THREE.Mesh {
   return mesh;
 }
 
-export class MusicianView extends THREE.Group {
-  private readonly body = new THREE.Group();
-  private readonly head = new THREE.Group();
-  private readonly strumArm = new THREE.Group();
-  private readonly cup: THREE.Mesh;
+/** Picks a clip from what the simulation says she is doing. Presentation only. */
+export function musicianClipFor(state: Pick<MusicianState, "activity" | "moving" | "heldEntityId">): string {
+  const holding = state.heldEntityId !== undefined;
+  const hurrying = state.activity === "chasing" || state.activity === "retrieving" || state.activity === "carrying";
+  if (state.moving) return `${holding ? "carry-" : ""}${hurrying ? "jog" : "walk"}`;
+  if (holding) return state.activity === "playing" ? "play" : "rest";
+  switch (state.activity) {
+    case "sipping": return "sip";
+    case "reacting": return "startle";
+    case "shooing": return "shoo";
+    case "puzzled": case "missing": return "shrug";
+    case "eyeing": case "investigating": case "searching": case "looking-around": case "chasing": return "look";
+    default: return "idle";
+  }
+}
+
+const MARKER_HEIGHT = 2.95;
+const CUP_POINT = new THREE.Vector3();
+
+export class MusicianView extends RiggedCharacterView {
+  private readonly cup = createTakeawayCup();
+  /** Follows the rig's chest once it loads; a held guitar's wrapper is parented here. */
   private readonly guitarSocket = new THREE.Object3D();
   private readonly marker: THREE.Sprite;
   private readonly markerTextures: Record<"!" | "?", THREE.Texture | undefined>;
   private readonly wideSight: THREE.Mesh;
   private readonly focusedSight: THREE.Mesh;
   private readonly sight = new THREE.Group();
+  private strap?: THREE.Object3D;
+  private hand?: THREE.Object3D;
+  private mouths: { closed: THREE.Object3D[]; open: THREE.Object3D[] } = { closed: [], open: [] };
   private state?: MusicianState;
   private time = 0;
 
-  constructor() {
-    super();
-    // Faces local -z, like the other people in town.
-    this.body.add(box(0.15, 0.85, 0.2, C.bodyShade, -0.1, 0.425), box(0.15, 0.85, 0.2, C.bodyShade, 0.1, 0.425));
-    this.body.add(box(0.46, 0.62, 0.26, C.body, 0, 1.16));
-    this.body.add(box(0.11, 0.56, 0.12, C.bodyShade, -0.3, 1.17));
-    this.strumArm.position.set(0.3, 1.42, 0);
-    this.strumArm.add(box(0.11, 0.56, 0.12, C.bodyShade, 0, -0.27));
-    this.cup = box(0.09, 0.13, 0.09, C.cup, 0, -0.58, -0.04); this.cup.visible = false; this.strumArm.add(this.cup);
-    this.body.add(this.strumArm);
-    this.head.position.set(0, 1.52, 0);
-    this.head.add(box(0.26, 0.28, 0.26, C.body, 0, 0.14));
-    // A dark visor marks which way they are looking.
-    this.head.add(box(0.2, 0.07, 0.06, C.face, 0, 0.17, -0.15));
-    this.body.add(this.head);
-    // Held guitar: headstock up at their left shoulder, body across the right hip, strings facing out.
-    this.guitarSocket.position.set(-0.36, 1.38, -0.2);
-    const along = new THREE.Vector3(0.62, -0.5, 0).normalize(); const face = new THREE.Vector3(0, 0, -1);
-    this.guitarSocket.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(face.clone().cross(along), face, along));
-    this.body.add(this.guitarSocket);
-    this.add(this.body);
+  constructor(loader?: CharacterLoader) {
+    super({ name: "street musician", errorLabel: "the street musician", palette: MUSICIAN_COLORS,
+      loader: loader ?? (typeof window === "undefined" ? undefined : buildLater("street-musician", createMusicianModel)), initialClip: "play" });
+    // Until the rig loads the guitar hangs roughly where she holds it.
+    this.guitarSocket.position.set(-0.6, 1.85, -0.5);
+    this.add(this.guitarSocket);
+    this.cup.visible = false;
+    void this.ready.then(() => {
+      const socket = this.getObjectByName("guitar_socket");
+      if (socket) { socket.add(this.guitarSocket); this.guitarSocket.position.set(0, 0, 0); }
+      this.hand = this.getHandSocket("right");
+      this.add(this.cup);
+      this.strap = this.getObjectByName("town-bag");
+      this.traverse((object) => {
+        if (object.name === "town-mouth-open") this.mouths.open.push(object);
+        else if (object.name === "town-mouth") this.mouths.closed.push(object);
+      });
+      if (this.state) this.setState(this.state);
+    }).catch(() => undefined);
 
     this.markerTextures = { "!": markerTexture("!", C.alert), "?": markerTexture("?", C.puzzled) };
     this.marker = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
-    this.marker.scale.set(0.5, 0.5, 1); this.marker.position.set(0, 2.15, 0); this.marker.visible = false; this.marker.renderOrder = 3;
+    this.marker.scale.set(0.5, 0.5, 1); this.marker.position.set(0, MARKER_HEIGHT, 0); this.marker.visible = false; this.marker.renderOrder = 3;
     // Markers and the sight overlay are not part of the world: line-of-sight checks pass straight through them.
     this.marker.raycast = () => {};
     this.add(this.marker);
@@ -116,25 +137,37 @@ export class MusicianView extends THREE.Group {
 
   setState(state: MusicianState): void {
     this.state = state;
+    this.userData.gameplayState = state.activity;
     const focused = state.sightHalfAngle < MUSICIAN_TUNING.sightHalfAngle - 0.01;
     this.wideSight.visible = !focused; this.focusedSight.visible = focused;
     const texture = state.alert ? this.markerTextures[state.alert] : undefined;
     this.marker.visible = texture !== undefined;
     if (texture && this.marker.material.map !== texture) { this.marker.material.map = texture; this.marker.material.needsUpdate = true; }
+    const clip = musicianClipFor(state);
+    this.playAnimation(clip, 0.25);
+    // The strap goes with the guitar; a coffee only while sipping on her break.
+    if (this.strap) this.strap.visible = state.heldEntityId !== undefined;
+    this.cup.visible = clip === "sip";
+    const open = clip === "startle" || clip === "shoo";
+    for (const mouth of this.mouths.open) mouth.visible = open;
+    for (const mouth of this.mouths.closed) mouth.visible = !open;
   }
 
-  update(delta: number): void {
-    const state = this.state; if (!state || !Number.isFinite(delta)) return;
+  override update(delta: number): void {
+    if (!Number.isFinite(delta)) return;
+    super.update(delta);
     this.time += Math.min(delta, 0.1);
-    const running = state.activity === "chasing" || state.activity === "retrieving" || state.activity === "carrying";
-    const bob = state.moving ? Math.abs(Math.sin(this.time * (running ? 14 : 9))) * (running ? 0.07 : 0.04) : 0;
-    this.body.position.y = bob;
-    this.body.rotation.x = running && state.moving ? -0.22 : state.activity === "missing" ? 0.08 : 0;
-    this.head.rotation.x = state.activity === "missing" ? 0.45 : state.activity === "sipping" ? -0.25 : 0;
-    // Strumming while playing, a raised cup while sipping, a wave while shooing; otherwise hanging.
-    this.cup.visible = state.activity === "sipping";
-    this.strumArm.rotation.x = state.activity === "playing" ? 0.9 + Math.sin(this.time * 11) * 0.35
-      : state.activity === "sipping" ? 2.2 : state.activity === "shooing" ? 2.6 + Math.sin(this.time * 18) * 0.4 : 0;
-    this.marker.position.y = 2.15 + Math.sin(this.time * 5) * 0.05;
+    this.marker.position.y = MARKER_HEIGHT + Math.sin(this.time * 5) * 0.05;
+    this.placeCup();
+  }
+
+  /** The coffee stays upright beside her palm rather than turning with the wrist, tipping toward her lips as she sips. */
+  private placeCup(): void {
+    if (!this.hand || !this.cup.visible) return;
+    this.updateMatrixWorld(true);
+    const palm = this.worldToLocal(this.hand.getWorldPosition(CUP_POINT));
+    const raised = THREE.MathUtils.clamp((palm.y - 1.55) / 0.45, 0, 1);
+    this.cup.position.set(palm.x - 0.075, palm.y + 0.02 * (1 - raised), palm.z);
+    this.cup.rotation.set(raised * 1.05, 0, 0);
   }
 }

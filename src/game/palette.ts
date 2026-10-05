@@ -398,7 +398,7 @@ export const PALETTE = {
     guitarCream: 0xeee3c8,
     guitarMetal: 0xd6cfbf,
   },
-  /** Gray-box stand-ins for the street musician, their guitar, and its stand while gameplay is tuned. */
+  /** Street musician extras still drawn as simple shapes: the guitar stand, the "!"/"?" markers, and the developer sight cone. */
   musicianGraybox: {
     body: 0x9b9d9f,
     bodyShade: 0x7d8083,

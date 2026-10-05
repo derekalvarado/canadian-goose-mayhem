@@ -22,7 +22,7 @@ export const TOWNSFOLK_WALK: Omit<WalkStyle, "legs" | "duration" | "speed"> = {
   ...CAFE_WALK, crouch: 0.04, bob: 0.03, stepHeight: 0.08, lean: 0.03,
 };
 /** Metres per full cycle (two steps) for a person of height scale 1. */
-const STRIDE = 1.15;
+export const TOWNSFOLK_STRIDE = 1.15;
 /** Leg lengths read off a townsperson's rig. */
 export function legsFromBind(bind: ReadonlyMap<string, THREE.Vector3>): LegDimensions {
   const hipJointY = (bind.get("hips")?.y ?? 0) + (bind.get("left_hip")?.y ?? 0);
@@ -32,7 +32,7 @@ export function legsFromBind(bind: ReadonlyMap<string, THREE.Vector3>): LegDimen
 /** The walk at this person's pace and size. */
 export function townsfolkWalkStyle(look: TownsfolkLook, legs: LegDimensions, tweak: Partial<WalkStyle> = {}): WalkStyle {
   const k = legs.ankleY / 0.19; const speed = TOWNSFOLK_WALK_SPEEDS[look];
-  return { ...TOWNSFOLK_WALK, ...tweak, legs, speed, duration: STRIDE * k / speed };
+  return { ...TOWNSFOLK_WALK, ...tweak, legs, speed, duration: TOWNSFOLK_STRIDE * k / speed };
 }
 const SEATED = new Set(["sit", "sit-sip", "sit-look", "sit-startle", "sit-shoo", "sit-wait"]);
 

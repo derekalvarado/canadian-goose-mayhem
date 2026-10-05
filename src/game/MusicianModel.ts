@@ -4,9 +4,10 @@ import { PALETTE } from "./palette.ts";
 import { RIG_ANKLE_Y, RIG_HIP_JOINT_Y } from "./personRig.ts";
 import { drawTownsperson, lookColors, type Look, type TownSlot } from "./TownsfolkModel.ts";
 import { TOWNSFOLK_LEG_SCALE } from "./townsfolkTuning.ts";
-import { legsFromBind } from "./townsfolkMoves.ts";
-import { arm, full, standingClips, type Rotations } from "./cafeMoves.ts";
-import { cycleClip, type Vec3 } from "./janitorGaits.ts";
+import { legsFromBind, TOWNSFOLK_RUN, TOWNSFOLK_STRIDE, TOWNSFOLK_WALK } from "./townsfolkMoves.ts";
+import { arm, envelope, full, hang, standingClips, withHips, type Rotations } from "./cafeMoves.ts";
+import { cycleClip, walkPose, type Vec3, type WalkStyle } from "./janitorGaits.ts";
+import { MUSICIAN_GUITAR_LENGTH, MUSICIAN_TUNING } from "./musicianTuning.ts";
 
 /**
  * The street musician: a folk singer drawn with the townsfolk kit, plus her
@@ -36,15 +37,15 @@ export const MUSICIAN_COLORS: Readonly<Record<TownSlot | GuitarSlot, number>> = 
 
 // --- Guitar ---------------------------------------------------------------------------------------
 
-/** The guitar is drawn at these sizes and then scaled up to suit the townsfolk's big storybook bodies. */
-const GUITAR_SCALE = 1.15;
 /** Distances along the guitar from the headstock end, before scaling. */
 const NUT = 0.168, SADDLE = 1.235, NECK_HEEL = 0.74, SOUND_HOLE = 0.9;
 const UPPER_BOUT = { center: 0.87, radius: 0.18 }, LOWER_BOUT = { center: 1.17, radius: 0.235 };
 const BODY_DEPTH = 0.11;
 const BODY_END = LOWER_BOUT.center + LOWER_BOUT.radius;
 /** Guitar length from the end of the headstock (the origin, where the goose bites) to the bottom of the body. */
-export const ACOUSTIC_GUITAR_LENGTH = BODY_END * GUITAR_SCALE;
+export const ACOUSTIC_GUITAR_LENGTH = MUSICIAN_GUITAR_LENGTH;
+/** The guitar is drawn at these sizes and then scaled up to suit the townsfolk's big storybook bodies. */
+const GUITAR_SCALE = ACOUSTIC_GUITAR_LENGTH / BODY_END;
 
 /** Half the body's width at a distance along the guitar: the two bouts blended smoothly at the waist. */
 function bodyHalfWidth(v: number): number {
@@ -243,6 +244,10 @@ const mix = (a: ArmPose, b: ArmPose, t: number): ArmPose => a.map((value, i) => 
 const smooth = (t: number) => t * t * (3 - 2 * t);
 
 function createMusicianClips(model: THREE.Group, frame: GuitarFrame, bind: ReadonlyMap<string, THREE.Vector3>): THREE.AnimationClip[] {
+  const legs = legsFromBind(bind); const k = legs.ankleY / RIG_ANKLE_Y;
+  // Walking and jogging at the speeds the simulation moves her at.
+  const walk: WalkStyle = { ...TOWNSFOLK_WALK, legs, speed: MUSICIAN_TUNING.walkSpeed, duration: TOWNSFOLK_STRIDE * k / MUSICIAN_TUNING.walkSpeed };
+  const jog: WalkStyle = { ...TOWNSFOLK_RUN, legs, speed: MUSICIAN_TUNING.jogSpeed, duration: 0.72, stepHeight: 0.14, lean: 0.12, armSwing: 0.55 };
   // Fretting hand wrapped behind the neck; strumming hand over the strings between the sound hole and bridge.
   const fretWrist: Vec3 = [-0.25, 0.9, 0.2], strumWrist: Vec3 = [-0.35, -0.3, 0.1];
   const chordA = reach(model, "left", pointOn(frame, 0.36, -0.035), fretWrist, [0.9, 0.3, 1.4, 0]);
@@ -250,6 +255,10 @@ function createMusicianClips(model: THREE.Group, frame: GuitarFrame, bind: Reado
   const strumUp = reach(model, "right", pointOn(frame, 1.04, 0.075, -0.06), strumWrist, [0.6, 0.2, 1.3, 0]);
   const strumDown = reach(model, "right", pointOn(frame, 1.04, 0.075, 0.07), strumWrist, strumUp);
   const strumRest = reach(model, "right", pointOn(frame, 1.08, 0.06, 0.04), strumWrist, strumUp);
+  // A takeaway cup held low in front, then lifted to the lips.
+  const sipWrist: Vec3 = [-0.3, 0, 0];
+  const cupLow = reach(model, "right", new THREE.Vector3(0.3, 1.42 + LEG_LIFT, -0.45).multiplyScalar(k), sipWrist, [0.5, 0.1, 1.2, 0]);
+  const cupUp = reach(model, "right", new THREE.Vector3(0.14, 2.0 + LEG_LIFT, -0.5).multiplyScalar(k), sipWrist, [1.2, 0.1, 2.0, 0]);
   const arms = (fret: ArmPose, strum: ArmPose): Rotations => ({
     ...arm("left", fret[0], fret[1], fret[2], fretWrist, fret[3]), ...arm("right", strum[0], strum[1], strum[2], strumWrist, strum[3]),
   });
@@ -271,7 +280,17 @@ function createMusicianClips(model: THREE.Group, frame: GuitarFrame, bind: Reado
       ...arms(chordA, strumRest),
       chest: [0.015 * Math.sin(Math.PI * 2 * p), 0, 0], neck: [0, -0.06, 0], head: [0.03, 0.25 * Math.sin(Math.PI * 2 * p) - 0.05, 0.02],
     }), bind),
-    // Without the guitar: the everyday standing clips.
-    ...standingClips(legsFromBind(bind), 1.35, bind).filter((clip) => ["idle", "look", "startle", "shrug"].includes(clip.name)),
+    // Walking or jogging with the guitar held across her, as between songs.
+    cycleClip("carry-walk", walk.duration, (p) => withHips({ ...walkPose(walk, p), rot: { ...walkPose(walk, p).rot, ...arms(chordA, strumRest) } }), bind),
+    cycleClip("carry-jog", jog.duration, (p) => withHips({ ...walkPose(jog, p), rot: { ...walkPose(jog, p).rot, ...arms(chordA, strumRest) } }), bind),
+    // Without the guitar.
+    cycleClip("walk", walk.duration, (p) => withHips(walkPose(walk, p)), bind),
+    cycleClip("jog", jog.duration, (p) => withHips(walkPose(jog, p)), bind),
+    cycleClip("sip", 4, (p) => {
+      const lift = envelope(Math.min(1, Math.max(0, (p - 0.3) / 0.45)), 0.35, 0.35);
+      const [forward, out, elbow, twist] = mix(cupLow, cupUp, lift);
+      return full({ ...hang(), ...arm("right", forward, out, elbow, sipWrist, twist), head: [0.12 * lift, 0, 0], chest: [0.012 * Math.sin(Math.PI * 2 * p), 0, 0] });
+    }, bind),
+    ...standingClips(legs, MUSICIAN_TUNING.walkSpeed, bind).filter((clip) => ["idle", "look", "startle", "shrug", "shoo"].includes(clip.name)),
   ];
 }

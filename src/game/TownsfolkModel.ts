@@ -436,8 +436,8 @@ export function drawTownsperson(name: string, spec: Look) {
     if (spec.bottom === "trousers") {
       garment("town-bottom", [[0.2, 0.11], [0.3, 0.14], [0.53, 0.165], [0.75, 0.19], [0.92, 0.2], [1.03, 0.15], [1.06, 0]], 0.94, center, lowerLeg);
     } else {
-      // Bare legs below shorts or a skirt.
-      garment("town-skin", [[0.2, 0.085], [0.32, 0.115], [0.5, 0.125], [0.62, 0.14], [0.8, 0.165], [0.95, 0.17], [1.02, 0]], 0.94, center, lowerLeg);
+      // Bare legs below shorts or a skirt; under a long skirt they wear its colour, so a stride doesn't flash bare knee.
+      garment(spec.skirtHem !== undefined ? "town-bottom" : "town-skin", [[0.2, 0.085], [0.32, 0.115], [0.5, 0.125], [0.62, 0.14], [0.8, 0.165], [0.95, 0.17], [1.02, 0]], 0.94, center, lowerLeg);
       if (spec.bottom === "shorts") garment("town-bottom", [[0.58, 0.185], [0.72, 0.2], [0.92, 0.205], [1.03, 0.15], [1.06, 0]], 0.94, center, legWeight);
     }
     const shoeWeight = rigid(ankle);

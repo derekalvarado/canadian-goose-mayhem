@@ -5,7 +5,7 @@ import { SplashKidView } from "./SplashKidView.ts";
 import { CafePersonView } from "./CafePersonView.ts";
 import { DogView, TownspersonView } from "./TownsfolkView.ts";
 import { RiggedCharacterView } from "./RiggedCharacterView.ts";
-import { MusicianView } from "./MusicianView.ts";
+import { GUITAR_LENGTH, MusicianView } from "./MusicianView.ts";
 import type { SyncState, UpdatePresentation } from "./CafePropsView.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { isWorldChunkPlayable, WORLD_CHUNK_SIZE, type WorldArea, type WorldInstance } from "./worldLayout.ts";
@@ -162,7 +162,7 @@ export class WorldView extends THREE.Group {
     DRAG_TRAIL.set(0, -1, 0).addScaledVector(DRAG_FACE, 0.2).normalize();
     DRAG_UP.copy(DRAG_FACE).addScaledVector(DRAG_TRAIL, -DRAG_FACE.dot(DRAG_TRAIL)).normalize();
     DRAG_SIDE.crossVectors(DRAG_UP, DRAG_TRAIL);
-    wrapper.position.set(entity.position.x, entity.position.y + 0.98, entity.position.z).addScaledVector(DRAG_FACE, -0.1);
+    wrapper.position.set(entity.position.x, entity.position.y + GUITAR_LENGTH * 0.96, entity.position.z).addScaledVector(DRAG_FACE, -0.1);
     wrapper.quaternion.setFromRotationMatrix(DRAG_BASIS.makeBasis(DRAG_SIDE, DRAG_UP, DRAG_TRAIL));
   }
 

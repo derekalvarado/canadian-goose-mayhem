@@ -16,6 +16,9 @@ export const MUSICIAN_TUNING: MusicianTuning = {
   eyeSeconds: 3.5, lookSeconds: 3, puzzledSeconds: 2.5,
 };
 
+/** Her acoustic guitar, headstock to tail, metres: how far behind the goose it drags, and the model's size. */
+export const MUSICIAN_GUITAR_LENGTH = 1.62;
+
 /**
  * The musician's places, in the stage's own frame (+z toward the audience,
  * steps at the front): where they stand to play beside the stand, the way down
