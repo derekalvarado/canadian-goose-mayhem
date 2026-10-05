@@ -17,7 +17,7 @@ import type { DogState, TownActivity, TownspersonState } from "./simulation/town
 type Source = Awaited<ReturnType<CharacterLoader>>;
 const sources = new Map<string, Promise<Source>>();
 let queue: Promise<unknown> = Promise.resolve();
-function buildLater(key: string, build: () => THREE.Group): CharacterLoader {
+export function buildLater(key: string, build: () => THREE.Group): CharacterLoader {
   return () => {
     let source = sources.get(key);
     if (!source) {

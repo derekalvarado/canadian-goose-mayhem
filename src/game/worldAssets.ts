@@ -1,4 +1,5 @@
 import type { EntityCondition, EntityTag } from "./simulation/Simulation.ts";
+import { MUSICIAN_GUITAR_LENGTH } from "./musicianTuning.ts";
 
 /**
  * Source-owned catalog metadata. Layout files intentionally reference these
@@ -215,8 +216,8 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "plaza.small-white-dog", label: "Small white dog (sits with the nearest parent)", category: "character", halfWidth: 0.25, halfDepth: 0.4, colliders: [], warnForOverlap: false, gameplayRole: "town-dog" },
   { assetId: "plaza.splash-faucet", label: "Splash-pad faucet", category: "gameplay", halfWidth: 0.4, halfDepth: 0.28, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.2 }], warnForOverlap: false, controller: { interactionOffset: { x: 0, y: 0.58, z: -0.19 }, range: 1.05 } },
   { assetId: "oldtown.guitar-stand", label: "Guitar stand", category: "prop", halfWidth: 0.22, halfDepth: 0.22, colliders: [], warnForOverlap: false },
-  { assetId: "prop.guitar", label: "Musician's guitar", category: "prop", halfWidth: 0.2, halfDepth: 0.5, colliders: [], warnForOverlap: false, tags: ["guitar"], essential: true,
-    carryable: { interactionRange: 1.15, carryHeight: 0.42, carryDistance: 0.58, maxCarrySpeed: 1.9, drag: { length: 1.02, scrapeRadius: 9 } } },
+  { assetId: "prop.guitar", label: "Musician's guitar", category: "prop", halfWidth: 0.3, halfDepth: MUSICIAN_GUITAR_LENGTH / 2, colliders: [], warnForOverlap: false, tags: ["guitar"], essential: true,
+    carryable: { interactionRange: 1.15, carryHeight: 0.42, carryDistance: 0.58, maxCarrySpeed: 1.9, drag: { length: MUSICIAN_GUITAR_LENGTH, scrapeRadius: 9 } } },
   { assetId: "prop.beer-can", label: "Little beer can", category: "prop", halfWidth: 0.09, halfDepth: 0.09, colliders: [], warnForOverlap: false, tags: ["drink"], carryable: { interactionRange: 0.95, carryHeight: 0.72, carryDistance: 0.54 } },
   { assetId: "prop.trash-bag", label: "Janitor's trash bag", category: "prop", halfWidth: 0.24, halfDepth: 0.18, colliders: [], warnForOverlap: false, cleanupRole: "trash-bag", essential: true, carryable: { interactionRange: 1, carryHeight: 0.68, carryDistance: 0.48, stealableWhileHeld: true } },
   { assetId: "prop.litter-picker", label: "Janitor's litter picker", category: "prop", halfWidth: 0.12, halfDepth: 0.78, colliders: [], warnForOverlap: false, cleanupRole: "litter-picker", essential: true, carryable: { interactionRange: 1.5, carryHeight: 0.16, carryDistance: 0.45, stealableWhileHeld: true } },

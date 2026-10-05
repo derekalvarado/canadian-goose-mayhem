@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Street musician mockups</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4efe6; color: #293e39; font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 22px 24px 4px; max-width: 1280px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0; opacity: .75; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; padding: 18px 24px 40px; max-width: 1280px; margin: 0 auto; }
+  .card { background: #fbf8f1; border: 1px solid #ddd5c3; border-radius: 12px; padding: 12px 14px 14px; display: flex; flex-direction: column; }
+  .card svg.big { width: 100%; height: auto; display: block; }
+  h2 { margin: 6px 0 2px; font-size: 17px; }
+  h2 b { display: inline-block; width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; background: #315c52; color: #fff; font-size: 13px; margin-right: 6px; }
+  .card p { margin: 0 0 10px; opacity: .85; font-size: 14px; }
+  .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: auto; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+  .swatches span { width: 18px; height: 18px; border-radius: 4px; border: 1px solid #0002; }
+  .tiny { text-align: center; font-size: 11px; opacity: .65; }
+  .tiny svg { width: 34px; height: auto; display: block; margin: 0 auto 2px; }
+  @media (max-width: 600px) { header, main { padding-left: 16px; padding-right: 16px; } }
+</style>
+<header>
+  <h1>Street musician — 2D mockups</h1>
+  <p>Four looks for the Old Town busker, drawn in the town's flat colours. Mix and match is fine ("A's beanie on D").
+    The small figure in each corner is roughly how big they'll look from the game camera.</p>
+</header>
+<main id="cards"></main>
+<script>
+// Colours come from the game's townsfolk palette; the guitar woods are new.
+const P = {
+  skinUmber: "#6e4026", skinBronze: "#a86b45", skinTan: "#d9a77a", skinFair: "#f0c7a6",
+  hairBlack: "#231d1b", hairDarkBrown: "#3f2a1f", hairAuburn: "#8a3f26", hairGrey: "#b9b5ad",
+  flannelRed: "#9e3b32", denimDark: "#34465c", bootBrown: "#5a3b26", beanie: "#d39b3a",
+  shirtWhite: "#eeeae0", waistcoatBrown: "#6d4a33", charcoal: "#3a3b3f", shoeBlack: "#24211f",
+  fedora: "#5b4636", hatBand: "#3d6e6a", neckerchief: "#b8322f",
+  mustardKnit: "#c9a144", sage: "#8fa77f", coatOlive: "#5e6b45", frames: "#2b2623",
+  stripeCream: "#eee3c8", stripeBlue: "#4b6f9e", beretRed: "#b33a3a", jeansBlack: "#2e2f36", sneakerWhite: "#ece7dc",
+  eyes: "#221e1c", mouth: "#7a3b33", cheeks: "#d98a76",
+};
+const GUITARS = {
+  natural: { top: "#e2b977", edge: "#a8743e", burst: "#e2b977", neck: "#6b4329", head: "#3a2a20", guard: "#5a3b26" },
+  sunburst: { top: "#e8b25c", edge: "#5a2e1a", burst: "#8a3f1e", neck: "#5a3b26", head: "#2b2320", guard: "#24211f" },
+  cherry: { top: "#b8433a", edge: "#6e231e", burst: "#8f2f28", neck: "#5a3b26", head: "#2b2320", guard: "#eee3c8" },
+  black: { top: "#34363a", edge: "#1f2023", burst: "#2a2b2e", neck: "#5a3b26", head: "#1f2023", guard: "#d39b3a" },
+};
+
+const LOOKS = [
+  { id: "A", name: "Beanie busker", guitar: "natural",
+    note: "Mustard beanie, curly hair, stubble, red flannel with rolled sleeves, dark jeans, boots. Friendly and scruffy.",
+    skin: P.skinBronze, hair: P.hairBlack, hairStyle: "curls", hat: "beanie", hatColor: P.beanie,
+    top: "flannel", topColor: P.flannelRed, sleeves: "rolled", face: ["stubble"],
+    legs: "trousers", legColor: P.denimDark, shoes: P.bootBrown, boots: true },
+  { id: "B", name: "Old-town troubadour", guitar: "sunburst",
+    note: "Brown fedora, grey sideburns, big moustache, waistcoat over a white shirt, red neckerchief. A bit old-fashioned, very proud of his guitar.",
+    skin: P.skinFair, hair: P.hairGrey, hairStyle: "sideburns", hat: "fedora", hatColor: P.fedora,
+    top: "waistcoat", topColor: P.waistcoatBrown, sleeves: "long", sleeveColor: P.shirtWhite, face: ["moustache"], neckerchief: true,
+    legs: "trousers", legColor: P.charcoal, shoes: P.shoeBlack },
+  { id: "C", name: "Folk singer", guitar: "cherry",
+    note: "Long auburn hair, round glasses, mustard knit sweater, long sage skirt, brown boots. Soft and dreamy.",
+    skin: P.skinTan, hair: P.hairAuburn, hairStyle: "long", top: "sweater", topColor: P.mustardKnit, sleeves: "long",
+    face: ["glasses"], legs: "skirt", legColor: P.sage, shoes: P.bootBrown, boots: true },
+  { id: "D", name: "Beret busker", guitar: "black",
+    note: "Red beret, striped tee, little goatee, black jeans, white sneakers. The classic street-corner look.",
+    skin: P.skinUmber, hair: P.hairBlack, hairStyle: "short", hat: "beret", hatColor: P.beretRed,
+    top: "stripes", topColor: P.stripeCream, stripeColor: P.stripeBlue, sleeves: "short", face: ["goatee"],
+    legs: "trousers", legColor: P.jeansBlack, shoes: P.sneakerWhite, soles: "#c9c2b4" },
+];
+
+/** Darkens a hex colour for the shaded side of a shape. */
+function shade(hex, amount = 0.18) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * (1 - amount)));
+  return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+
+// Shoulders, elbows, and hands for the playing pose: right hand strums the body, left hand on the neck.
+const R_SHOULDER = [98, 216], R_ELBOW = [80, 282], R_HAND = [134, 294];
+const L_SHOULDER = [202, 216], L_ELBOW = [234, 282], L_HAND = [225, 243];
+const limb = (a, b, color, width) => `<path d="M${a} L${b}" stroke="${color}" stroke-width="${width}" stroke-linecap="round" fill="none"/>`;
+const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+function guitar(kind, uid) {
+  const g = GUITARS[kind];
+  return `<g transform="translate(112 308) rotate(-30)">
+    <defs><radialGradient id="burst${uid}" cx="0.45" cy="0.5" r="0.6"><stop offset="0.55" stop-color="${g.top}"/><stop offset="1" stop-color="${g.burst}"/></radialGradient></defs>
+    <ellipse cx="2" cy="4" rx="44" ry="40" fill="${g.edge}"/><ellipse cx="46" cy="3" rx="33" ry="30" fill="${g.edge}"/>
+    <rect x="18" y="-22" width="30" height="48" fill="${g.edge}"/>
+    <ellipse cx="0" cy="0" rx="42" ry="38" fill="url(#burst${uid})"/><ellipse cx="44" cy="0" rx="31" ry="28" fill="url(#burst${uid})"/>
+    <rect x="16" y="-25" width="32" height="50" fill="${g.top}"/>
+    <path d="M28 8 Q24 26 40 28 Q54 26 50 12 Z" fill="${g.guard}"/>
+    <circle cx="38" cy="0" r="11" fill="#2a1d16"/><circle cx="38" cy="0" r="13.5" fill="none" stroke="${g.edge}" stroke-width="1.6"/>
+    <rect x="-20" y="-13" width="8" height="26" rx="2" fill="${g.head}"/>
+    <rect x="68" y="-6.5" width="98" height="13" rx="2" fill="${g.neck}"/>
+    ${[80, 92, 103, 113, 122, 131, 139, 147, 154].map((x) => `<line x1="${x}" y1="-6.5" x2="${x}" y2="6.5" stroke="#cfc8b8" stroke-width="1"/>`).join("")}
+    ${[97, 117, 135].map((x) => `<circle cx="${x + 1}" cy="0" r="1.6" fill="#eee3c8"/>`).join("")}
+    <path d="M164 -7 L192 -11 Q196 0 192 11 L164 7 Z" fill="${g.head}"/>
+    ${[170, 179, 188].map((x) => `<circle cx="${x}" cy="-12" r="3" fill="#d6cfbf"/><circle cx="${x}" cy="12" r="3" fill="#d6cfbf"/>`).join("")}
+    ${[-4.5, -1.5, 1.5, 4.5].map((y) => `<line x1="-16" y1="${y}" x2="166" y2="${y * 0.8}" stroke="#efe8d8" stroke-width="0.7"/>`).join("")}
+  </g>`;
+}
+
+function arms(look, front) {
+  const sleeve = look.sleeveColor ?? look.topColor;
+  const sides = [[R_SHOULDER, R_ELBOW, R_HAND], [L_SHOULDER, L_ELBOW, L_HAND]];
+  let out = "";
+  for (const [shoulder, elbow, hand] of sides) {
+    if (!front) {
+      // Upper arms, behind the guitar.
+      if (look.sleeves === "long") out += limb(shoulder, elbow, shade(sleeve, 0.06), 30);
+      else {
+        out += limb(shoulder, elbow, look.skin, 24);
+        out += limb(shoulder, lerp(shoulder, elbow, look.sleeves === "rolled" ? 0.95 : 0.45), sleeve, 31);
+        if (look.top === "stripes") out += limb(lerp(shoulder, elbow, 0.2), lerp(shoulder, elbow, 0.3), look.stripeColor, 31);
+        if (look.sleeves === "rolled") out += limb(lerp(shoulder, elbow, 0.86), lerp(shoulder, elbow, 0.97), shade(sleeve, 0.22), 32);
+      }
+    } else {
+      // Forearms and hands, over the guitar.
+      out += limb(elbow, hand, look.sleeves === "long" ? sleeve : look.skin, look.sleeves === "long" ? 27 : 22);
+      if (look.sleeves === "long") out += limb(lerp(elbow, hand, 0.78), lerp(elbow, hand, 0.84), shade(sleeve, 0.15), 28);
+      out += `<circle cx="${hand[0]}" cy="${hand[1]}" r="13" fill="${look.skin}"/>`;
+    }
+  }
+  if (front) out += `<path d="M216 236 q4 -8 12 -6" stroke="${shade(look.skin, 0.25)}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  return out;
+}
+
+function torso(look, uid) {
+  const body = "M100 194 L200 194 Q216 197 213 218 L205 342 L95 342 L87 218 Q84 197 100 194 Z";
+  let out = `<clipPath id="torso${uid}"><path d="${body}"/></clipPath>`;
+  const c = look.topColor;
+  if (look.top === "waistcoat") {
+    out += `<path d="${body}" fill="${look.sleeveColor}"/>`;
+    out += `<path d="M92 205 L132 200 L150 262 L168 200 L208 205 L205 336 L150 348 L95 336 Z" fill="${c}"/>`;
+    out += [276, 298, 320].map((y) => `<circle cx="150" cy="${y}" r="3.2" fill="#d1a23f"/>`).join("");
+    out += `<rect x="168" y="268" width="22" height="4" rx="2" fill="${shade(c, 0.25)}"/>`;
+  } else {
+    out += `<path d="${body}" fill="${c}"/>`;
+    if (look.top === "flannel") {
+      out += `<g clip-path="url(#torso${uid})" opacity="0.35">${[100, 128, 156, 184].map((x) => `<rect x="${x}" y="190" width="9" height="160" fill="${shade(c, 0.5)}"/>`).join("")}
+        ${[220, 255, 290, 325].map((y) => `<rect x="80" y="${y}" width="140" height="8" fill="${shade(c, 0.5)}"/>`).join("")}</g>`;
+      out += `<path d="M150 196 L128 192 L136 218 Z M150 196 L172 192 L164 218 Z" fill="${shade(c, 0.12)}"/>`;
+      out += `<path d="M138 196 L150 214 L162 196 Z" fill="#9a9c98"/>`;
+      out += [232, 262, 292, 322].map((y) => `<circle cx="150" cy="${y}" r="2.6" fill="#eee3c8"/>`).join("");
+    } else if (look.top === "sweater") {
+      out += `<g clip-path="url(#torso${uid})"><rect x="80" y="326" width="140" height="20" fill="${shade(c, 0.12)}"/>
+        ${[96, 106, 116, 126, 136, 146, 156, 166, 176, 186, 196].map((x) => `<line x1="${x}" y1="326" x2="${x}" y2="346" stroke="${shade(c, 0.25)}" stroke-width="2"/>`).join("")}</g>`;
+      out += `<path d="M150 196 L132 194 L138 212 Z M150 196 L168 194 L162 212 Z" fill="${P.shirtWhite}"/>`;
+    } else if (look.top === "stripes") {
+      out += `<g clip-path="url(#torso${uid})">${[214, 240, 266, 292, 318].map((y) => `<rect x="80" y="${y}" width="140" height="11" fill="${look.stripeColor}"/>`).join("")}</g>`;
+      out += `<path d="M132 194 Q150 210 168 194 Z" fill="${look.skin}"/>`;
+    }
+  }
+  // Shaded side of the torso.
+  out += `<path d="M200 194 Q216 197 213 218 L205 342 L188 342 L194 218 Z" fill="#000" opacity="0.08"/>`;
+  return out;
+}
+
+function legs(look) {
+  const c = look.legColor; let out = "";
+  if (look.legs === "skirt") {
+    out += `<rect x="110" y="400" width="32" height="70" rx="12" fill="${shade(look.shoes, 0.1)}"/><rect x="158" y="400" width="32" height="70" rx="12" fill="${shade(look.shoes, 0.1)}"/>`;
+    out += `<path d="M98 330 L202 330 L222 448 Q150 462 78 448 Z" fill="${c}"/>`;
+    out += `<path d="M184 330 L202 330 L222 448 Q212 451 200 452 Z" fill="#000" opacity="0.1"/>`;
+    out += `<path d="M86 438 Q150 450 214 438 L216 446 Q150 458 84 446 Z" fill="${shade(c, 0.2)}"/>`;
+  } else {
+    out += `<rect x="100" y="318" width="47" height="156" rx="16" fill="${c}"/><rect x="153" y="318" width="47" height="156" rx="16" fill="${shade(c, 0.1)}"/>`;
+    out += `<rect x="98" y="318" width="104" height="40" rx="14" fill="${c}"/>`;
+    if (look.legColor === P.denimDark) out += `<path d="M124 368 L124 470 M176 368 L176 470" stroke="${shade(c, 0.25)}" stroke-width="2" opacity="0.6"/>`;
+  }
+  // Shoes: boots rise higher up the leg.
+  for (const x of [123, 177]) {
+    if (look.boots) out += `<rect x="${x - 21}" y="440" width="42" height="40" rx="10" fill="${look.shoes}"/>`;
+    out += `<ellipse cx="${x + (x < 150 ? -4 : 4)}" cy="480" rx="28" ry="14" fill="${look.shoes}"/>`;
+    if (look.soles) out += `<path d="M${x - 31} 484 Q${x} 498 ${x + 31} 484 L${x + 30} 489 Q${x} 501 ${x - 30} 489 Z" fill="${look.soles}"/>`;
+  }
+  return out;
+}
+
+function hairBack(look) {
+  if (look.hairStyle === "long") return `<path d="M98 120 Q90 200 96 262 Q150 276 204 262 Q210 200 202 120 Z" fill="${look.hair}"/><path d="M180 130 Q210 200 204 262 Q194 266 186 267 Z" fill="#000" opacity="0.12"/>`;
+  if (look.hairStyle === "curls") return [[100, 150], [97, 128], [200, 150], [203, 128], [150, 180]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="14" fill="${look.hair}"/>`).join("");
+  return "";
+}
+
+function head(look) {
+  const s = look.skin; let out = "";
+  out += `<rect x="137" y="170" width="26" height="34" rx="8" fill="${shade(s, 0.12)}"/>`;
+  out += `<circle cx="101" cy="142" r="11" fill="${shade(s, 0.06)}"/><circle cx="199" cy="142" r="11" fill="${shade(s, 0.06)}"/>`;
+  out += `<ellipse cx="150" cy="136" rx="49" ry="51" fill="${s}"/>`;
+  out += `<path d="M184 104 Q206 140 182 178 Q196 140 184 104 Z" fill="#000" opacity="0.06"/>`;
+  if (look.face.includes("stubble")) out += `<path d="M112 150 Q116 190 150 192 Q184 190 188 150 Q178 176 150 178 Q122 176 112 150 Z" fill="${look.hair}" opacity="0.28"/>`;
+  out += `<ellipse cx="131" cy="140" rx="5" ry="7" fill="${P.eyes}"/><ellipse cx="169" cy="140" rx="5" ry="7" fill="${P.eyes}"/>`;
+  out += `<circle cx="132.5" cy="137" r="1.7" fill="#f6f1e6"/><circle cx="170.5" cy="137" r="1.7" fill="#f6f1e6"/>`;
+  out += `<path d="M122 124 L140 122 M160 122 L178 124" stroke="${look.hair === P.hairGrey ? shade(P.hairGrey, 0.2) : look.hair}" stroke-width="4" stroke-linecap="round"/>`;
+  if (!look.face.includes("stubble")) out += `<circle cx="120" cy="157" r="8" fill="${P.cheeks}" opacity="0.55"/><circle cx="180" cy="157" r="8" fill="${P.cheeks}" opacity="0.55"/>`;
+  out += `<ellipse cx="150" cy="154" rx="8" ry="7" fill="${shade(s, 0.12)}"/>`;
+  out += `<path d="M139 168 Q150 177 161 168" stroke="${P.mouth}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  if (look.face.includes("moustache")) out += `<path d="M150 161 Q136 158 126 170 Q138 172 150 166 Q162 172 174 170 Q164 158 150 161 Z" fill="${look.hair}"/>`;
+  if (look.face.includes("goatee")) out += `<ellipse cx="150" cy="183" rx="10" ry="8" fill="${look.hair}"/>`;
+  if (look.face.includes("glasses")) out += `<g fill="none" stroke="${P.frames}" stroke-width="2.5"><circle cx="131" cy="140" r="12"/><circle cx="169" cy="140" r="12"/><path d="M143 139 Q150 135 157 139 M119 138 L104 134 M181 138 L196 134"/></g>`;
+  if (look.neckerchief) out += `<path d="M130 196 L170 196 L150 222 Z" fill="${P.neckerchief}"/><circle cx="150" cy="199" r="6" fill="${shade(P.neckerchief, 0.2)}"/>`;
+  return out;
+}
+
+function hairFront(look) {
+  const h = look.hair;
+  switch (look.hairStyle) {
+    case "long": return `<path d="M100 140 Q98 84 150 84 Q202 84 200 140 Q190 108 162 100 Q140 112 104 140 Z" fill="${h}"/>
+      <path d="M100 132 Q94 170 104 200 L114 200 Q106 166 110 134 Z M200 132 Q206 170 196 200 L186 200 Q194 166 190 134 Z" fill="${h}"/>`;
+    case "sideburns": return `<rect x="103" y="116" width="11" height="34" rx="5" fill="${h}"/><rect x="186" y="116" width="11" height="34" rx="5" fill="${h}"/><path d="M106 120 Q150 104 194 120 L194 112 Q150 98 106 112 Z" fill="${h}"/>`;
+    case "short": return `<path d="M101 128 Q100 86 150 84 Q200 86 199 128 Q186 108 150 106 Q114 108 101 128 Z" fill="${h}"/>`;
+    case "curls": return [[116, 116], [134, 112], [166, 112], [184, 116]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" fill="${h}"/>`).join("");
+    default: return "";
+  }
+}
+
+function hat(look) {
+  const c = look.hatColor;
+  switch (look.hat) {
+    case "beanie": return `<path d="M99 122 Q100 70 150 68 Q200 70 201 122 Z" fill="${c}"/>
+      <path d="M176 76 Q202 92 201 122 L186 122 Q188 96 176 76 Z" fill="#000" opacity="0.1"/>
+      <rect x="96" y="106" width="108" height="24" rx="10" fill="${shade(c, 0.12)}"/>
+      ${[108, 120, 132, 144, 156, 168, 180, 192].map((x) => `<line x1="${x}" y1="110" x2="${x}" y2="126" stroke="${shade(c, 0.28)}" stroke-width="2"/>`).join("")}
+      <circle cx="150" cy="64" r="13" fill="${shade(c, 0.05)}"/>`;
+    case "fedora": return `<ellipse cx="150" cy="104" rx="80" ry="15" fill="${shade(c, 0.15)}"/>
+      <path d="M108 104 L114 60 Q132 52 150 60 Q168 52 186 60 L192 104 Z" fill="${c}"/>
+      <path d="M150 60 L150 80" stroke="${shade(c, 0.25)}" stroke-width="3" stroke-linecap="round"/>
+      <rect x="109" y="86" width="82" height="13" fill="${P.hatBand}"/>
+      <path d="M176 60 L186 60 L192 104 L180 104 Z" fill="#000" opacity="0.1"/>`;
+    case "beret": return `<g transform="rotate(-10 150 100)"><ellipse cx="156" cy="98" rx="60" ry="22" fill="${c}"/>
+      <ellipse cx="156" cy="106" rx="50" ry="10" fill="${shade(c, 0.2)}"/><path d="M156 76 l3 -9" stroke="${shade(c, 0.2)}" stroke-width="4" stroke-linecap="round"/></g>`;
+    default: return "";
+  }
+}
+
+function strap(look) {
+  return `<path d="M178 272 L198 196 Q204 190 210 198" stroke="#3a2a20" stroke-width="9" fill="none" stroke-linecap="round"/>`;
+}
+
+function figure(look, uid) {
+  return `<svg viewBox="40 40 260 470" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="150" cy="490" rx="92" ry="15" fill="#000" opacity="0.1"/>
+    ${legs(look)}${hairBack(look)}${torso(look, uid)}${head(look)}${hairFront(look)}${hat(look)}
+    ${arms(look, false)}${strap(look)}${guitar(look.guitar, uid)}${arms(look, true)}
+  </svg>`;
+}
+
+const cards = document.querySelector("#cards");
+LOOKS.forEach((look, index) => {
+  const card = document.createElement("article");
+  card.className = "card";
+  const swatches = [look.skin, look.hair, look.hatColor, look.topColor, look.stripeColor ?? look.sleeveColor, look.legColor, look.shoes, GUITARS[look.guitar].top]
+    .filter(Boolean).map((color) => `<span style="background:${color}"></span>`).join("");
+  card.innerHTML = `${figure(look, "b" + index).replace("<svg", '<svg class="big"')}
+    <h2><b>${look.id}</b>${look.name}</h2><p>${look.note}</p>
+    <div class="row"><div class="swatches">${swatches}</div><div class="tiny">${figure(look, "t" + index)}game size</div></div>`;
+  cards.append(card);
+});
+</script>
+</html>
