@@ -37,6 +37,21 @@ export class OcclusionFadeGroupRegistry {
     return group;
   }
 
+  /** Points a group at the combined mesh that now draws some of its meshes. */
+  replaceMeshes(removed: readonly THREE.Mesh[], merged: THREE.Mesh): void {
+    const group = removed.length > 0 ? this.groupsByMesh.get(removed[0]) : undefined;
+    if (!group) return;
+    const gone = new Set(removed);
+    const next: OcclusionFadeGroup = { id: group.id, meshes: [...group.meshes.filter((mesh) => !gone.has(mesh)), merged] };
+    this.groupsById.set(group.id, next);
+    for (const mesh of removed) this.groupsByMesh.delete(mesh);
+    for (const mesh of next.meshes) this.groupsByMesh.set(mesh, next);
+    const kept = this.raycastMeshes.filter((mesh) => !gone.has(mesh));
+    this.raycastMeshes.length = 0;
+    for (const mesh of kept) this.raycastMeshes.push(mesh);
+    this.raycastMeshes.push(merged);
+  }
+
   /** The small authored subset eligible to block the camera. */
   meshesForRaycast(): THREE.Mesh[] {
     return this.raycastMeshes;
