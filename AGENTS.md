@@ -92,6 +92,15 @@ worked example).
    or a hand grips it; otherwise it hangs from a generic point.
 4. **Renderer.** Add a `case` for the ID in `createWorldAssetView` in
    `src/game/PlazaWorld.ts`.
+   Draw calls are the game's main performance cost, so `WorldView` automatically
+   stops pieces under ~35 cm from casting shadows and combines the plain-colored
+   pieces of anything that never moves into a few meshes (`src/game/staticMeshBake.ts`).
+   Build each piece as its own `toonMaterial()` mesh as usual and let the bake
+   combine them, rather than hand-merging. Anything with parts that move, hide, or
+   change color after it is built must say so, or the bake will freeze those parts:
+   expose `userData.update` / `userData.syncState` (see `CafePropsView.ts`), be a
+   gameplay view class listed in `WorldView.addInstance`, or be carryable. Meshes with a texture or
+   custom shader are left as their own mesh.
 5. **Placement.** Insert the instance into `src/game/content/world-layout.json`
    by editing the text (re-serializing the file reformats the coffee-shop area).
    Keep it on paving inside a playable chunk; `generate-old-town-layout.mjs` is

@@ -10,6 +10,7 @@ import type { SyncState, UpdatePresentation } from "./CafePropsView.ts";
 import { OcclusionFadeGroupRegistry } from "./OcclusionFadeGroups.ts";
 import { isWorldChunkPlayable, WORLD_CHUNK_SIZE, type WorldArea, type WorldInstance } from "./worldLayout.ts";
 import { getWorldAsset } from "./worldAssets.ts";
+import { bakeStaticMeshes, dropSmallShadows } from "./staticMeshBake.ts";
 import type { WorldEntityState, WorldSnapshot } from "./simulation/Simulation.ts";
 
 const LITTER_PICKER_ASSET_ID = "prop.litter-picker";
@@ -106,14 +107,16 @@ export class WorldView extends THREE.Group {
       instance.transform.rotationY,
       0,
     );
-    const view = createWorldAssetView(
-      instance.assetId,
-      registerOcclusion ? this.occlusionFadeGroups : new OcclusionFadeGroupRegistry(),
-      instance.id,
-    );
+    const fadeGroups = registerOcclusion ? this.occlusionFadeGroups : new OcclusionFadeGroupRegistry();
+    const view = createWorldAssetView(instance.assetId, fadeGroups, instance.id);
+    const gameplay = view instanceof SplashPadView || view instanceof JanitorView || view instanceof SplashKidView || view instanceof CafePersonView
+      || view instanceof TownspersonView || view instanceof DogView || view instanceof MusicianView;
+    // Draw-call savings: tiny pieces skip shadows, and scenery that never moves is combined.
+    dropSmallShadows(view);
+    if (!gameplay && typeof view.userData.update !== "function" && typeof view.userData.syncState !== "function"
+      && !getWorldAsset(instance.assetId)?.carryable) bakeStaticMeshes(view, fadeGroups);
     wrapper.add(view);
-    if (view instanceof SplashPadView || view instanceof JanitorView || view instanceof SplashKidView || view instanceof CafePersonView
-      || view instanceof TownspersonView || view instanceof DogView || view instanceof MusicianView) {
+    if (gameplay) {
       this.presentationViews.push(view);
       this.gameplayViews.set(instance.id, view);
     }
