@@ -6,6 +6,12 @@ const HONK_URL = `${import.meta.env.BASE_URL}audio/canada-goose-honk.mp3`;
 // assets/audio/README.md for source/license.
 const FOOTSTEP_URL = `${import.meta.env.BASE_URL}audio/footsteps/goose-footstep-pat1.mp3`;
 
+// A seamless loop of wood dragged on concrete (WAV so it loops without a gap).
+// See assets/audio/README.md for source/license.
+const GUITAR_DRAG_URL = `${import.meta.env.BASE_URL}audio/guitar/guitar-drag-loop.wav`;
+/** How loud the guitar scrape plays at full drag speed, right beside the listening goose. */
+const SCRAPE_LEVEL = 0.085;
+
 /** Browser audio output consumes gameplay events; it never decides gameplay. */
 export class GameAudio {
   private context: AudioContext | undefined;
@@ -25,6 +31,7 @@ export class GameAudio {
       if (this.context.state === "suspended") void this.context.resume().catch(() => {});
       void this.loadBuffer(this.context, HONK_URL).catch(() => {});
       void this.loadBuffer(this.context, FOOTSTEP_URL).catch(() => {});
+      void this.loadBuffer(this.context, GUITAR_DRAG_URL).then((buffer) => { this.dragBuffer = buffer; }).catch(() => {});
     } catch {
       // Unavailable audio must not prevent gameplay.
     }
@@ -250,36 +257,47 @@ export class GameAudio {
     }
   }
 
-  private scrape?: { source: AudioBufferSourceNode; filter: BiquadFilterNode; gain: GainNode };
+  private scrape?: { source: AudioBufferSourceNode; gain: GainNode; nodes: AudioNode[] };
+  private dragBuffer?: AudioBuffer;
 
   /** Wood scraping on paving while a goose drags the guitar (`loudness` 0–1, 0 stops it). */
   setScrape(loudness: number): void {
     const context = this.context;
     if (loudness <= 0.001) {
       if (!this.scrape || !context) return;
-      const { source, gain } = this.scrape; this.scrape = undefined;
+      const { source, gain, nodes } = this.scrape; this.scrape = undefined;
       gain.gain.setTargetAtTime(0, context.currentTime, 0.05);
-      window.setTimeout(() => { try { source.stop(); } catch { /* already stopped */ } source.disconnect(); gain.disconnect(); }, 400);
+      window.setTimeout(() => { try { source.stop(); } catch { /* already stopped */ } for (const node of nodes) node.disconnect(); }, 400);
       return;
     }
     if (this.scrape) {
       if (!context) return;
       // A rough, uneven grind: the level wobbles a little as it catches on the paving.
-      this.scrape.gain.gain.setTargetAtTime(loudness * (0.14 + Math.random() * 0.06), context.currentTime, 0.04);
-      this.scrape.filter.frequency.setTargetAtTime(700 + Math.random() * 500, context.currentTime, 0.05);
+      this.scrape.gain.gain.setTargetAtTime(loudness * (SCRAPE_LEVEL + Math.random() * 0.02), context.currentTime, 0.04);
       return;
     }
-    const running = this.runningContext(); if (!running) return;
-    const length = running.sampleRate * 2; const buffer = running.createBuffer(1, length, running.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let index = 0; index < length; index += 1) data[index] = (Math.random() * 2 - 1) * (0.6 + 0.4 * Math.sin(index / 900));
+    const running = this.runningContext(); const buffer = this.dragBuffer;
+    if (!running || !buffer) return;
+    // Each drag starts somewhere new in the loop, slightly higher or lower, so repeats don't sound identical.
     const source = running.createBufferSource(); source.buffer = buffer; source.loop = true;
-    const filter = running.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 900; filter.Q.value = 0.9;
+    source.playbackRate.value = 0.92 + Math.random() * 0.16;
+    // A hollow guitar body: boost its two boom notes, soften the hiss, and add a tiny echo off the inside of the box.
+    const filter = (type: BiquadFilterType, frequency: number, q: number, boost = 0): BiquadFilterNode => {
+      const node = running.createBiquadFilter(); node.type = type; node.frequency.value = frequency; node.Q.value = q; node.gain.value = boost; return node;
+    };
+    const airBoom = filter("peaking", 105, 5, 14); const topBoom = filter("peaking", 230, 3, 10); const soften = filter("lowpass", 2400, 0.7);
+    const box = running.createDelay(0.02); box.delayTime.value = 0.0045;
+    const boxFeedback = running.createGain(); boxFeedback.gain.value = 0.62;
+    const boxDamping = filter("lowpass", 1800, 0.7);
+    const boxLevel = running.createGain(); boxLevel.gain.value = 0.85;
     const gain = running.createGain(); gain.gain.value = 0;
-    source.connect(filter); filter.connect(gain); gain.connect(running.destination);
-    source.start();
-    gain.gain.setTargetAtTime(loudness * 0.16, running.currentTime, 0.05);
-    this.scrape = { source, filter, gain };
+    source.connect(airBoom); airBoom.connect(topBoom); topBoom.connect(soften);
+    soften.connect(gain); soften.connect(box);
+    box.connect(boxDamping); boxDamping.connect(boxFeedback); boxFeedback.connect(box); boxDamping.connect(boxLevel); boxLevel.connect(gain);
+    gain.connect(running.destination);
+    source.start(0, Math.random() * buffer.duration);
+    gain.gain.setTargetAtTime(loudness * SCRAPE_LEVEL, running.currentTime, 0.05);
+    this.scrape = { source, gain, nodes: [source, airBoom, topBoom, soften, box, boxDamping, boxFeedback, boxLevel, gain] };
   }
 
   async playHonk(): Promise<void> {
