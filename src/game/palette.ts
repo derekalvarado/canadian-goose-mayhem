@@ -380,6 +380,18 @@ export const PALETTE = {
     collar: 0xc4483e,
     tag: 0xe0b84e,
   },
+  /** The street musician (folk singer) and her cherry-red acoustic guitar. */
+  musician: {
+    hairAuburn: 0x8a3f26,
+    strap: 0x3a2a20,
+    guitarTop: 0xb8433a,
+    guitarEdge: 0x6e231e,
+    guitarNeck: 0x5a3b26,
+    fretboard: 0x2b2320,
+    soundHole: 0x2a1d16,
+    guitarCream: 0xeee3c8,
+    guitarMetal: 0xd6cfbf,
+  },
   /** Gray-box stand-ins for the street musician, their guitar, and its stand while gameplay is tuned. */
   musicianGraybox: {
     body: 0x9b9d9f,

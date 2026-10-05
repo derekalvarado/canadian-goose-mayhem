@@ -19,13 +19,18 @@ type Sleeves = "none" | "short" | "rolled" | "long";
 type Bottom = "trousers" | "shorts" | "skirt";
 type Extra = "sunglasses" | "glasses" | "beard" | "stubble" | "moustache" | "headphones" | "backpack" | "tote" | "scarf" | "bowtie" | "stripes";
 
-interface Look {
+/** What a townsperson-style character wears; the street musician is drawn from one too. */
+export interface Look {
   readonly description: string;
   readonly height: number; readonly bulk: number;
   readonly hair: Hair; readonly hat?: Hat; readonly top: Top; readonly sleeves: Sleeves; readonly bottom: Bottom;
   readonly extras: readonly Extra[];
   /** Brow tilt: positive is worried, negative is cheerful-stern. */
   readonly brow: number;
+  /** Skirt hem height (default just above the knee); lower for a long skirt. */
+  readonly skirtHem?: number;
+  /** Shoes rise up the shin as boots. */
+  readonly boots?: boolean;
   readonly colors: Readonly<Record<"skin" | "hair" | "top" | "accent" | "bottom" | "shoes" | "trim" | "hat" | "bag" | "glasses", number>>;
 }
 
@@ -76,8 +81,9 @@ export const TOWNSFOLK: Readonly<Record<TownsfolkLook, Look>> = {
 };
 
 /** Palette slots per look, for the toon loader. */
-export function townsfolkColors(look: TownsfolkLook): Readonly<Record<TownSlot, number>> {
-  const c = TOWNSFOLK[look].colors;
+export function townsfolkColors(look: TownsfolkLook): Readonly<Record<TownSlot, number>> { return lookColors(TOWNSFOLK[look]); }
+export function lookColors(spec: Look): Readonly<Record<TownSlot, number>> {
+  const c = spec.colors;
   return { "town-skin": c.skin, "town-hair": c.hair, "town-eyes": C.eyes, "town-eye-shine": C.eyeShine, "town-mouth": C.mouth,
     "town-mouth-open": C.mouthOpen, "town-cheeks": C.cheeks, "town-top": c.top, "town-accent": c.accent, "town-bottom": c.bottom,
     "town-shoes": c.shoes, "town-trim": c.trim, "town-hat": c.hat, "town-bag": c.bag, "town-glasses": c.glasses };
@@ -142,11 +148,18 @@ function shoulderStrap(profile: [number, number][], depth: number, x: number, wi
  * at a lighter facet count (there are many of them on screen at once).
  */
 export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
-  const spec = TOWNSFOLK[look];
+  const { rig } = drawTownsperson(`townsfolk-${look}`, TOWNSFOLK[look]);
+  rig.model.userData = { assetRole: "rigged-character", visualDetailTier: 3, forward: "-Z", look };
+  rig.finish(townsfolkColors(look), ["town-mouth-open"]);
+  rig.model.animations = createTownsfolkClips(look, rig.bindPose());
+  return rig.model;
+}
+
+/** Draws a townsperson's body and clothes onto a fresh rig, ready for extra pieces before `rig.finish`. */
+export function drawTownsperson(name: string, spec: Look) {
   const k = spec.height;
-  const rig = createPersonRig<TownSlot>(`townsfolk-${look}`, k, 0.62, TOWNSFOLK_LEG_SCALE);
-  const { model, hips, chest, neck, head, joint, rigid, blendY, torsoWeight, add, oval, garment, tube, onFace } = rig;
-  model.userData = { assetRole: "rigged-character", visualDetailTier: 3, forward: "-Z", look };
+  const rig = createPersonRig<TownSlot>(name, k, 0.62, TOWNSFOLK_LEG_SCALE);
+  const { hips, chest, neck, head, joint, rigid, blendY, torsoWeight, add, oval, garment, tube, onFace } = rig;
   const has = (extra: Extra) => spec.extras.includes(extra);
 
   // Limb joints first, so skirts and coat tails can follow the thighs.
@@ -258,7 +271,10 @@ export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
 
   // --- Hips, neck, and head ---------------------------------------------------------------------
   oval(spec.bottom === "skirt" ? "town-skin" : "town-bottom", [0, 0.985, 0.012], [0.35, 0.21, 0.245], rigid(hips));
-  if (spec.bottom === "skirt") skirt(spec.top === "dress" ? "town-top" : "town-bottom", 1.12, spec.top === "dress" ? 0.58 : 0.64, spec.top === "dress" ? 0.06 : 0.0);
+  if (spec.bottom === "skirt") {
+    const hem = spec.skirtHem ?? (spec.top === "dress" ? 0.58 : 0.64);
+    skirt(spec.top === "dress" ? "town-top" : "town-bottom", 1.12, hem, spec.top === "dress" ? 0.06 : 0.04 * (0.64 - hem) / 0.3);
+  }
   oval("town-skin", [0, 1.94, -0.015], [0.13, 0.145, 0.125], blendY(chest, neck, 1.87, 1.99));
   oval("town-skin", HEAD_CENTER, HEAD_RADII, rigid(head));
   for (const side of [-1, 1]) {
@@ -431,6 +447,7 @@ export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
       oval("town-shoes", [sign * 0.22, 0.025, -0.085], [0.125, 0.025, 0.235], shoeWeight);
       for (const z of [-0.17, 0.0]) oval("town-shoes", [sign * 0.22, 0.1, z], [0.12, 0.025, 0.04], shoeWeight);
     } else {
+      if (spec.boots) garment("town-shoes", [[0.15, 0.118], [0.3, 0.13], [0.42, 0.135], [0.45, 0.12]], 0.94, [sign * 0.22, 0, 0.015], lowerLeg);
       garment("town-shoes", [[0.03, 0.11], [0.1, 0.12], [0.2, 0.118], [0.23, 0.1]], 0.9, [sign * 0.22, 0, 0.015], shoeWeight);
       oval("town-shoes", [sign * 0.22, 0.075, -0.09], [0.13, 0.075, 0.23], shoeWeight);
       if (spec.colors.trim !== spec.colors.shoes && (spec.colors.shoes === T.sneakerWhite || spec.colors.shoes === T.sneakerOrange)) {
@@ -439,7 +456,5 @@ export function createTownsfolkModel(look: TownsfolkLook): THREE.Group {
     }
   }
 
-  rig.finish(townsfolkColors(look), ["town-mouth-open"]);
-  model.animations = createTownsfolkClips(look, rig.bindPose());
-  return model;
+  return { rig, limbs };
 }
