@@ -34,6 +34,26 @@ the goose's distance and dragging speed. To sound like a hollow guitar body
 rather than a stick, it boosts the body's two resonances (105Hz and 230Hz),
 softens the hiss, and feeds a 4.5ms echo back on itself (the inside of the box).
 
+## Street musician's tune
+
+- Runtime file: `public/audio/guitar/street-guitar-loop.wav`, looped by
+  `GameAudio.setStreetMusic()` (`src/game/GameAudio.ts`) while the musician plays
+- Archived source: `source/garuda-guitar-melody-2/guitar-melody-2-preview.mp3`
+  (the high-quality preview stream; sourced without a Freesound login, so this
+  is not the original upload)
+- Description: "acoustic guitar melody #2 d-dur" — a fingerpicked acoustic
+  guitar melody in D major, field-recorded with a Zoom H2n
+- Author: Garuda1982
+- Source: https://freesound.org/people/Garuda1982/sounds/462723/
+- License: CC0 (public domain dedication, no attribution required)
+
+The runtime file mixes the stereo source down to mono, removes sub-60Hz rumble,
+and plays from the first note (0.38s) to 29.6s, partway through the final
+chord's ring-out. The rest of that ring-out (29.6–31.3s, faded out) is mixed
+over the loop's start, so the last chord rings on as the tune begins again and
+the loop has no gap. Saved as mono 24kHz WAV (MP3 adds silence at the ends,
+which would click at every loop).
+
 ## Goose footstep
 
 - Runtime file (currently used): `public/audio/footsteps/goose-footstep-pat1.mp3`,
