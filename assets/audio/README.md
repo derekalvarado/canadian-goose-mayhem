@@ -12,6 +12,28 @@
 The runtime file takes the opening call from the 3.1-second source, converts it to
 mono MP3, normalizes its level, removes sub-bass rumble, and adds short edge fades.
 
+## Guitar drag scrape
+
+- Runtime file: `public/audio/guitar/guitar-drag-loop.wav`, looped by
+  `GameAudio.setScrape()` (`src/game/GameAudio.ts`) while a goose drags the guitar
+- Archived source: `source/stick-dragged/stick-dragged-preview.mp3`
+  (the high-quality preview stream; sourced without a Freesound login, so this
+  is not the original upload)
+- Description: "Stick Dragged" — a wooden stick dragged on a concrete floor,
+  fast and slow, loud and soft
+- Author: 190129_Tristan_Woolmington
+- Source: https://freesound.org/people/190129_Tristan_Woolmington/sounds/492474/
+- License: CC0 (public domain dedication, no attribution required)
+
+The runtime file takes the steady fast drag at 31.4–35.1s, removes sub-70Hz
+rumble, crossfades its last 0.35s into its start so it loops seamlessly, raises
+the level with a limiter, and is saved as mono 32kHz WAV (MP3 adds silence at
+the ends, which would click at every loop). `setScrape()` starts each drag at a
+random point in the loop with a small pitch change, and its loudness follows
+the goose's distance and dragging speed. To sound like a hollow guitar body
+rather than a stick, it boosts the body's two resonances (105Hz and 230Hz),
+softens the hiss, and feeds a 4.5ms echo back on itself (the inside of the box).
+
 ## Goose footstep
 
 - Runtime file (currently used): `public/audio/footsteps/goose-footstep-pat1.mp3`,

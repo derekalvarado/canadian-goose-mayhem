@@ -419,7 +419,8 @@ export class Game {
     const musician = world.musician;
     this.audio.setStreetMusic(musician?.activity === "playing" ? Math.max(0, 1 - away(musician.position) / 26) ** 1.5 : 0);
     const scraping = world.players.filter((player) => player.dragging && player.speed > 0.3)
-      .map((player) => Math.max(0, 1 - away(player.position) / 18));
+      // Louder on each tug, when the guitar is moving fastest.
+      .map((player) => Math.max(0, 1 - away(player.position) / 18) * Math.min(1, player.speed / 1.6));
     this.audio.setScrape(scraping.length > 0 ? Math.max(...scraping) : 0);
   }
 

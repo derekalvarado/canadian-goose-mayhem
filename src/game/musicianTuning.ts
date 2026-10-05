@@ -5,13 +5,14 @@ import type { MusicianTuning } from "./simulation/musician.ts";
  * (the developer sight overlay). Renderer-free.
  */
 export const MUSICIAN_TUNING: MusicianTuning = {
-  walkSpeed: 1.35, jogSpeed: 2.5,
-  sightRange: 15, sightHalfAngle: 0.85, focusedHalfAngle: 0.35,
+  walkSpeed: 1.35, jogSpeed: 1.9,
+  sightRange: 15, sightHalfAngle: 0.72, focusedHalfAngle: 0.35,
   nearSenseRadius: 1.4,
   honkHearingRadius: 14, catchReach: 1.05,
+  noticeSeconds: 1, chaseSeconds: 6, windedSeconds: 4,
   setSeconds: { min: 18, max: 26 }, breakSeconds: 32,
   watchSeconds: { min: 3, max: 5.5 }, sipSeconds: { min: 4, max: 7 },
-  setDownSeconds: 1.2, reactSeconds: 0.7, shooSeconds: 0.9,
+  setDownSeconds: 1.2, reactSeconds: 1, shooSeconds: 0.9,
   eyeSeconds: 3.5, lookSeconds: 3, puzzledSeconds: 2.5,
 };
 
