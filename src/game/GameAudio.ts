@@ -12,6 +12,13 @@ const GUITAR_DRAG_URL = `${import.meta.env.BASE_URL}audio/guitar/guitar-drag-loo
 /** How loud the guitar scrape plays at full drag speed, right beside the listening goose. */
 const SCRAPE_LEVEL = 0.085;
 
+// The street musician's tune: a fingerpicked acoustic melody, looped so its last
+// chord rings into the next play-through (WAV so it loops without a gap).
+// See assets/audio/README.md for source/license.
+const STREET_MUSIC_URL = `${import.meta.env.BASE_URL}audio/guitar/street-guitar-loop.wav`;
+/** How loud the street musician's tune plays right beside the listening goose. */
+const STREET_MUSIC_LEVEL = 0.15;
+
 /** Browser audio output consumes gameplay events; it never decides gameplay. */
 export class GameAudio {
   private context: AudioContext | undefined;
@@ -32,6 +39,7 @@ export class GameAudio {
       void this.loadBuffer(this.context, HONK_URL).catch(() => {});
       void this.loadBuffer(this.context, FOOTSTEP_URL).catch(() => {});
       void this.loadBuffer(this.context, GUITAR_DRAG_URL).then((buffer) => { this.dragBuffer = buffer; }).catch(() => {});
+      void this.loadBuffer(this.context, STREET_MUSIC_URL).then((buffer) => { this.streetBuffer = buffer; }).catch(() => {});
     } catch {
       // Unavailable audio must not prevent gameplay.
     }
@@ -189,54 +197,32 @@ export class GameAudio {
     this.music = music;
   }
 
-  private street?: { gain: GainNode; timer: number; nextBeat: number; beat: number };
+  private street?: { source: AudioBufferSourceNode; gain: GainNode };
+  private streetBuffer?: AudioBuffer;
 
   /**
-   * The street musician's guitar: a plucked folk progression, louder the closer
-   * the goose is (`loudness` 0–1, 0 stops it). Follows the musician's playing state.
+   * The street musician's guitar: a recorded fingerpicked tune on loop, louder
+   * the closer the goose is (`loudness` 0–1, 0 stops it). Follows the musician's
+   * playing state; each time he starts playing again, the tune starts from the top.
    */
   setStreetMusic(loudness: number): void {
     const context = this.context;
     if (loudness <= 0.001) {
-      if (!this.street) return;
-      const { gain, timer } = this.street; this.street = undefined;
-      window.clearInterval(timer);
-      if (context) { gain.gain.setTargetAtTime(0, context.currentTime, 0.08); window.setTimeout(() => gain.disconnect(), 600); }
+      if (!this.street || !context) return;
+      const { source, gain } = this.street; this.street = undefined;
+      gain.gain.setTargetAtTime(0, context.currentTime, 0.08);
+      window.setTimeout(() => { try { source.stop(); } catch { /* already stopped */ } source.disconnect(); gain.disconnect(); }, 600);
       return;
     }
-    if (this.street) { if (context) this.street.gain.gain.setTargetAtTime(loudness, context.currentTime, 0.25); return; }
-    const running = this.runningContext(); if (!running) return;
-    const gain = running.createGain(); gain.gain.value = 0; gain.connect(running.destination);
-    gain.gain.setTargetAtTime(loudness, running.currentTime, 0.4);
-    const street = { gain, timer: 0, nextBeat: running.currentTime + 0.1, beat: 0 };
-    const beatSeconds = 60 / 104 / 2;
-    // G – Em – C – D, picked as a rolling eighth-note pattern.
-    const chords = [[98, 146.8, 196, 246.9, 293.7], [82.4, 123.5, 164.8, 196, 246.9], [130.8, 164.8, 196, 261.6, 329.6], [146.8, 220, 293.7, 370, 440]];
-    const pattern = [0, 2, 3, 4, 3, 2, 1, 3];
-    const schedule = () => {
-      const now = running.currentTime;
-      if (this.paused || running.state !== "running") { street.nextBeat = now + 0.1; return; }
-      while (street.nextBeat < now + 0.3) {
-        const chord = chords[Math.floor(street.beat / 8) % chords.length];
-        const string = chord[pattern[street.beat % pattern.length]];
-        this.pluck(running, gain, string, street.nextBeat, street.beat % 8 === 0 ? 0.07 : 0.045);
-        street.beat += 1; street.nextBeat += beatSeconds;
-      }
-    };
-    street.timer = window.setInterval(schedule, 100);
-    schedule();
-    this.street = street;
-  }
-
-  /** A short plucked string: bright attack, quick decay. */
-  private pluck(context: AudioContext, output: AudioNode, frequency: number, at: number, volume: number): void {
-    const oscillator = context.createOscillator(); const filter = context.createBiquadFilter(); const gain = context.createGain();
-    oscillator.type = "sawtooth"; oscillator.frequency.value = frequency;
-    filter.type = "lowpass"; filter.frequency.setValueAtTime(frequency * 8, at); filter.frequency.exponentialRampToValueAtTime(frequency * 1.5, at + 0.35);
-    gain.gain.setValueAtTime(0.0001, at); gain.gain.exponentialRampToValueAtTime(volume, at + 0.006); gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.9);
-    oscillator.connect(filter); filter.connect(gain); gain.connect(output);
-    oscillator.start(at); oscillator.stop(at + 0.95);
-    oscillator.onended = () => { oscillator.disconnect(); filter.disconnect(); gain.disconnect(); };
+    if (this.street) { if (context) this.street.gain.gain.setTargetAtTime(loudness * STREET_MUSIC_LEVEL, context.currentTime, 0.25); return; }
+    const running = this.runningContext(); const buffer = this.streetBuffer;
+    if (!running || !buffer) return;
+    const source = running.createBufferSource(); source.buffer = buffer; source.loop = true;
+    const gain = running.createGain(); gain.gain.value = 0;
+    source.connect(gain); gain.connect(running.destination);
+    source.start();
+    gain.gain.setTargetAtTime(loudness * STREET_MUSIC_LEVEL, running.currentTime, 0.4);
+    this.street = { source, gain };
   }
 
   /** A goose honking into a guitar: a jangled chord that sags out of tune. */
