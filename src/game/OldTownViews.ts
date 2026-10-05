@@ -24,22 +24,70 @@ function label(text: string, width: number, height: number): THREE.Mesh {
   return new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
 }
 
-/** A continuous, low-contrast paving field. The catalog owns its walkable extent. */
+/** Flat-to-flat width of one hexagonal paver, in meters. */
+const HEX_PAVER_WIDTH = .3;
+let hexPavingMaterial: THREE.MeshToonMaterial | undefined;
+
+/**
+ * Hexagonal concrete pavers drawn on the surface in world space, so overlapping
+ * or neighbouring paving pieces line up into one seamless field.
+ */
+function hexPaving(): THREE.MeshToonMaterial {
+  if (hexPavingMaterial) return hexPavingMaterial;
+  const P = PALETTE.oldTown;
+  const color = (hex: number) => ({ value: new THREE.Color(hex) });
+  const uniforms = {
+    hexWidth: { value: HEX_PAVER_WIDTH },
+    hexBlue: color(P.hexBlue), hexSlate: color(P.hexSlate), hexNeutral: color(P.hexNeutral),
+    hexWarm: color(P.hexWarm), hexWarmLight: color(P.hexWarmLight),
+    hexGrout: color(P.hexGrout), hexSpeck: color(P.hexSpeck), hexEdge: color(P.hexEdge),
+  };
+  const material = toonMaterial(0xffffff);
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = "varying vec2 vPaveXZ;\n" + shader.vertexShader.replace("#include <project_vertex>",
+      "#include <project_vertex>\nvPaveXZ = (modelMatrix * vec4(transformed, 1.0)).xz;");
+    shader.fragmentShader = `varying vec2 vPaveXZ;
+uniform float hexWidth;
+uniform vec3 hexBlue, hexSlate, hexNeutral, hexWarm, hexWarmLight, hexGrout, hexSpeck, hexEdge;
+float paveHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float paveNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(paveHash(i), paveHash(i + vec2(1, 0)), f.x), mix(paveHash(i + vec2(0, 1)), paveHash(i + vec2(1, 1)), f.x), f.y);
+}
+` + shader.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
+{
+  const vec2 s = vec2(1.0, 1.7320508);
+  // Flat edges face the default camera, as the square's pavers face the street.
+  vec2 uv = vPaveXZ.yx / hexWidth;
+  vec4 c = floor(vec4(uv, uv - vec2(.5, 1.)) / s.xyxy) + .5;
+  vec4 h = vec4(uv - c.xy * s, uv - (c.zw + .5) * s);
+  vec2 local = dot(h.xy, h.xy) < dot(h.zw, h.zw) ? h.xy : h.zw;
+  vec2 cell = dot(h.xy, h.xy) < dot(h.zw, h.zw) ? c.xy : c.zw + .5;
+  vec2 a = abs(local);
+  float edge = .5 - max(dot(a, s * .5), a.x);
+  float aa = fwidth(edge) * .75;
+  // Warm tiles gather in loose drifts across the grey field.
+  float drift = paveNoise(cell * s * hexWidth / 2.6) * .6 + paveNoise(cell * s * hexWidth / 1.1) * .4;
+  float pick = drift * .62 + paveHash(cell) * .38;
+  vec3 tile = pick < .22 ? hexSlate : pick < .42 ? hexBlue : pick < .6 ? hexNeutral : pick < .78 ? hexWarm : hexWarmLight;
+  float speck = step(.93, paveHash(floor(vPaveXZ * 70.0))) * .35 * (1.0 - smoothstep(.006, .016, aa));
+  tile = mix(tile, hexSpeck, speck);
+  tile = mix(hexEdge, tile, smoothstep(.04 - aa, .04 + aa, edge) * .55 + .45);
+  diffuseColor.rgb = mix(hexGrout, tile, smoothstep(.022 - aa, .022 + aa, edge));
+}`);
+  };
+  material.customProgramCacheKey = () => "oldtown-hex-paving";
+  return hexPavingMaterial = material;
+}
+
+/** A continuous hex-paver field matching the real square. The catalog owns its walkable extent. */
 export function createOldTownPaving(halfWidth = 22, halfDepth = 18): THREE.Group {
   const group = new THREE.Group();
-  group.add(box(halfWidth * 2, .12, halfDepth * 2, C.limestone, 0, -.065));
-  const geo = new THREE.BoxGeometry(.98, .016, .48);
-  const colors = [PALETTE.oldTown.paving, PALETTE.oldTown.pavingLight, PALETTE.oldTown.pavingShade];
-  const batches = colors.map(c => new THREE.InstancedMesh(geo, toonMaterial(c), Math.ceil(halfWidth * 2) * Math.ceil(halfDepth * 4)));
-  const counts = [0, 0, 0]; const matrix = new THREE.Matrix4();
-  for (let row = 0; row < halfDepth * 4; row++) for (let col = 0; col < halfWidth * 2 - 1; col++) {
-    const n = (row * 17 + col * 13) % 11; const color = n < 7 ? 0 : n < 9 ? 1 : 2;
-    matrix.makeTranslation(-halfWidth + .75 + col + (row % 2) * .25, -.004, -halfDepth + .25 + row * .5);
-    batches[color].setMatrixAt(counts[color]++, matrix);
-  }
-  batches.forEach((m, i) => { m.count = counts[i]; m.receiveShadow = true; group.add(m); });
-  // Thin brick bands frame the pedestrian axis without disrupting walking height.
-  if (halfWidth === 22) for (const z of [-12, 12]) group.add(box(44, .025, .32, C.brick, 0, .006, z));
+  group.add(box(halfWidth * 2, .12, halfDepth * 2, PALETTE.oldTown.hexGrout, 0, -.062));
+  const surface = new THREE.Mesh(new THREE.PlaneGeometry(halfWidth * 2, halfDepth * 2), hexPaving());
+  surface.rotation.x = -Math.PI / 2; surface.receiveShadow = true;
+  group.add(surface);
   return group;
 }
 

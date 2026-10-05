@@ -197,9 +197,15 @@ export const PALETTE = {
     foot: 0x1b2f36,
   },
   oldTown: {
-    paving: 0xc3af98,
-    pavingLight: 0xcbb9a3,
-    pavingShade: 0xbca58d,
+    /** Speckled concrete hex pavers of the real square: grey with warm taupe patches. */
+    hexBlue: 0x95928d,
+    hexSlate: 0x8c8985,
+    hexNeutral: 0x9c968e,
+    hexWarm: 0xa8998c,
+    hexWarmLight: 0xb3a393,
+    hexGrout: 0x6a6560,
+    hexSpeck: 0xcfcac2,
+    hexEdge: 0x807b75,
   },
   building1: {
     brick: 0xb77961,
