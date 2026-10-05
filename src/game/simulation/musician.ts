@@ -30,6 +30,10 @@ export interface MusicianTuning {
   /** Close enough to notice even outside the cone (still blocked by walls). */
   readonly nearSenseRadius: number;
   readonly honkHearingRadius: number; readonly catchReach: number;
+  /** How long a goose with the guitar must stay in view before they notice, at middle distance (quicker up close, slower far off). */
+  readonly noticeSeconds: number;
+  /** How long they chase before running out of puff, and how long they then stop to catch their breath. */
+  readonly chaseSeconds: number; readonly windedSeconds: number;
   readonly setSeconds: Readonly<{ min: number; max: number }>; readonly breakSeconds: number;
   readonly watchSeconds: Readonly<{ min: number; max: number }>; readonly sipSeconds: Readonly<{ min: number; max: number }>;
   readonly setDownSeconds: number; readonly reactSeconds: number; readonly shooSeconds: number;
@@ -116,6 +120,9 @@ export class Musician {
   private searchQueue: Position[] = [];
   private scanBase = 0; private scanTime = 0;
   private previousHolder?: string;
+  /** 0–1: how close they are to noticing the goose with the guitar. */
+  private suspicion = 0;
+  private chaseTime = 0; private windedTimer = 0;
   private random: () => number;
 
   constructor(definition: MusicianDefinition) {
@@ -136,13 +143,13 @@ export class Musician {
     this.setTimer = between(this.random, this.definition.tuning.setSeconds); this.breakTimer = 0; this.holding = false;
     this.believesMissing = false; this.searchedStage = false; this.lastSeenGuitar = undefined; this.lastSeenThief = undefined;
     this.chaseTarget = undefined; this.eyeTarget = undefined; this.eyePoint = undefined; this.searchQueue = []; this.pendingWalk = undefined;
-    this.previousHolder = undefined;
+    this.previousHolder = undefined; this.suspicion = 0; this.chaseTime = 0; this.windedTimer = 0;
   }
 
   snapshot(): MusicianState {
     const { tuning } = this.definition;
     const alert = this.activity === "reacting" || this.activity === "chasing" ? "!"
-      : ["puzzled", "looking-around", "searching", "investigating", "missing"].includes(this.activity) ? "?" : undefined;
+      : this.suspicion > 0 || ["puzzled", "looking-around", "searching", "investigating", "missing"].includes(this.activity) ? "?" : undefined;
     return { id: this.definition.id, position: { ...this.position }, heading: this.heading, activity: this.activity,
       activitySecondsRemaining: this.timer, moving: this.moving, heldEntityId: this.holding ? this.definition.guitarId : undefined, alert,
       sightHalfAngle: this.activity === "eyeing" ? tuning.focusedHalfAngle : tuning.sightHalfAngle };
@@ -167,7 +174,8 @@ export class Musician {
       && this.activity === "eyeing" && this.eyeTarget && this.eyeTarget !== holder) world.recordFact(GUITAR_DISTRACTION_FACT_ID);
     this.previousHolder = holder;
 
-    this.perceive(world, guitar);
+    this.windedTimer = Math.max(0, this.windedTimer - dt);
+    this.perceive(world, guitar, dt);
     this.hear(world);
 
     switch (this.activity) {
@@ -238,13 +246,24 @@ export class Musician {
   }
 
   /** Sight: what they can see right now updates what they believe and what they do next. */
-  private perceive(world: MusicianWorld, guitar: MusicianGuitar | undefined): void {
-    if (!guitar || this.holding) return;
-    const halfAngle = this.activity === "eyeing" ? this.definition.tuning.focusedHalfAngle : this.definition.tuning.sightHalfAngle;
+  private perceive(world: MusicianWorld, guitar: MusicianGuitar | undefined, dt: number): void {
+    if (!guitar || this.holding) { this.suspicion = 0; return; }
+    const { tuning } = this.definition;
+    const halfAngle = this.activity === "eyeing" ? tuning.focusedHalfAngle : tuning.sightHalfAngle;
     const thief = world.geese.find((goose) => goose.heldEntityId === guitar.id && this.sees(goose.position, halfAngle));
+    const pursuing = this.activity === "reacting" || this.activity === "chasing" || this.activity === "shooing";
+    if (thief && !pursuing) {
+      // It takes a moment to notice (longer far off), and none at all while still catching their breath.
+      const distance = distance2d(this.position, thief.position);
+      const nearness = distance <= tuning.nearSenseRadius ? 3
+        : 1.6 - 1.1 * (distance - tuning.nearSenseRadius) / Math.max(0.01, tuning.sightRange - tuning.nearSenseRadius);
+      if (this.windedTimer <= 0) this.suspicion = Math.min(1, this.suspicion + dt * nearness / tuning.noticeSeconds);
+      if (this.suspicion < 1) return;
+    } else if (!thief) this.suspicion = Math.max(0, this.suspicion - dt * 0.5);
     if (thief) {
       this.believesMissing = true; this.lastSeenThief = { ...thief.position }; this.lastSeenGuitar = { ...guitar.position };
-      if (this.activity !== "reacting" && this.activity !== "chasing" && this.activity !== "shooing") {
+      if (!pursuing) {
+        this.suspicion = 0; this.chaseTime = 0;
         this.chaseTarget = thief.id; this.path = []; this.arrival = undefined;
         this.activity = "reacting"; this.timer = this.definition.tuning.reactSeconds;
         this.heading = headingTo(this.position, thief.position);
@@ -305,6 +324,13 @@ export class Musician {
       return;
     }
     if (!visible) { this.searchFrom(this.lastSeenThief); return; }
+    this.chaseTime += dt;
+    if (this.chaseTime > tuning.chaseSeconds) {
+      // Out of puff: they stop where they are and look around, catching their breath.
+      this.windedTimer = tuning.windedSeconds; this.chaseTarget = undefined; this.path = []; this.arrival = undefined;
+      this.lookAround(tuning.windedSeconds);
+      return;
+    }
     this.lastSeenThief = { ...target.position };
     if (distance2d(this.position, target.position) <= tuning.catchReach) {
       this.heading = headingTo(this.position, target.position);

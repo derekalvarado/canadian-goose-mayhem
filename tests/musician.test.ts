@@ -135,6 +135,33 @@ test("taking the guitar in plain view sends the musician after the goose; caught
   assert.equal(guitar(simulation).holderId, "musician", "picked up and played again");
 });
 
+test("a goose with the guitar has a moment before the musician notices it", () => {
+  const simulation = new Simulation(stageRules());
+  waitForBreak(simulation, "watching");
+  grabFromStand(simulation);
+  run(simulation, 0.3);
+  assert.equal(musician(simulation).activity, "watching", "not yet");
+  assert.equal(musician(simulation).alert, "?", "but something has caught their eye");
+  runUntil(simulation, () => musician(simulation).activity === "reacting", 4);
+});
+
+test("a goose that keeps dragging the guitar away outlasts the musician, who stops to catch their breath", () => {
+  const simulation = new Simulation(stageRules());
+  waitForBreak(simulation, "watching");
+  grabFromStand(simulation);
+  const away: PlayerCommand = { ...idle, moveX: -1 };
+  runUntil(simulation, () => musician(simulation).activity === "chasing", 5, away);
+  const events: GameplayEvent[] = [];
+  for (let tick = 0; tick < 12 / FIXED_STEP && musician(simulation).activity === "chasing"; tick += 1) {
+    events.push(...simulation.advancePlayers(FIXED_STEP, away));
+  }
+  assert.equal(musician(simulation).activity, "looking-around", "out of puff");
+  assert.ok(!events.some((event) => event.type === "goose-shooed"), "never caught");
+  events.push(...run(simulation, 3, away));
+  assert.equal(simulation.player.heldEntityId, "guitar");
+  assert.notEqual(musician(simulation).activity, "chasing", "still catching their breath");
+});
+
 test("an unseen theft leaves the musician puzzled; after searching they give up, and the guitar counts as hidden", () => {
   const simulation = new Simulation(stageRules());
   waitForBreak(simulation, "sipping");
