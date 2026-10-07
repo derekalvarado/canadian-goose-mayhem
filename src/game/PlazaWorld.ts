@@ -1,3 +1,4 @@
+import { createBikeRack } from "./BikeRackView.ts";
 import { createGasMeterBank } from "./GasMeterBankView.ts";
 import { createCoffeeChair, createCoffeeTable } from "./CoffeeFurnitureView.ts";
 import { createBistroSet } from "./PlazaBistroView.ts";
@@ -1201,6 +1202,7 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "oldtown.light-span": return createTownLights();
     case "oldtown.fireplace": return createTownFireplace();
     case "oldtown.gas-meter-bank": return createGasMeterBank();
+    case "oldtown.bike-rack": return createBikeRack();
     case "street.trash-can": return new TrashCanView();
     case "plaza.planter-cluster": return createPlanterCluster();
     case "plaza.planter-east-north": return createSinglePlanter(1.45, 3.3);

@@ -281,6 +281,12 @@ export const PALETTE = {
     concrete: 0xb0aba0,
     concreteShade: 0x8f8b82,
   },
+  bikeRack: {
+    steel: 0x5f5249,
+    steelShade: 0x54483f,
+    rail: 0x4f4138,
+    rust: 0x684234,
+  },
   flower: {
     coral: 0xd86650,
     yellow: 0xe0b84e,

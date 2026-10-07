@@ -182,6 +182,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
     { shape: "box", x: -1.45, z: -0.38, halfWidth: 0.75, halfDepth: 0.22 },
     { shape: "box", x: 0.72, z: -0.07, halfWidth: 1.45, halfDepth: 0.53 },
   ], occludesCamera: false },
+  { assetId: "oldtown.bike-rack", label: "Wire bike rack", category: "furniture", halfWidth: 1.22, halfDepth: 0.36, colliders: [{ shape: "box", x: 0, z: -0.02, halfWidth: 1.2, halfDepth: 0.32 }], occludesCamera: false },
   { assetId: "oldtown.shade-tree", label: "Old Town shade tree", category: "planting", halfWidth: 3.6, halfDepth: 2.736, colliders: [{ shape: "circle", x: 0, z: 0, radius: 0.4824 }], occludesCamera: true },
   { assetId: "oldtown.oval-inlay", label: "Oval plaza paving inlay", category: "ground", halfWidth: 13.76, halfDepth: 8, colliders: [], warnForOverlap: false },
   { assetId: "oldtown.light-span", label: "Old Town festoon span", category: "lighting", halfWidth: 0.1, halfDepth: 8.1, colliders: [], warnForOverlap: false },
