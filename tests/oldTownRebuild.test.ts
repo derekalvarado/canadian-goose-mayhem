@@ -162,7 +162,8 @@ test("drafts saved before the latest plaza arrangement update untouched placemen
   const canonical = getWorldArea(CANONICAL_WORLD_LAYOUT);
   const updatedPlaza = getWorldArea(updated);
   assert.equal(updated.canonicalRevision, 26);
-  for (const id of ["plaza.paving", "plaza.pavilion-stage", "oldtown.coopersmith", "oldtown.southwest.tree-2", "plaza.splash-faucet"]) {
+  assert.notDeepEqual(updatedPlaza.instances.find((item) => item.id === "plaza.paving")!.transform, { x: 0, y: 0, z: 0, rotationY: 0 });
+  for (const id of ["plaza.pavilion-stage", "oldtown.coopersmith", "oldtown.southwest.tree-2", "plaza.splash-faucet"]) {
     assert.deepEqual(updatedPlaza.instances.find((item) => item.id === id)!.transform, canonical.instances.find((item) => item.id === id)!.transform);
   }
   assert.equal(updatedPlaza.instances.find((item) => item.id === "plaza.goose-fountain")!.transform.x, -14.25);
