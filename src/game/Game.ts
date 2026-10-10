@@ -5,7 +5,7 @@ import { WorldView } from "./WorldView";
 import { Goose } from "./Goose";
 import { InputController, type GamepadLayout, type InputDevice, type InputFrame } from "./InputController";
 import { TouchControls } from "./TouchControls";
-import { PauseReasons, parseTouchControlsPreference, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
+import { cycleTouchControlsPreference, PauseReasons, parseTouchControlsPreference, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
 import { Simulation, FIXED_STEP, HURRY_SPEED, WALK_SPEED, type GameplayEvent, type PlayerCommand, type WorldSnapshot } from "./simulation/Simulation";
 import { PALETTE } from "./palette";
@@ -143,13 +143,14 @@ export class Game {
   private readonly gamepadSneakKey = requireElement<HTMLElement>("#gamepad-sneak-key");
   private readonly gamepadThreatKey = requireElement<HTMLElement>("#gamepad-threat-key");
   private readonly gamepadInteractKey = requireElement<HTMLElement>("#gamepad-interact-key");
+  private readonly gamepadTodoKey = requireElement<HTMLElement>("#gamepad-todo-key");
   private readonly touchControlsRoot = requireElement<HTMLElement>("#touch-controls");
   private readonly settingsMenu = requireElement<HTMLElement>("#settings-menu");
   private readonly settingsButton = requireElement<HTMLButtonElement>("#settings-button");
   private readonly installButton = requireElement<HTMLButtonElement>("#install-button");
   private readonly installMenu = requireElement<HTMLElement>("#install-menu");
   private readonly fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
-  private readonly touchPreferenceSelect = requireElement<HTMLSelectElement>("#touch-controls-preference");
+  private readonly touchPreferenceValue = requireElement<HTMLElement>("#touch-controls-value");
   private readonly controllerDiagnostics = requireElement<HTMLDetailsElement>("#controller-diagnostics");
   private readonly controllerDiagnosticsOutput = requireElement<HTMLPreElement>("#controller-diagnostics-output");
   private readonly controllerLobby = requireElement<HTMLElement>("#controller-lobby");
@@ -164,8 +165,12 @@ export class Game {
   private readonly allDoneLevel = requireElement<HTMLElement>("#all-done-level");
   private readonly todoList = requireElement<HTMLElement>("#todo-list");
   private readonly todoTitle = requireElement<HTMLElement>("#todo-title");
+  private readonly todoKey = requireElement<HTMLElement>("#todo-key");
+  private readonly taskStrip = requireElement<HTMLElement>("#task-strip");
+  private readonly taskStripText = requireElement<HTMLElement>("#task-strip-text");
+  private readonly taskStripQueue: string[] = [];
+  private taskStripTimer = 0;
   private readonly startOverButton = requireElement<HTMLButtonElement>("#start-over");
-  private todoTimer = 0;
   private highlightedObjectiveId: string | undefined;
   private currentGamepadLayout: GamepadLayout = "standard";
   private startOverArmed = false;
@@ -178,6 +183,7 @@ export class Game {
   private transitioning = false;
   private readonly transitionCurtain: HTMLDivElement;
   private lastInputTime = performance.now();
+  private lastDevice: InputDevice = "keyboard";
   private readonly reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   private readonly canvasResizeObserver: ResizeObserver;
   private controllerDiagnosticsRefresh = 0;
@@ -261,6 +267,10 @@ export class Game {
     if (!this.editorMode && !this.overviewMode) {
       this.multiplayerMenu = new MultiplayerMenu({
         onOpenChange: (open) => this.setPauseReason("multiplayer", open),
+        onBack: () => {
+          this.openSettings();
+          requireElement<HTMLButtonElement>("#settings-play-together").focus({ preventScroll: true });
+        },
         onLocalStart: this.startLocalMultiplayer,
         onConnected: this.handleOnlineConnected,
         onDisconnected: this.handleOnlineDisconnected,
@@ -322,6 +332,7 @@ export class Game {
       return;
     }
 
+    if (this.input.consumeTodoPress() && !this.todoToggle.hidden) this.toggleTodoList();
     const localInput = this.localMultiplayer ? this.input.sampleLocalGamepads() : undefined;
     if (localInput) this.updateControllerLobby(localInput.assignments);
     const frame = localInput?.player1 ?? (this.localMultiplayer ? idleInputFrame() : this.input.sample());
@@ -933,13 +944,14 @@ export class Game {
   }
 
   private celebrateTask(objectiveId: string): void {
-    this.highlightedObjectiveId = objectiveId;
+    // An open list highlights the line; otherwise the torn strip carries the news.
+    if (!this.todoList.hidden) this.highlightedObjectiveId = objectiveId;
     this.renderObjectives();
     // Shared progress is saved on the host only; a guest just sees the tick.
     if (this.onlineRole !== "guest") saveProgress(this.simulation.sessionState);
     this.audio.playTaskComplete();
     const task = this.listedObjectives().find((objective) => objective.id === objectiveId);
-    this.revealTodoList();
+    if (task) this.showTaskStrip(task.description);
     // Finishing a level's last task, wherever the goose happens to be, earns that level's card.
     const level = task?.areaId;
     const levelTasks = this.listedObjectives().filter((objective) => objective.areaId === level);
@@ -964,15 +976,12 @@ export class Game {
   };
 
   private openTodoList(): void {
-    window.clearTimeout(this.todoTimer);
-    this.todoTimer = 0;
     this.todoList.hidden = false;
+    this.todoList.classList.remove("todo-list--reveal"); void this.todoList.offsetWidth; this.todoList.classList.add("todo-list--reveal");
     this.todoToggle.setAttribute("aria-expanded", "true");
   }
 
   private closeTodoList(): void {
-    window.clearTimeout(this.todoTimer);
-    this.todoTimer = 0;
     this.todoList.hidden = true;
     this.todoList.classList.remove("todo-list--reveal");
     this.todoToggle.setAttribute("aria-expanded", "false");
@@ -980,18 +989,31 @@ export class Game {
     this.objectiveList.querySelector(".is-newly-complete")?.classList.remove("is-newly-complete");
   }
 
-  private revealTodoList(): void {
-    this.openTodoList();
-    // Re-trigger the reveal animation for back-to-back completed tasks.
-    this.todoList.classList.remove("todo-list--reveal"); void this.todoList.offsetWidth; this.todoList.classList.add("todo-list--reveal");
-    this.todoTimer = window.setTimeout(() => this.closeTodoList(), 3600);
+  /** Back-to-back finished tasks each get their own torn strip, one after another. */
+  private showTaskStrip(description: string): void {
+    this.taskStripQueue.push(description);
+    if (!this.taskStripTimer) this.nextTaskStrip();
   }
+
+  private readonly nextTaskStrip = (): void => {
+    const description = this.taskStripQueue.shift();
+    if (description === undefined) {
+      this.taskStrip.hidden = true;
+      this.taskStripTimer = 0;
+      return;
+    }
+    this.taskStripText.textContent = description;
+    this.taskStrip.hidden = false;
+    // Restart the slide-up and cross-out for each strip.
+    this.taskStrip.classList.remove("task-strip--show"); void this.taskStrip.offsetWidth; this.taskStrip.classList.add("task-strip--show");
+    this.taskStripTimer = window.setTimeout(this.nextTaskStrip, 3400);
+  };
 
   private readonly startOver = (): void => {
     if (!this.startOverArmed) {
       this.startOverArmed = true;
-      this.startOverButton.textContent = "Press again to clear your list";
-      window.setTimeout(() => { this.startOverArmed = false; this.startOverButton.textContent = "Start over"; }, 4000);
+      this.startOverButton.textContent = "[press again to clear your list]";
+      window.setTimeout(() => { this.startOverArmed = false; this.startOverButton.textContent = "[start over]"; }, 4000);
       return;
     }
     clearProgress();
@@ -1060,12 +1082,20 @@ export class Game {
     this.gamepadSneakKey.textContent = "Y";
     this.gamepadThreatKey.textContent = joyCon ? "SL" : "LB";
     this.gamepadInteractKey.textContent = joyCon ? "X" : "B";
+    this.gamepadTodoKey.textContent = joyCon ? "+" : "View";
+    if (this.lastDevice === "gamepad") this.todoKey.textContent = this.gamepadTodoKey.textContent;
   }
 
   private readonly handleDeviceChanged = (device: InputDevice): void => {
     const usingGamepad = device === "gamepad";
     this.keyboardControls.hidden = usingGamepad;
     this.gamepadControls.hidden = !usingGamepad;
+    this.lastDevice = device;
+    // Touch never hides the hint: resetting the on-screen stick also reports as touch.
+    if (device !== "touch") {
+      this.todoKey.hidden = false;
+      this.todoKey.textContent = usingGamepad ? this.gamepadTodoKey.textContent : "T";
+    }
     this.lastInputTime = performance.now();
     this.controlsCard.classList.remove("controls-card--quiet");
   };
@@ -1081,7 +1111,7 @@ export class Game {
 
   private setupMobileControls(): void {
     this.touchPreference = this.loadTouchPreference();
-    this.touchPreferenceSelect.value = this.touchPreference;
+    this.touchPreferenceValue.textContent = this.touchPreference.toUpperCase();
     this.touchControls = new TouchControls(
       requireElement<HTMLElement>("#touch-movement-area"),
       requireElement<HTMLElement>("#touch-stick"),
@@ -1106,12 +1136,15 @@ export class Game {
     requireElement<HTMLButtonElement>("#settings-back").addEventListener("click", this.backToSettings);
     requireElement<HTMLButtonElement>("#settings-play-together").addEventListener("click", this.closeSettingsForMultiplayer);
     this.todoToggle.addEventListener("click", this.toggleTodoList);
+    // Touch-first screens have no T key to hint at until a keyboard or controller is used.
+    this.todoKey.hidden = window.matchMedia("(pointer: coarse)").matches;
     window.addEventListener("keydown", this.handleTodoShortcut);
     this.startOverButton.addEventListener("click", this.startOver);
     this.installButton.addEventListener("click", this.openInstallHelp);
     requireElement<HTMLButtonElement>("#install-close").addEventListener("click", this.closeInstallHelp);
     requireElement<HTMLButtonElement>("#settings-close").addEventListener("click", this.closeSettings);
-    this.touchPreferenceSelect.addEventListener("change", this.updateTouchPreference);
+    requireElement<HTMLButtonElement>("#touch-controls-prev").addEventListener("click", () => this.updateTouchPreference(-1));
+    requireElement<HTMLButtonElement>("#touch-controls-next").addEventListener("click", () => this.updateTouchPreference(1));
     this.fullscreenButton.addEventListener("click", this.toggleFullscreen);
     this.updateTouchControlsVisibility();
     this.syncFullscreenLabel();
@@ -1123,12 +1156,13 @@ export class Game {
     catch { return "auto"; }
   }
 
-  private readonly updateTouchPreference = (): void => {
-    this.touchPreference = parseTouchControlsPreference(this.touchPreferenceSelect.value);
+  private updateTouchPreference(step: 1 | -1): void {
+    this.touchPreference = cycleTouchControlsPreference(this.touchPreference, step);
+    this.touchPreferenceValue.textContent = this.touchPreference.toUpperCase();
     try { window.localStorage.setItem(TOUCH_CONTROLS_STORAGE_KEY, this.touchPreference); } catch { /* Storage is optional. */ }
     this.touchControls?.clear();
     this.updateTouchControlsVisibility();
-  };
+  }
 
   private updateTouchControlsVisibility(): void {
     const showTouchControls = shouldShowTouchControls(this.touchPreference, this.coarseTouchDevice)
@@ -1240,7 +1274,7 @@ export class Game {
   private readonly dispose = (): void => {
     if (this.disposed) return;
     this.disposed = true;
-    window.clearTimeout(this.todoTimer);
+    window.clearTimeout(this.taskStripTimer);
     if (!this.progressCleared && !this.editorMode && !this.overviewMode && this.onlineRole !== "guest") saveProgress(this.simulation.sessionState);
     this.audio.setCafeMusic(false);
     this.audio.setStreetMusic(0); this.audio.setScrape(0);

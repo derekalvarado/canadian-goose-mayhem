@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GamepadJoinLobby, gamepadHasActivity, sampleGamepad, type GamepadActions, type GamepadLike, type LocalPlayerNumber } from "./gamepads.ts";
+import { GamepadJoinLobby, gamepadHasActivity, sampleGamepad, todoButtonDown, type GamepadActions, type GamepadLike, type LocalPlayerNumber } from "./gamepads.ts";
 
 export type InputDevice = "keyboard" | "gamepad" | "touch";
 export type GamepadLayout = "standard" | "single-right-joycon";
@@ -73,6 +73,7 @@ export class InputController {
   private readonly onDeviceChanged: (device: InputDevice, connected: boolean) => void;
   private readonly localLobby = new GamepadJoinLobby();
   private readonly localPadMemory = new Map<number, LocalPadMemory>();
+  private readonly todoPadsDown = new Set<number>();
 
   constructor(onDeviceChanged: (device: InputDevice, connected: boolean) => void) {
     this.onDeviceChanged = onDeviceChanged;
@@ -159,6 +160,18 @@ export class InputController {
       device: this.lastDevice,
       gamepadLayout: activeGamepadLayout,
     };
+  }
+
+  /** True once per press of any connected controller's to-do button. */
+  consumeTodoPress(): boolean {
+    let pressed = false;
+    for (const pad of Array.from(navigator.getGamepads?.() ?? []) as readonly (GamepadLike | null)[]) {
+      if (!pad) continue;
+      const down = pad.connected && todoButtonDown(pad);
+      if (down && !this.todoPadsDown.has(pad.index)) pressed = true;
+      if (down) this.todoPadsDown.add(pad.index); else this.todoPadsDown.delete(pad.index);
+    }
+    return pressed;
   }
 
   sampleLocalGamepads(): LocalGamepadSample {

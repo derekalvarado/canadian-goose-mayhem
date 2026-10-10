@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  FloatingJoystick, HURRY_ENTER_DISTANCE, HURRY_EXIT_DISTANCE, PauseReasons,
+  cycleTouchControlsPreference, FloatingJoystick, HURRY_ENTER_DISTANCE, HURRY_EXIT_DISTANCE, PauseReasons,
   parseTouchControlsPreference, shouldShowTouchControls,
 } from "../src/game/mobileControls.ts";
 
@@ -47,4 +47,10 @@ test("page activity pause recovers when visibility returns before focus", () => 
   assert.equal(pauses.paused, true);
   assert.equal(pauses.syncPageActivity(false, true), true);
   assert.equal(pauses.paused, false);
+});
+
+test("settings arrows step through touch control choices and wrap around", () => {
+  assert.equal(cycleTouchControlsPreference("auto", 1), "show");
+  assert.equal(cycleTouchControlsPreference("hide", 1), "auto");
+  assert.equal(cycleTouchControlsPreference("auto", -1), "hide");
 });

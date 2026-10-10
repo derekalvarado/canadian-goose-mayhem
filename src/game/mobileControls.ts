@@ -53,6 +53,14 @@ export function parseTouchControlsPreference(value: string | null): TouchControl
   return value === "show" || value === "hide" || value === "auto" ? value : "auto";
 }
 
+const TOUCH_CONTROLS_CHOICES: readonly TouchControlsPreference[] = ["auto", "show", "hide"];
+
+/** The settings sheet's < > arrows step through the choices and wrap around. */
+export function cycleTouchControlsPreference(preference: TouchControlsPreference, step: 1 | -1): TouchControlsPreference {
+  const index = TOUCH_CONTROLS_CHOICES.indexOf(preference);
+  return TOUCH_CONTROLS_CHOICES[(index + step + TOUCH_CONTROLS_CHOICES.length) % TOUCH_CONTROLS_CHOICES.length]!;
+}
+
 export function shouldShowTouchControls(preference: TouchControlsPreference, coarseTouchDevice: boolean): boolean {
   return preference === "show" || (preference === "auto" && coarseTouchDevice);
 }
