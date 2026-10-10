@@ -423,10 +423,9 @@ kbd,
 }
 .multiplayer-card { width: min(92vw, 34rem); }
 .multiplayer-status--error { margin: .75rem 0 1rem; padding: .8rem .9rem; border: 1px solid rgb(241 211 139 / 75%); border-left: 4px solid var(--sun); border-radius: .6rem; color: var(--goose-white) !important; background: rgb(158 79 67 / 48%); font-size: 1rem; font-weight: 700; line-height: 1.4; }
-.multiplayer-choice-panel[hidden], .multiplayer-flow-step[hidden], .multiplayer-back-options[hidden] { display: none; }
+.multiplayer-choice-panel[hidden], .multiplayer-flow-step[hidden] { display: none; }
 .multiplayer-choice-label { margin: 1rem 0 .5rem; color: var(--sun); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .multiplayer-choice-local { margin-top: 1.2rem; padding-top: .2rem; border-top: 1px solid var(--line); }
-.settings-card .multiplayer-back-options { margin: 0 0 .65rem; padding: 0; min-height: 30px; border: 0; color: var(--sun); background: transparent; }
 .multiplayer-flow-step { display: grid; gap: .55rem; margin-top: .7rem; padding-top: .75rem; border-top: 1px solid var(--line); }
 .multiplayer-flow-step h3 { margin: 0; }
 .multiplayer-flow-step .settings-help { margin: 0; }
@@ -1252,7 +1251,5 @@ kbd,
 .multiplayer-sheet .multiplayer-code-panel strong { color: var(--notebook-ink); font: italic 400 2.6rem/1 var(--type-font); letter-spacing: .25em; }
 .multiplayer-sheet .multiplayer-code-panel span { color: var(--notebook-ink-faded); font-size: .85rem; }
 .multiplayer-sheet .multiplayer-approval strong { font-weight: 400; }
-.multiplayer-sheet .multiplayer-back-options { display: block; min-height: 40px; margin: 0 auto 6px; padding: 0 10px; border: 0; background: transparent; color: var(--notebook-ink); font: inherit; cursor: pointer; }
-.multiplayer-sheet .multiplayer-back-options[hidden] { display: none; }
 .multiplayer-sheet .multiplayer-join-debug { color: var(--notebook-ink-faded); font-size: .75rem; }
 .multiplayer-sheet .multiplayer-status--error { margin: 10px 0; padding: 10px 12px; border: 0; border-left: 4px solid var(--signal-red); border-radius: 0; background: rgb(198 61 54 / 10%); color: var(--signal-red) !important; font-size: 1rem; font-weight: 400; text-align: left; }

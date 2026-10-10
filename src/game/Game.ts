@@ -267,6 +267,10 @@ export class Game {
     if (!this.editorMode && !this.overviewMode) {
       this.multiplayerMenu = new MultiplayerMenu({
         onOpenChange: (open) => this.setPauseReason("multiplayer", open),
+        onBack: () => {
+          this.openSettings();
+          requireElement<HTMLButtonElement>("#settings-play-together").focus({ preventScroll: true });
+        },
         onLocalStart: this.startLocalMultiplayer,
         onConnected: this.handleOnlineConnected,
         onDisconnected: this.handleOnlineDisconnected,

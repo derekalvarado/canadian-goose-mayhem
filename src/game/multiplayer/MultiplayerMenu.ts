@@ -59,6 +59,8 @@ type StatusTone = "info" | "error";
 
 export interface MultiplayerMenuOptions {
   readonly onOpenChange?: (open: boolean) => void;
+  /** "back" from the first screen returns to the menu Play together lives in. */
+  readonly onBack?: () => void;
   readonly onLocalStart?: () => void;
   readonly onConnected?: (role: MultiplayerRole, peer: WebRtcPeer, identity: MultiplayerConnectionIdentity) => void;
   readonly onDisconnected?: (role: MultiplayerRole) => void;
@@ -92,7 +94,6 @@ export class MultiplayerMenu {
   private readonly chooseHostButton = required<HTMLButtonElement>("#multiplayer-choose-host");
   private readonly chooseJoinButton = required<HTMLButtonElement>("#multiplayer-choose-join");
   private readonly chooseLocalButton = required<HTMLButtonElement>("#multiplayer-choose-local");
-  private readonly backOptionsButton = required<HTMLButtonElement>("#multiplayer-back-options");
   private readonly gameHelp = required<HTMLElement>("#multiplayer-game-help");
   private readonly hostButton = required<HTMLButtonElement>("#multiplayer-host");
   private readonly joinButton = required<HTMLButtonElement>("#multiplayer-family-join");
@@ -123,7 +124,7 @@ export class MultiplayerMenu {
   private readonly replacementNote = required<HTMLElement>("#multiplayer-replacement-note");
   private readonly localButton = required<HTMLButtonElement>("#multiplayer-local");
   private readonly openButton = required<HTMLButtonElement>("#settings-play-together");
-  private readonly closeButton = required<HTMLButtonElement>("#multiplayer-close");
+  private readonly backButton = required<HTMLButtonElement>("#multiplayer-back");
   private readonly settingsPairing = required<HTMLElement>("#settings-family-pairing");
   private readonly settingsPeer = required<HTMLElement>("#settings-family-peer");
   private readonly settingsName = required<HTMLInputElement>("#settings-family-name");
@@ -187,11 +188,10 @@ export class MultiplayerMenu {
 
   constructor(private readonly options: MultiplayerMenuOptions = {}) {
     this.openButton.addEventListener("click", this.open);
-    this.closeButton.addEventListener("click", this.close);
+    this.backButton.addEventListener("click", this.back);
     this.chooseHostButton.addEventListener("click", () => this.showFlow("host"));
     this.chooseJoinButton.addEventListener("click", () => this.showFlow("join"));
     this.chooseLocalButton.addEventListener("click", () => this.showFlow("local"));
-    this.backOptionsButton.addEventListener("click", this.backToChoices);
     this.hostButton.addEventListener("click", () => { void this.startFamilyHost(); });
     this.joinButton.addEventListener("click", () => { void this.startFamilyJoin(); });
     this.sessionEndButton.addEventListener("click", this.handleSessionEndButton);
@@ -263,10 +263,22 @@ export class MultiplayerMenu {
     this.title.focus({ preventScroll: true });
   };
 
+  /** Straight back to the game, e.g. once a shared game starts. */
   private readonly close = (): void => {
     this.menu.hidden = true;
     this.options.onOpenChange?.(false);
     required<HTMLButtonElement>("#settings-button").focus({ preventScroll: true });
+  };
+
+  /** One step back: a host/join/two-controller screen returns to the choices, the choices to settings. */
+  private readonly back = (): void => {
+    if (this.flowView !== "choose" || this.showReplacementSetup) {
+      this.backToChoices();
+      return;
+    }
+    this.menu.hidden = true;
+    this.options.onOpenChange?.(false);
+    this.options.onBack?.();
   };
 
   private showFlow(flow: "host" | "join" | "local"): void {
@@ -275,7 +287,7 @@ export class MultiplayerMenu {
     else if (!this.familyClient) this.setStatus(NOT_CONFIGURED);
     else this.setStatus("");
     this.updateFamilyUi();
-    this.backOptionsButton.focus({ preventScroll: true });
+    this.title.focus({ preventScroll: true });
   }
 
   private readonly backToChoices = (): void => {
@@ -322,7 +334,6 @@ export class MultiplayerMenu {
     this.choiceIntro.textContent = "Replaces your old pairing";
     this.pairingChoices.hidden = pairedChoice;
     this.localChoice.hidden = session !== "idle";
-    this.backOptionsButton.hidden = view === "choose";
     this.joinDebug.hidden = !import.meta.env.DEV || view === "local";
     this.gameHelp.hidden = !(setupView || pairedChoice);
     this.localPanel.hidden = view !== "local";
