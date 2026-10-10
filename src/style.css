@@ -1178,7 +1178,7 @@ kbd,
 }
 
 /* Settings: a hole-punched, typewritten notebook sheet on flat blue. */
-#settings-menu.options-menu { background: var(--options-blue); }
+.settings-menu.options-menu { background: var(--options-blue); }
 .options-layout { position: relative; width: min(620px, 100%); max-height: 100%; }
 .options-sheet { max-height: calc(100dvh - 48px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 34px 44px 30px 70px; background: radial-gradient(circle, var(--options-blue) 0 6.5px, transparent 7px) left 14px top 12px / 20px 35px repeat-y, linear-gradient(var(--options-blue) 55%, transparent 0) left 42px top 0 / 2px 9px repeat-y, var(--notebook-paper); background-attachment: local; clip-path: polygon(0 0, calc(100% - 15px) 0, calc(100% - 12px) 6%, calc(100% - 17px) 12%, calc(100% - 11px) 19%, calc(100% - 15px) 25%, calc(100% - 5px) 28%, 100% 30%, 100% 100%, 0 100%); color: var(--notebook-ink); font: italic 400 1.12rem/1.35 var(--type-font); }
 .options-title { margin: 0 0 18px; color: var(--notebook-ink); font: inherit; font-size: 1.25rem; letter-spacing: .06em; text-align: center; text-transform: uppercase; outline: none; }
@@ -1192,7 +1192,7 @@ kbd,
 .options-arrow { display: grid; place-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: center; cursor: pointer; }
 .options-row--link:hover .options-value, .options-row--link:focus-visible .options-value, .options-arrow:hover, .options-arrow:focus-visible { background: var(--notebook-marker); }
 .options-sheet :focus-visible { outline: 2px dashed var(--notebook-ink); outline-offset: 2px; }
-.options-sheet .options-arrow:focus-visible, .options-sheet .options-row--link:focus-visible { outline: none; }
+.options-sheet .options-arrow:focus-visible, .options-sheet .options-row--link:focus-visible, .options-sheet .options-title:focus-visible { outline: none; }
 .options-row--input { cursor: text; }
 .options-input { grid-column: 3 / 5; min-width: 0; min-height: 40px; padding: 4px 2px; border: 0; border-bottom: 1.5px dashed var(--notebook-ink); border-radius: 0; background: transparent; color: var(--notebook-ink); font: inherit; text-align: center; -webkit-user-select: auto; user-select: auto; }
 .options-subtitle { margin: 22px 0 2px; font: inherit; text-align: center; }
@@ -1227,3 +1227,42 @@ kbd,
   .options-sticky { display: none; }
   .options-sheet { max-height: calc(100dvh - 32px); padding-top: 20px; padding-bottom: 16px; }
 }
+
+/* Play together: the same typed notebook sheet as settings. */
+.multiplayer-sheet { font-size: 1.05rem; }
+.multiplayer-sheet .settings-help { margin: 6px 0; color: var(--notebook-ink-faded); font-size: .9rem; line-height: 1.4; text-align: center; }
+.multiplayer-sheet .multiplayer-choice-label { margin: 18px 0 4px; color: var(--notebook-ink); font-size: 1rem; font-weight: 400; letter-spacing: 0; text-align: center; text-transform: lowercase; }
+.multiplayer-sheet .multiplayer-choice-label::before { content: "~ "; }
+.multiplayer-sheet .multiplayer-choice-label::after { content: " ~"; }
+.multiplayer-sheet .multiplayer-choice { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: space-between; gap: 14px; margin: 4px 0; padding: 6px 8px; border: 0; border-radius: 3px; background: transparent; color: var(--notebook-ink); font: inherit; text-align: left; cursor: pointer; }
+.multiplayer-sheet .multiplayer-choice strong { font-size: 1.05rem; font-weight: 400; }
+.multiplayer-sheet .multiplayer-choice small { color: var(--notebook-ink-faded); font-size: .85rem; }
+.multiplayer-sheet .multiplayer-choice span:last-child { color: var(--notebook-ink); font-size: 1.05rem; }
+.multiplayer-sheet .multiplayer-choice:hover, .multiplayer-sheet .multiplayer-choice:focus-visible { background: var(--notebook-marker); outline: none; }
+.multiplayer-sheet .multiplayer-choice-local { margin-top: 10px; padding-top: 0; border-top: 0; }
+/* Action buttons read as typed [bracketed] links; the game sets their words. */
+.multiplayer-sheet .multiplayer-family-panel button, .multiplayer-sheet .multiplayer-flow-step button, .multiplayer-sheet .multiplayer-code-panel button { width: auto; min-height: 44px; margin: 0 auto; padding: 0 10px; border: 0; border-radius: 3px; background: transparent; color: var(--notebook-ink); font: inherit; cursor: pointer; }
+.multiplayer-sheet .multiplayer-family-panel button::before, .multiplayer-sheet .multiplayer-flow-step button::before, .multiplayer-sheet .multiplayer-code-panel button::before { content: "["; }
+.multiplayer-sheet .multiplayer-family-panel button::after, .multiplayer-sheet .multiplayer-flow-step button::after, .multiplayer-sheet .multiplayer-code-panel button::after { content: "]"; }
+.multiplayer-sheet .multiplayer-family-panel button:hover, .multiplayer-sheet .multiplayer-flow-step button:hover, .multiplayer-sheet .multiplayer-code-panel button:hover { background: var(--notebook-marker); }
+.multiplayer-sheet .multiplayer-family-panel button:disabled, .multiplayer-sheet .multiplayer-flow-step button:disabled { opacity: .45; cursor: default; }
+.multiplayer-sheet .multiplayer-secondary { color: var(--notebook-ink-faded); }
+.multiplayer-sheet .multiplayer-family-actions { justify-content: center; gap: 6px; }
+.multiplayer-sheet .multiplayer-family-actions button { flex: 0 1 auto; }
+.multiplayer-sheet .multiplayer-family-panel { gap: 8px; margin: 14px 0; padding: 12px 10px; border: 1.5px dashed rgb(43 42 51 / 30%); border-radius: 3px; }
+.multiplayer-sheet .multiplayer-family-panel h3, .multiplayer-sheet .multiplayer-flow-step h3 { margin: 4px 0 0; font: inherit; text-align: center; }
+.multiplayer-sheet .multiplayer-family-label { font-weight: 400; }
+.multiplayer-sheet .multiplayer-family-presence { color: var(--notebook-ink-faded); }
+.multiplayer-sheet .multiplayer-flow-step { margin-top: 8px; padding-top: 10px; border-top: 1.5px dashed rgb(43 42 51 / 30%); }
+.multiplayer-sheet label { display: grid; gap: 4px; color: var(--notebook-ink-faded); font-size: .9rem; text-align: center; }
+.multiplayer-sheet input { width: 100%; min-height: 42px; padding: 4px 2px; border: 0; border-bottom: 1.5px dashed var(--notebook-ink); border-radius: 0; background: transparent; color: var(--notebook-ink); font: inherit; font-size: 1.1rem; text-align: center; -webkit-user-select: auto; user-select: auto; }
+.multiplayer-sheet input::placeholder { color: rgb(43 42 51 / 35%); }
+.multiplayer-sheet #multiplayer-family-code { font: italic 400 1.6rem/1 var(--type-font); letter-spacing: .3em; }
+.multiplayer-sheet .multiplayer-code-panel, .multiplayer-sheet .multiplayer-approval { padding: 12px; border-radius: 3px; background: var(--notebook-marker); color: var(--notebook-ink); }
+.multiplayer-sheet .multiplayer-code-panel strong { color: var(--notebook-ink); font: italic 400 2.6rem/1 var(--type-font); letter-spacing: .25em; }
+.multiplayer-sheet .multiplayer-code-panel span { color: var(--notebook-ink-faded); font-size: .85rem; }
+.multiplayer-sheet .multiplayer-approval strong { font-weight: 400; }
+.multiplayer-sheet .multiplayer-back-options { display: block; min-height: 40px; margin: 0 auto 6px; padding: 0 10px; border: 0; background: transparent; color: var(--notebook-ink); font: inherit; cursor: pointer; }
+.multiplayer-sheet .multiplayer-back-options[hidden] { display: none; }
+.multiplayer-sheet .multiplayer-join-debug { color: var(--notebook-ink-faded); font-size: .75rem; }
+.multiplayer-sheet .multiplayer-status--error { margin: 10px 0; padding: 10px 12px; border: 0; border-left: 4px solid var(--signal-red); border-radius: 0; background: rgb(198 61 54 / 10%); color: var(--signal-red) !important; font-size: 1rem; font-weight: 400; text-align: left; }
