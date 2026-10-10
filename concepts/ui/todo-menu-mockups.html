@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>To-do button mockups</title>
+<style>
+  * { box-sizing: border-box; }
+  :root { --paper:#fbf6e6; --rule:#a9c3e6; --margin:#e08b80; --ink:#2b2a33; --marker:rgba(241,211,139,.85); --sticky:#f3e28c; --hand:"Noteworthy","Bradley Hand","Segoe Print","Comic Sans MS",cursive; }
+  body { margin:0; background:#1b2b22; color:#f3f2e9; font:15px/1.45 system-ui,sans-serif; }
+  header { max-width:1100px; margin:0 auto; padding:22px 24px 4px; }
+  h1 { margin:0 0 4px; font-size:22px; } header p { margin:0; opacity:.75; }
+  main { display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:20px; max-width:1100px; margin:0 auto; padding:18px 24px 40px; }
+  h2 { margin:10px 0 2px; font-size:17px; } .card > p { margin:0; opacity:.8; font-size:14px; }
+  .scene { position:relative; height:170px; border-radius:10px; overflow:hidden; background:linear-gradient(#8fb8d6 0 35%,#b9ae8f 35% 60%,#7a8a7c 60%); border:1px solid #fff2; }
+  .scene::after { content:""; position:absolute; right:14px; top:12px; width:74px; height:30px; border-radius:99px; background:#0f1a12c4; border:1px solid #fff3; }
+  .dev { position:absolute; top:10px; left:36%; padding:4px 9px; border:1px solid #f1d38b80; border-radius:99px; background:#202523dc; color:#f1d38b; font:700 10px system-ui; letter-spacing:.08em; }
+  .btn { position:absolute; left:24px; top:0; font-family:var(--hand); color:var(--ink); display:inline-flex; align-items:center; gap:10px; cursor:pointer; box-shadow:0 8px 18px #050d0840; }
+  kbd { font:700 .62rem system-ui; padding:1px 5px; border:1px solid #2b2a3355; border-radius:4px; opacity:.7; }
+  .cnt { display:grid; place-items:center; min-width:24px; height:24px; font:700 .9rem var(--hand); }
+  /* A: paper tab hanging from the top edge */
+  .A { padding:7px 14px 9px; font-size:1.15rem; background:var(--paper); border-radius:0 0 4px 4px; transform:rotate(-1deg); transform-origin:top left;
+       background-image:linear-gradient(90deg,transparent 0 100%); border-bottom:3px solid var(--rule); }
+  .A .cnt { background:var(--marker); border-radius:50% 45% 55% 50%; }
+  /* B: sticky note */
+  .B { top:12px; padding:9px 16px 11px; font-size:1.15rem; background:var(--sticky); transform:rotate(-2.5deg); border-radius:1px 1px 8px 1px; }
+  .B::before { content:""; position:absolute; left:50%; top:-7px; width:46px; height:14px; margin-left:-23px; background:#fff7; border:1px solid #0001; transform:rotate(2deg); }
+  .B .cnt { background:#fff6; border-radius:50%; }
+  /* C: notebook margin tab / index tab */
+  .C { top:0; padding:8px 16px 8px 14px; font-size:1.1rem; background:var(--paper); border-left:3px solid var(--margin); border-radius:0 0 8px 0;
+       background-image:repeating-linear-gradient(transparent 0 20px,var(--rule) 20px 21px); background-position:0 9px; }
+  .C .cnt { border:2px solid var(--ink); border-radius:50%; background:var(--paper); }
+  /* D: checkbox line, pencil style */
+  .D { top:14px; padding:6px 14px 8px; font-size:1.15rem; background:var(--paper); border-radius:3px; transform:rotate(.8deg); }
+  .D::before { content:""; width:17px; height:17px; border:2px solid var(--ink); border-radius:2px; }
+  .D .cnt { min-width:auto; padding:0 4px; background:var(--marker); border-radius:3px; }
+</style>
+<header>
+  <h1>To-do button — top-left corner</h1>
+  <p>Just the button, four paper-style looks. The dev-start tag sits top centre so nothing covers it. Clicking opens the list below it.</p>
+</header>
+<main>
+  <section class="card"><div class="scene"><span class="dev">DEV START · SQUARE</span>
+    <div class="btn A">To do <span class="cnt">4</span><kbd>T</kbd></div></div>
+    <h2>A · Paper tab</h2><p>Cream paper hanging from the top edge with a blue rule underneath. Closest to the list sheet.</p></section>
+  <section class="card"><div class="scene"><span class="dev">DEV START · SQUARE</span>
+    <div class="btn B">To do <span class="cnt">4</span><kbd>T</kbd></div></div>
+    <h2>B · Sticky note</h2><p>Taped yellow note, same yellow as the settings page notes. Most playful.</p></section>
+  <section class="card"><div class="scene"><span class="dev">DEV START · SQUARE</span>
+    <div class="btn C">To do <span class="cnt">4</span><kbd>T</kbd></div></div>
+    <h2>C · Notebook margin tab</h2><p>Ruled paper with the red margin line, count circled in pen.</p></section>
+  <section class="card"><div class="scene"><span class="dev">DEV START · SQUARE</span>
+    <div class="btn D">To do <span class="cnt">4</span><kbd>T</kbd></div></div>
+    <h2>D · Checkbox line</h2><p>Small paper strip with an empty tick box. Smallest, least in the way.</p></section>
+</main>

@@ -210,7 +210,8 @@ button {
 .dev-mode-banner {
   position: fixed;
   top: max(16px, env(safe-area-inset-top));
-  left: max(18px, env(safe-area-inset-left));
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 20;
   padding: 6px 10px;
   border: 1px solid rgba(241, 211, 139, 0.5);
@@ -263,13 +264,13 @@ button {
   display: none;
 }
 
-.todo-toggle { position: absolute; top: 0; left: 50%; z-index: 4; display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-width: 138px; min-height: 42px; padding: 9px 16px 10px; border: 1px solid rgb(246 241 223 / 24%); border-top: 0; border-radius: 0 0 14px 14px; background: rgb(15 26 18 / 88%); color: var(--ink); font: 800 .78rem/1 system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; transform: translateX(-50%); cursor: pointer; pointer-events: auto; backdrop-filter: blur(10px); }
-.todo-toggle:hover, .todo-toggle:focus-visible { border-color: var(--sun); background: rgb(35 75 53 / 92%); }
-.todo-count { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 50%; background: var(--sun); color: rgb(15 26 18); font-size: .66rem; letter-spacing: 0; }
-.todo-key { display: inline-grid; min-width: 20px; height: 18px; padding: 0 5px; place-items: center; border: 1px solid rgb(246 241 223 / 38%); border-radius: 4px; color: var(--ink-muted); font: 700 .62rem/1 system-ui, sans-serif; letter-spacing: .04em; text-transform: none; }
+.todo-toggle { position: absolute; top: 0; left: max(24px, env(safe-area-inset-left)); z-index: 4; display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; padding: 8px 16px 8px 14px; border: 0; border-left: 3px solid var(--notebook-margin); border-radius: 0 0 8px 0; background-color: var(--notebook-paper); background-image: repeating-linear-gradient(transparent 0 20px, var(--notebook-rule) 20px 21px); background-position: 0 9px; box-shadow: 0 8px 18px rgb(5 13 8 / 28%); color: var(--notebook-ink); font: 400 1.1rem/1 var(--hand-font); cursor: pointer; pointer-events: auto; }
+.todo-toggle:hover, .todo-toggle:focus-visible { background-color: #fff9e0; outline: none; }
+.todo-count { display: grid; min-width: 24px; height: 24px; place-items: center; border: 2px solid var(--notebook-ink); border-radius: 50%; background: var(--notebook-paper); color: var(--notebook-ink); font: 700 .9rem/1 var(--hand-font); }
+.todo-key { display: inline-grid; min-width: 20px; height: 18px; padding: 0 5px; place-items: center; border: 1px solid rgb(43 42 51 / 35%); border-radius: 4px; color: var(--notebook-ink-faded); font: 700 .62rem/1 system-ui, sans-serif; letter-spacing: .04em; }
 .todo-key[hidden] { display: none; }
 /* Lined notebook page: 28px ruled rows with a red margin line, written in by hand. */
-.todo-list { position: absolute; top: max(38px, calc(env(safe-area-inset-top) + 16px)); left: 50%; z-index: 5; width: min(340px, calc(100vw - 48px)); padding: 14px 18px 18px 46px; border-radius: 2px 2px 3px 3px; background-color: var(--notebook-paper); background-image: linear-gradient(90deg, transparent 32px, var(--notebook-margin) 32px 33px, transparent 33px), repeating-linear-gradient(transparent 0 27px, var(--notebook-rule) 27px 28px); background-position: 0 0, 0 14px; box-shadow: 0 14px 38px rgb(5 13 8 / 28%); color: var(--notebook-ink); font: 400 1rem/28px var(--hand-font); transform: translateX(-50%) rotate(-.6deg); }
+.todo-list { position: absolute; top: 44px; left: max(24px, env(safe-area-inset-left)); z-index: 5; width: min(340px, calc(100vw - 150px)); padding: 14px 18px 18px 46px; border-radius: 2px 2px 3px 3px; background-color: var(--notebook-paper); background-image: linear-gradient(90deg, transparent 32px, var(--notebook-margin) 32px 33px, transparent 33px), repeating-linear-gradient(transparent 0 27px, var(--notebook-rule) 27px 28px); background-position: 0 0, 0 14px; box-shadow: 0 14px 38px rgb(5 13 8 / 28%); color: var(--notebook-ink); font: 400 1rem/28px var(--hand-font); transform: rotate(-.6deg); transform-origin: top left; }
 .todo-list--reveal { animation: todo-list-drop 420ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 .todo-list > p { margin: 0; color: var(--notebook-ink); font: inherit; }
 .todo-list > p::after { content: ":"; }
@@ -997,8 +998,8 @@ kbd,
 }
 
 @keyframes todo-list-drop {
-  from { opacity: 0; transform: translate(-50%, -16px) rotate(-.6deg); }
-  to { opacity: 1; transform: translate(-50%, 0) rotate(-.6deg); }
+  from { opacity: 0; transform: translateY(-16px) rotate(-.6deg); }
+  to { opacity: 1; transform: translateY(0) rotate(-.6deg); }
 }
 
 @keyframes task-strip-pop {
