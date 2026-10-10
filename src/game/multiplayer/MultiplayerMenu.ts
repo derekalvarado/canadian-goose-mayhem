@@ -50,8 +50,8 @@ const MAX_MISSED_HEARTBEATS = 2;
 const TOAST_MS = 4_500;
 // Problems come with advice to read, so they stay up longer.
 const PROBLEM_TOAST_MS = 9_000;
-const SAME_WIFI_HINT = "Both devices need to be on the same Wi‑Fi network. Guest networks and VPNs can block it.";
-const NOT_CONFIGURED = "Online pairing is not configured in this build. Local two-controller play is still available.";
+const SAME_WIFI_HINT = "Same Wi‑Fi?";
+const NOT_CONFIGURED = "Online play isn't set up here. Two controllers still work.";
 
 /** Where this device is in a shared game, which decides the paired panel's text and buttons. */
 type SessionView = "idle" | "hosting" | "joining" | "connected-host" | "connected-guest" | "guest-ended";
@@ -93,7 +93,6 @@ export class MultiplayerMenu {
   private readonly chooseJoinButton = required<HTMLButtonElement>("#multiplayer-choose-join");
   private readonly chooseLocalButton = required<HTMLButtonElement>("#multiplayer-choose-local");
   private readonly backOptionsButton = required<HTMLButtonElement>("#multiplayer-back-options");
-  private readonly flowHelp = required<HTMLElement>("#multiplayer-flow-help");
   private readonly gameHelp = required<HTMLElement>("#multiplayer-game-help");
   private readonly hostButton = required<HTMLButtonElement>("#multiplayer-host");
   private readonly joinButton = required<HTMLButtonElement>("#multiplayer-family-join");
@@ -274,8 +273,7 @@ export class MultiplayerMenu {
     this.flowView = flow;
     if (flow === "local") this.setStatus("");
     else if (!this.familyClient) this.setStatus(NOT_CONFIGURED);
-    else if (this.showReplacementSetup) this.setStatus("Use a new code only when both players are ready. The new pairing replaces the old one.");
-    else this.setStatus("Pair these two devices once. After that, either player can host.");
+    else this.setStatus("");
     this.updateFamilyUi();
     this.backOptionsButton.focus({ preventScroll: true });
   }
@@ -314,24 +312,17 @@ export class MultiplayerMenu {
     // Once paired, one panel starts, follows, and ends a shared game; codes are only for pairing.
     const pairedChoice = view === "choose" && Boolean(pairing || this.activeRole) && !this.showReplacementSetup;
     const peerName = this.peerName();
-    this.title.textContent = view === "host" ? "Host another player"
-      : view === "join" ? "Join another player"
+    this.title.textContent = view === "host" ? "Host"
+      : view === "join" ? "Join"
         : view === "local" ? "Two controllers"
           : session === "connected-host" ? `Playing with ${peerName}`
-            : session === "connected-guest" ? `Playing in ${peerName}'s game` : "How will you play?";
+            : session === "connected-guest" ? `In ${peerName}'s game` : "Play together";
     this.choicePanel.hidden = view !== "choose";
-    this.choiceIntro.hidden = pairedChoice;
-    this.choiceIntro.textContent = this.showReplacementSetup
-      ? "Pick which device shows the code. The new pairing replaces the old one on both devices."
-      : "Choose how the second player joins.";
+    this.choiceIntro.hidden = pairedChoice || !this.showReplacementSetup;
+    this.choiceIntro.textContent = "Replaces your old pairing";
     this.pairingChoices.hidden = pairedChoice;
     this.localChoice.hidden = session !== "idle";
     this.backOptionsButton.hidden = view === "choose";
-    this.flowHelp.hidden = !(setupView || view === "local");
-    this.flowHelp.textContent = view === "host"
-      ? "Show a code here, then have the other player enter it on their device."
-      : view === "join" ? "Ask the other player to show a code, then enter it here."
-        : view === "local" ? "Connect two controllers to this device, then start a shared game." : "";
     this.joinDebug.hidden = !import.meta.env.DEV || view === "local";
     this.gameHelp.hidden = !(setupView || pairedChoice);
     this.localPanel.hidden = view !== "local";
@@ -342,21 +333,21 @@ export class MultiplayerMenu {
     this.replacementNote.hidden = !pairing;
     this.settingsPairing.hidden = !pairing;
 
-    this.pairedLabel.textContent = pairing ? `Paired with ${peerName}` : `Playing with ${peerName}`;
+    this.pairedLabel.textContent = pairing ? `paired with ${peerName}` : `playing with ${peerName}`;
     this.familyActions.hidden = !(session === "idle" || session === "guest-ended");
     this.hostButton.hidden = session !== "idle";
-    this.joinButton.textContent = session === "guest-ended" ? `Join ${peerName} again` : `Join ${peerName}`;
+    this.joinButton.textContent = session === "guest-ended" ? `join ${peerName} again` : `join ${peerName}`;
     this.sessionActions.hidden = session === "idle";
     this.sessionEndButton.hidden = session === "guest-ended";
-    this.sessionEndButton.textContent = session === "joining" ? "Cancel"
-      : session === "connected-guest" ? "Leave game"
-        : session === "hosting" && !this.activeRole ? "Stop hosting" : "End shared game";
+    this.sessionEndButton.textContent = session === "joining" ? "cancel"
+      : session === "connected-guest" ? "leave game"
+        : session === "hosting" && !this.activeRole ? "stop hosting" : "end game";
     this.playSoloButton.hidden = session !== "guest-ended";
     this.pairDifferentButton.hidden = session !== "idle" || !pairing;
     this.renderPresence();
 
     if (pairing) {
-      this.settingsPeer.textContent = `This device is paired with ${pairing.peerName}.`;
+      this.settingsPeer.textContent = `paired with ${pairing.peerName}`;
       if (document.activeElement !== this.setupName) this.setupName.value = pairing.selfName;
       if (document.activeElement !== this.settingsName) this.settingsName.value = pairing.selfName;
     } else {
@@ -400,7 +391,7 @@ export class MultiplayerMenu {
       this.createCodeButton.hidden = true;
       this.codePanel.hidden = false;
       this.approvalPanel.hidden = true;
-      this.setStatus("Enter this code on the other device, then approve the player here.");
+      this.setStatus("");
       this.startSetupPolling();
     } catch (error) {
       this.fail(error);
@@ -419,7 +410,7 @@ export class MultiplayerMenu {
       this.joinSession = await this.familyClient.requestPairing(code, device);
       this.codePanel.hidden = true;
       this.approvalPanel.hidden = true;
-      this.setStatus("Pairing request sent. Ask the other player to approve it.");
+      this.setStatus("Waiting for the host to say yes…");
       this.startSetupPolling();
     } catch (error) {
       this.fail(error);
@@ -433,8 +424,8 @@ export class MultiplayerMenu {
     const render = (): void => {
       const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1_000));
       this.codeExpiry.textContent = seconds > 0
-        ? `Expires in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
-        : "Expired";
+        ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+        : "expired";
     };
     render();
     this.codeCountdownTimer = window.setInterval(render, 1_000);
@@ -470,16 +461,16 @@ export class MultiplayerMenu {
         this.approvalQuestion.textContent = `Pair with ${result.candidate.name}?`;
         this.codePanel.hidden = true;
         this.approvalPanel.hidden = false;
-        this.setStatus(`${result.candidate.name} entered your code. Only approve if they are beside you.`);
+        this.setStatus("");
       } else if (result.state === "denied") {
         this.stopSetupPolling();
         this.joinSession = undefined;
-        this.setStatus("The other player did not approve this pairing request.", "error");
+        this.setStatus("The host said no.", "error");
       } else if (result.state === "expired") {
         this.stopPairingSetupUi();
         this.setStatus(creatorSession
-          ? "That code expired. Show a new one and try again."
-          : "That code expired. Ask the other player for a new one.", "error");
+          ? "Code expired. Show a new one."
+          : "Code expired. Ask for a new one.", "error");
       }
     } catch (error) {
       this.stopPairingSetupUi();
@@ -510,7 +501,7 @@ export class MultiplayerMenu {
       this.pendingCandidate = undefined;
       this.approvalPanel.hidden = true;
       this.codePanel.hidden = false;
-      this.setStatus("Request denied. The code still works until it expires or you cancel it.");
+      this.setStatus("Said no. The code still works.");
     } catch (error) {
       this.fail(error);
     } finally {
@@ -690,7 +681,7 @@ export class MultiplayerMenu {
   private hostingWaitText(): string {
     const pairing = this.pairing;
     return pairing
-      ? `Hosting. Ask ${pairing.peerName} to tap “Join ${pairing.selfName}” on their device.`
+      ? `Hosting. ${pairing.peerName} taps “join ${pairing.selfName}”.`
       : "Hosting.";
   }
 
@@ -698,7 +689,7 @@ export class MultiplayerMenu {
     const pairing = this.pairing;
     if (!this.familyClient || !pairing) return this.fail(new Error("Pair this device with the other player first."));
     if (this.familyMode === "host") {
-      this.setStatus(this.peerConnected ? `${pairing.peerName} is already playing in your game.` : this.hostingWaitText());
+      this.setStatus(this.peerConnected ? `${pairing.peerName} already joined.` : this.hostingWaitText());
       return;
     }
     // A guest's screen shows the host's world; it has to go back to its own game before it can host.
@@ -708,7 +699,7 @@ export class MultiplayerMenu {
     this.stopFamilyPresence(true);
     this.closePeer();
     this.hostButton.disabled = true;
-    this.setStatus("Starting a game for two…");
+    this.setStatus("Starting…");
     try {
       const pairStatus = await this.familyClient.claimHost(pairing);
       this.familyMode = "host";
@@ -720,7 +711,7 @@ export class MultiplayerMenu {
       await this.handleHostStatus(pairStatus);
     } catch (error) {
       if (error instanceof FamilyPairingServiceError && error.code === "already-hosting") {
-        this.setStatus(`${error.hostName ?? pairing.peerName} is already hosting. Joining their game…`);
+        this.setStatus(`${error.hostName ?? pairing.peerName} is hosting. Joining…`);
         await this.startFamilyJoin();
       } else {
         this.handleFamilyError(error);
@@ -769,7 +760,7 @@ export class MultiplayerMenu {
       this.stopFamilyPresence(false);
       if (!this.activeRole) this.startIdleStatusPolling();
       if (error instanceof FamilyPairingServiceError && error.code === "already-hosting") {
-        this.setStatus(`${error.hostName ?? pairing.peerName} started hosting, so this device stopped.`);
+        this.setStatus(`${error.hostName ?? pairing.peerName} is hosting now.`);
       } else {
         this.handleFamilyError(error);
       }
@@ -804,7 +795,7 @@ export class MultiplayerMenu {
       if (!status.activeHost) return this.reclaimHost();
       this.stopFamilyPresence(false);
       if (!this.activeRole) this.startIdleStatusPolling();
-      this.setStatus(`${pairing.peerName} is hosting now, so this device stopped.`);
+      this.setStatus(`${pairing.peerName} is hosting now.`);
       this.updateFamilyUi();
       return;
     }
@@ -826,7 +817,7 @@ export class MultiplayerMenu {
       const invitation = await this.createHostedRoom();
       await this.familyClient.publishRoom(this.pairing, requestId, invitation);
       this.attemptRequestId = requestId;
-      this.setStatus(`Connecting to ${peerName}'s device…`);
+      this.setStatus(`Connecting to ${peerName}…`);
       this.startPickupTimer();
     } catch (error) {
       this.closePeer();
@@ -898,7 +889,7 @@ export class MultiplayerMenu {
     } catch (error) {
       this.reportJoinCheck(`Join wait check failed: ${error instanceof Error ? error.message : "unknown error"}`, error);
       if (error instanceof FamilyPairingServiceError && error.code === "pairing-missing") this.handleFamilyError(error);
-      else if (this.familyMode === "join") this.setStatus("Can't reach the pairing service right now. Still trying…");
+      else if (this.familyMode === "join") this.setStatus("Can't connect. Still trying…");
     } finally {
       this.presencePollRunning = false;
     }
@@ -928,7 +919,7 @@ export class MultiplayerMenu {
     if (!pairing) return;
     this.setStatus(status.activeHost?.deviceId === pairing.peerDeviceId
       ? `${pairing.peerName} is hosting. Connecting…`
-      : `Asked ${pairing.peerName} to host. Waiting for them to accept…`);
+      : `Waiting for ${pairing.peerName} to host…`);
   }
 
   private readonly handleSessionEndButton = (): void => {
@@ -984,8 +975,8 @@ export class MultiplayerMenu {
     this.refreshBanner();
     this.stopFamilyPresence(true);
     if (role === "host") {
-      this.setStatus(`Shared game ended. ${peerName}'s goose went home.`);
-      this.showToast(`Shared game ended. ${peerName}'s goose went home.`);
+      this.setStatus(`${peerName}'s goose went home.`);
+      this.showToast(`${peerName}'s goose went home.`);
       this.startIdleStatusPolling();
       this.updateFamilyUi();
       if (!this.menu.hidden) this.close();
@@ -1074,7 +1065,7 @@ export class MultiplayerMenu {
       this.pairing = undefined;
       this.peerPresence = "";
       this.showReplacementSetup = false;
-      this.setStatus("This pairing was forgotten on the other device. Pair the devices again.", "error");
+      this.setStatus("The other device forgot you. Pair again.", "error");
       this.updateFamilyUi();
       return;
     }
@@ -1110,7 +1101,7 @@ export class MultiplayerMenu {
     this.role = "guest";
     this.sessionId = invitation.roomId;
     this.reconnectToken = invitation.reconnectToken;
-    this.setStatus(`Found ${this.peerName()}'s game. Connecting…`);
+    this.setStatus(`Joining ${this.peerName()}…`);
     this.startConnectTimer("guest");
     this.roomSignaling = this.createRoomSignaling("guest", invitation);
     await this.roomSignaling.connect();
@@ -1137,7 +1128,7 @@ export class MultiplayerMenu {
       if (role === "guest" && message.type === "offer") {
         this.peer?.close();
         this.peer = this.createPeer("guest");
-        this.setStatus(`Connecting to ${this.peerName()}'s device…`);
+        this.setStatus(`Connecting to ${this.peerName()}…`);
         const description = await this.peer.acceptOfferAndCreateAnswer(message.description);
         if (description.type !== "answer" || !description.sdp) throw new Error("WebRTC did not create a guest answer.");
         this.roomSignaling?.sendDescription({ type: "answer", sdp: description.sdp });
@@ -1185,12 +1176,12 @@ export class MultiplayerMenu {
       const peerName = this.peerName();
       if (role === "host") {
         if (this.attemptRequestId) this.markJoinRequestHandled(this.attemptRequestId);
-        this.setStatus(`${peerName} is playing in your game.`);
+        this.setStatus(`${peerName} joined!`);
         this.showToast(`${peerName} joined your game!`);
       } else {
         // The join request is answered; stop asking for a room.
         this.stopFamilyPresence(false);
-        this.setStatus(`You're playing in ${peerName}'s game.`);
+        this.setStatus(`You're in ${peerName}'s game.`);
         this.showToast(`You joined ${peerName}'s game!`);
       }
       this.stopIdleStatusPolling();
@@ -1275,7 +1266,7 @@ export class MultiplayerMenu {
           ? `${peerName} left the game. Their goose will wait here if they come back.`
           : `${peerName} disconnected. Their goose will wait here until they rejoin.`);
       } else {
-        this.notify(message ?? `Couldn't connect to ${peerName}'s device. ${SAME_WIFI_HINT}`, "error");
+        this.notify(message ?? `Can't reach ${peerName}. ${SAME_WIFI_HINT}`, "error");
       }
       // Still hosting, so the other player can simply tap Join again.
       return;
@@ -1283,10 +1274,10 @@ export class MultiplayerMenu {
     this.stopFamilyPresence(false);
     if (wasConnected) {
       this.options.onDisconnected?.("guest");
-      if (kind === "goodbye") this.setStatus(`${peerName} ended the shared game.`);
-      else this.setStatus(`Lost the connection to ${peerName}'s game.`, "error");
+      if (kind === "goodbye") this.setStatus(`${peerName} ended the game.`);
+      else this.setStatus(`Lost ${peerName}'s game.`, "error");
     } else {
-      this.setStatus(message ?? `Couldn't reach ${peerName}'s device. ${SAME_WIFI_HINT} Then try joining again.`, "error");
+      this.setStatus(message ?? `Can't reach ${peerName}. ${SAME_WIFI_HINT}`, "error");
     }
     if (!this.activeRole) this.startIdleStatusPolling();
     this.showReplacementSetup = false;
@@ -1353,6 +1344,6 @@ export class MultiplayerMenu {
   }
 
   private fail(error: unknown): void {
-    this.setStatus(error instanceof Error ? error.message : "Pairing could not be completed.", "error");
+    this.setStatus(error instanceof Error ? error.message : "Pairing failed.", "error");
   }
 }
