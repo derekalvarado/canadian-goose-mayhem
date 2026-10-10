@@ -277,8 +277,7 @@ button {
 .todo-list ul { margin: 0; padding: 0; list-style: none; }
 .todo-list li { display: grid; grid-template-columns: 14px 1fr; gap: 4px; }
 .todo-list li::before { content: "•"; }
-.todo-list li.is-complete { color: var(--notebook-ink-faded); text-decoration: line-through 2px var(--notebook-ink); }
-.todo-list li.is-newly-complete { margin: 0 -6px; padding: 0 6px; border-radius: 3px; background: var(--notebook-marker); animation: completed-task-highlight 1400ms ease-out both; }
+.todo-list li.is-complete { text-decoration: line-through 2px var(--notebook-ink); }
 /* A torn strip of the same paper slides up with the finished task and crosses it off. */
 .task-strip { position: absolute; left: 50%; bottom: max(22px, calc(env(safe-area-inset-bottom) + 14px)); z-index: 5; width: min(520px, calc(100vw - 48px)); padding: 12px 26px 12px 62px; background-color: var(--notebook-paper); background-image: linear-gradient(90deg, transparent 44px, var(--notebook-margin) 44px 46px, transparent 46px), linear-gradient(transparent 9px, var(--notebook-rule) 9px 10px, transparent 10px calc(100% - 10px), var(--notebook-rule) calc(100% - 10px) calc(100% - 9px), transparent calc(100% - 9px)); clip-path: polygon(0 4px, 6% 0, 13% 5px, 21% 1px, 30% 4px, 41% 0, 52% 5px, 63% 1px, 74% 4px, 85% 0, 93% 5px, 100% 2px, 100% calc(100% - 3px), 92% 100%, 81% calc(100% - 5px), 70% calc(100% - 1px), 58% calc(100% - 4px), 47% 100%, 36% calc(100% - 5px), 25% calc(100% - 1px), 14% calc(100% - 4px), 6% 100%, 0 calc(100% - 3px)); color: var(--notebook-ink); font: 400 1.2rem/1.6 var(--hand-font); transform: translate(-50%, 0); pointer-events: none; }
 .task-strip[hidden] { display: none; }
@@ -1010,11 +1009,6 @@ kbd,
 
 @keyframes task-strip-cross {
   to { transform: scaleX(1) rotate(-1deg); }
-}
-
-@keyframes completed-task-highlight {
-  from { background: rgb(241 211 139 / 100%); }
-  to { background: var(--notebook-marker); }
 }
 
 @media (max-width: 780px) {
