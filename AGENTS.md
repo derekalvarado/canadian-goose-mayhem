@@ -64,6 +64,30 @@ future acceptance gates.
   Do not write tests that pin constants or tuning values, or that check where an
   asset sits in the world or how big it is; check those by looking in the browser.
 
+## Game UI look
+
+Menus and on-screen messages follow Untitled Goose Game's paper-and-objects style
+([reference screens](https://www.gameuidatabase.com/gameData.php?id=258)). The
+to-do list, settings and Play together menus are the worked examples (markup in
+`index.html`, styles at the end of `src/style.css`).
+
+- **Few words.** Each screen gets a title and at most one short line; the rest is
+  choices. Status messages are a few words ("Sam joined!", "Can't reach Sam.
+  Same Wi‑Fi?"). Put extra help on a yellow sticky note beside the sheet, not in
+  the sheet.
+- **Menus are a typed notebook sheet** on flat blue (`.options-menu`,
+  `.options-sheet`): hole-punched left edge, torn corner, italic typewriter text,
+  title as `~~~ TITLE ~~~`. Settings are rows with a lowercase label on the left
+  and `< VALUE >` on the right (`.options-row`); actions are underlined
+  `[bracketed]` links (`.options-link`); the bottom button is `back`, and it goes
+  one page back, not straight to the game.
+- **Player lists and notes are handwritten** on lined school paper (`.todo-list`,
+  `.task-strip`); finished items are crossed out.
+- **Little on screen during play.** Show news briefly (a torn strip slides up and
+  away) instead of opening panels over the game.
+- Use the `--notebook-*`, `--options-blue`, `--sticky-yellow`, `--type-font` and
+  `--hand-font` tokens in `src/style.css`; don't add new hard-coded UI colors.
+
 ## Adding a world asset
 
 Follow this checklist for each new prop, landmark, or building (see
