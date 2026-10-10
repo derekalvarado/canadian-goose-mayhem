@@ -212,6 +212,8 @@ test("the goose walks into CooperSmith's patio through its gate but not through 
 
   assert.equal(walkable(-8, 0), true, "open paving beside the long side wall");
   assert.equal(walkable(-5.2, -4), false, "the long side wall blocks");
+  assert.equal(walkable(-6, 1), false, "the goose cannot walk through the side planter");
+  assert.equal(walkable(-7, -7), false, "the goose cannot walk through the black glass room");
   assert.equal(walkable(2.49, 4.15), false, "the diagonal facade blocks just in front of its face");
   assert.equal(walkable(3.03, 4.73), true, "the goose can walk along the diagonal facade");
   assert.equal(walkable(-3.15, 8.1), true, "the goose can stand at the square-end door");

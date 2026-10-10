@@ -11,10 +11,12 @@ import { toonMaterial } from "./toonMaterial.ts";
  * meet the party wall. The facade carries segmental-arched windows under a
  * corbelled cornice and a black steel truss pergola. The triangle the taper
  * leaves in front of it is a wrought-iron patio full of black market umbrellas.
- * The long left wall runs back plain and still carries a faded grocery ghost
- * sign; the right wall is a party wall against the neighbouring block and is
- * left blank. Local +z is the plaza end, and the whole footprint is centred on
- * the origin so the catalog bounds stay symmetric.
+ * The long left wall runs back plain and still carries faded grocery ghost
+ * signs; a long raised planter runs along its foot, and a single-storey black
+ * glass room is built against its rear half. The right wall is a party wall
+ * against the neighbouring block and is left blank. Local +z is the plaza end;
+ * the brick block is centred on the origin, and the catalog bounds stay
+ * symmetric around it.
  */
 const C = PALETTE.coopersmith;
 
@@ -240,27 +242,68 @@ function weather(ctx: CanvasRenderingContext2D, w: number, h: number, specks: nu
   ctx.globalCompositeOperation = "source-over";
 }
 
-/** Faded "Staple & Fancy Grocery" advertising above an older sage panel. */
+/** Where the ghost sign's painted plane sits on the side wall (u along the wall, y up). */
+const GHOST_U0 = -2.9;
+const GHOST_U1 = 8.7;
+const GHOST_Y0 = 1.6;
+const GHOST_Y1 = 8.35;
+
+/**
+ * The side wall's layered ghost signs, as photographed: dark shadowed grocery
+ * lettering in a whitewashed frame up by the parapet, a big two-panel sign
+ * below it whose lime lettering has mostly flaked away, and a whitewashed band
+ * near the ground with "private property" scrawled above it. Measured in wall
+ * meters so it lines up with the windows and the planter.
+ */
 function ghostSign(): THREE.Mesh {
-  const width = 11.4; const height = 6.2; const ppm = 110;
+  const width = GHOST_U1 - GHOST_U0; const height = GHOST_Y1 - GHOST_Y0; const ppm = 110;
   return paintedPlane(width, height, ppm, (ctx, w, h) => {
-    const u = (meters: number) => (meters / width) * w;
-    const v = (meters: number) => h - (meters / height) * h;
-    // Lower left: an earlier sage-green panel with a painted border.
-    ctx.fillStyle = css(C.ghostSage); ctx.fillRect(u(0.3), v(3.2), u(3.3), v(0.4) - v(3.2));
-    ctx.strokeStyle = css(C.ghostPaint); ctx.lineWidth = u(0.14);
-    ctx.strokeRect(u(0.15), v(4.1), u(3.6), v(0.25) - v(4.1));
-    // Upper right: the grocery lettering and its rule lines.
-    const cx = u(7.55); const face = (px: number) => `bold ${Math.round(px)}px Georgia, 'Times New Roman', serif`;
-    text(ctx, "GROCERY & DRUG CO.", cx, v(5.35), face(u(0.6)), C.ghostPaint, u(6.2));
-    text(ctx, "WHOLESALE AND RETAIL", cx, v(4.72), face(u(0.32)), C.ghostPaint, u(5));
-    text(ctx, "STAPLE & FANCY GROCERY", cx, v(4.05), face(u(0.64)), C.ghostPaint, u(6.4));
-    text(ctx, "& PROVISIONS", cx, v(3.3), face(u(0.64)), C.ghostPaint, u(5));
-    ctx.fillStyle = css(C.ghostPaint);
-    ctx.fillRect(u(4.55), v(2.78), u(6), u(0.07));
-    text(ctx, "THE CORNER STORE", cx, v(2.5), face(u(0.24)), C.ghostPaint, u(3));
-    ctx.strokeRect(u(4.1), v(5.8), u(6.9), v(2.2) - v(5.8));
-    weather(ctx, w, h, 5200, u(0.077));
+    const u = (wallU: number) => ((wallU - GHOST_U0) / width) * w;
+    const v = (wallY: number) => h - ((wallY - GHOST_Y0) / height) * h;
+    const m = (meters: number) => (meters / width) * w;
+    const rect = (u0: number, y0: number, u1: number, y1: number) => [u(u0), v(y1), u(u1) - u(u0), v(y0) - v(y1)] as const;
+    const serif = (meters: number) => `bold ${Math.round(m(meters))}px Georgia, 'Times New Roman', serif`;
+    /** Shadowed sign-writer lettering: a pale offset under the dark face. */
+    const lettering = (value: string, cu: number, y: number, size: number, maxWidth: number) => {
+      text(ctx, value, u(cu) + m(0.035), v(y) + m(0.035), serif(size), C.whitewash, m(maxWidth));
+      text(ctx, value, u(cu), v(y), serif(size), C.ghostInk, m(maxWidth));
+    };
+
+    // Ground band: whitewash with the scrawl above it.
+    ctx.fillStyle = css(C.whitewash); ctx.fillRect(...rect(-1.6, 1.7, 7.9, 2.1));
+    text(ctx, "private property", u(1.8), v(2.38), `italic ${Math.round(m(0.34))}px 'Comic Sans MS', 'Marker Felt', cursive`, C.whitewash, m(3.8));
+
+    // Lower sign: a washed left panel and a wide right panel, both framed in whitewash.
+    let seed = 3;
+    const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    ctx.fillStyle = css(C.ghostWash);
+    for (let y = 2.25; y < 4.7; y += 0.077) if (random() < 0.5) ctx.fillRect(u(-2.65), v(y + 0.077), m(3.1), m(0.077));
+    ctx.strokeStyle = css(C.whitewash); ctx.lineWidth = m(0.13);
+    ctx.strokeRect(...rect(-2.75, 2.2, 0.55, 4.75));
+    ctx.strokeRect(...rect(0.7, 2.2, 8.5, 5.25));
+    text(ctx, "VEGETABLES", u(2.95), v(3.3), serif(1.4), C.ghostLime, m(10.4));
+
+    // Upper sign: the grocery lettering in its frame, with rules between lines.
+    const cu = 4.7;
+    ctx.strokeRect(...rect(0.95, 5.4, 8.45, 8.15));
+    lettering("BAKERY & GROCERY", cu, 7.72, 0.56, 7);
+    ctx.fillStyle = css(C.whitewash);
+    for (const y of [7.36, 6.86]) ctx.fillRect(u(1.4), v(y), m(6.6), m(0.06));
+    lettering("PROPRIETOR", cu, 7.1, 0.28, 3.4);
+    lettering("STAPLE & FANCY GROCERY", cu, 6.42, 0.62, 7.2);
+    lettering("& PROVISIONS", cu, 5.86, 0.56, 4);
+    // Arrow rules either side of "& PROVISIONS".
+    ctx.fillStyle = css(C.ghostInk);
+    for (const [a, b] of [[1.2, 2.55], [6.85, 8.2]] as const) {
+      ctx.fillRect(u(a), v(5.86), m(b - a), m(0.07));
+      const tip = a < cu ? a : b; const back = a < cu ? m(0.18) : -m(0.18);
+      ctx.beginPath(); ctx.moveTo(u(tip), v(5.83));
+      ctx.lineTo(u(tip) + back, v(5.98)); ctx.lineTo(u(tip) + back, v(5.68)); ctx.closePath(); ctx.fill();
+    }
+    lettering("WHOLESALE AND RETAIL", cu, 5.55, 0.17, 3);
+    ctx.fillStyle = css(C.whitewash); ctx.fillRect(...rect(0.95, 5.25, 8.45, 5.33));
+    lettering("THE CORNER STORE", cu, 5.08, 0.2, 3);
+    weather(ctx, w, h, 6200, m(0.077));
   });
 }
 
@@ -332,16 +375,12 @@ function createBuilding(): THREE.Group {
   g.add(mount(END, 0, 2.56, neonPub(), 0.08));
   g.add(mount(FRONT, -0.3, 3.62, signLetters(), 0.03));
 
-  // The long side wall: ghost sign toward the front, one tall window, a few
-  // smaller ones toward the rear, a service door and two downspouts.
-  g.add(mount(SIDE, 3.3, 4.8, ghostSign(), 0.012));
-  g.add(mount(SIDE, -0.45, 5.0, opening({ w: 1, h: 1.8, rise: 0, kind: "window" })));
-  for (const u of [-5.4, -6.6, -7.8]) g.add(mount(SIDE, u, 5.3, opening({ w: 0.62, h: 1.35, rise: 0.18, kind: "window" })));
-  g.add(mount(SIDE, -7.1, 0, opening({ w: 1.05, h: 2.3, rise: 0, kind: "door" })));
-  for (const u of [8.55, -8.8]) {
-    g.add(mount(SIDE, u, (BODY_H - 0.3) / 2, box(0.12, BODY_H - 0.3, 0.12, C.coping, 0, 0, 0), 0.08));
-    g.add(mount(SIDE, u, BODY_H - 0.25, box(0.26, 0.22, 0.2, C.coping, 0, 0, 0), 0.1));
-  }
+  // The long side wall: layered ghost signs over most of it, two plain
+  // upper-floor windows toward the rear, and a thin conduit climbing out of the
+  // planter. The black glass room and the planter are built separately.
+  g.add(mount(SIDE, (GHOST_U0 + GHOST_U1) / 2, (GHOST_Y0 + GHOST_Y1) / 2, ghostSign(), 0.012));
+  for (const u of [-0.6, -4.6]) g.add(mount(SIDE, u, 4.95, opening({ w: 0.9, h: 1.75, rise: 0, kind: "window" })));
+  g.add(mount(SIDE, -0.15, 2.25, box(0.05, 3.1, 0.05, C.vent, 0, 0, 0), 0.05));
 
   // Rear: a service door and two small upper windows.
   g.add(mount(REAR, 2.2, 0, opening({ w: 1.1, h: 2.3, rise: 0, kind: "door" })));
@@ -360,6 +399,206 @@ function createBuilding(): THREE.Group {
     g.add(bar([x, PARAPET_H + 0.08, z], [x, PARAPET_H + 0.08 + h, z], 0.04, C.steel));
   }
   return g;
+}
+
+// ---------------------------------------------------------------- side wall additions
+
+/** Black glass room against the rear of the side wall: along-wall span and how far it stands out. */
+const ANNEX_U0 = -8.85;
+const ANNEX_U1 = -2.85;
+const ANNEX_DEPTH = 3.4;
+const ANNEX_EAVE = 3.2;
+const ANNEX_RIDGE = 4.4;
+/** Raised planter along the side wall, from beside the glass room nearly to the patio fence. */
+const PLANTER_U0 = -2.7;
+const PLANTER_U1 = 7.45;
+const PLANTER_DEPTH = 1.7;
+const PLANTER_SOIL = 0.7;
+
+/**
+ * Half-hipped lean-to roof: a ridge against the wall falling to eaves on the
+ * three open sides. Built in the room's frame (x along the wall, z out).
+ */
+function annexRoof(halfLength: number, depth: number, overhang: number, hipRun: number): THREE.Mesh {
+  const b = halfLength + overhang; const f = depth + overhang; const r = halfLength - hipRun;
+  const E = ANNEX_EAVE; const R = ANNEX_RIDGE;
+  const v = (x: number, y: number, z: number) => [x, y, z];
+  const positions = [
+    // Front slope, then the hips at each end.
+    ...v(-r, R, 0), ...v(-b, E, f), ...v(b, E, f),
+    ...v(-r, R, 0), ...v(b, E, f), ...v(r, R, 0),
+    ...v(-b, E, 0), ...v(-b, E, f), ...v(-r, R, 0),
+    ...v(b, E, 0), ...v(r, R, 0), ...v(b, E, f),
+  ];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  const m = new THREE.Mesh(geometry, toonMaterial(C.annexRoof));
+  m.castShadow = true; m.receiveShadow = true; return m;
+}
+
+/**
+ * The black glass room on the rear half of the side wall: dark glazing in
+ * heavy black mullions, a deep black fascia, a standing-seam metal roof and a
+ * kitchen exhaust fan. Only a corner of it shows in the reference photo, so
+ * the rest follows that corner. Its plaza-facing end has the doors.
+ */
+function createGlassRoom(): THREE.Group {
+  const g = new THREE.Group(); g.name = "CooperSmith's black glass room";
+  const length = ANNEX_U1 - ANNEX_U0; const half = length / 2; const D = ANNEX_DEPTH;
+  const overhang = 0.15; const hipRun = 1.6;
+  const fasciaBottom = ANNEX_EAVE - 0.42; const curb = 0.22;
+  const glassH = fasciaBottom - curb;
+
+  /** One glazed wall: dark glass between a curb, posts and a transom. */
+  const glazedWall = (width: number, cx: number, cz: number, angle: number, door: boolean) => {
+    const wall = new THREE.Group();
+    wall.add(box(width, curb, 0.14, C.annexFrame, 0, curb / 2, 0));
+    wall.add(box(width - 0.02, glassH, 0.04, C.annexGlass, 0, curb + glassH / 2, 0));
+    wall.add(box(width, 0.08, 0.1, C.annexFrame, 0, curb + glassH * 0.78, 0.02));
+    const bays = Math.max(2, Math.round(width / 1.1));
+    for (let i = 0; i <= bays; i++) {
+      wall.add(box(i === 0 || i === bays ? 0.14 : 0.08, glassH, 0.12, C.annexFrame, -width / 2 + i * width / bays, curb + glassH / 2, 0.02));
+    }
+    if (door) {
+      // Paired glass doors in a heavier frame, with long pull bars.
+      const doorW = 1.6; const doorH = 2.25;
+      wall.add(box(doorW + 0.12, 0.1, 0.13, C.annexFrame, 0, doorH, 0.03));
+      for (const side of [-1, 1]) {
+        wall.add(box(0.1, doorH, 0.13, C.annexFrame, side * (doorW / 2 + 0.01), doorH / 2, 0.03));
+        wall.add(box(0.03, 0.9, 0.04, C.vent, side * 0.14, 1.05, 0.1));
+      }
+      wall.add(box(0.05, doorH, 0.12, C.annexFrame, 0, doorH / 2, 0.03));
+    }
+    wall.position.set(cx, 0, cz); wall.rotation.y = angle;
+    g.add(wall);
+  };
+  glazedWall(length, 0, D, 0, false);
+  glazedWall(D, half, D / 2, Math.PI / 2, true);
+  glazedWall(D, -half, D / 2, -Math.PI / 2, false);
+
+  // Deep black fascia under the eaves on the three open sides.
+  const fasciaH = ANNEX_EAVE - fasciaBottom + 0.02;
+  g.add(box(length + 0.16, fasciaH, 0.16, C.annexFrame, 0, fasciaBottom + fasciaH / 2, D + 0.02));
+  for (const side of [-1, 1]) g.add(box(0.16, fasciaH, D + 0.1, C.annexFrame, side * (half + 0.02), fasciaBottom + fasciaH / 2, D / 2));
+  // A flashing strip where the roof meets the brick.
+  g.add(box(length - 2 * hipRun + 0.3, 0.12, 0.08, C.annexSeam, 0, ANNEX_RIDGE + 0.02, 0.04));
+
+  g.add(annexRoof(half, D, overhang, hipRun));
+  // Standing seams down the front slope, starting on the ridge or the hip.
+  const b = half + overhang; const f = D + overhang; const r = half - hipRun;
+  for (let x = -b + 0.35; x < b - 0.2; x += 0.45) {
+    const t = Math.abs(x) <= r ? 0 : (Math.abs(x) - r) / (b - r);
+    const top: THREE.Vector3Tuple = [x, ANNEX_RIDGE - t * (ANNEX_RIDGE - ANNEX_EAVE) + 0.025, t * f];
+    if (t < 0.9) g.add(bar(top, [x, ANNEX_EAVE + 0.025, f], 0.035, C.annexSeam));
+  }
+
+  // Kitchen exhaust fan on the roof near the wall, with its curb.
+  const fanX = -r + 0.5; const fanZ = 0.9;
+  const roofY = ANNEX_RIDGE - (ANNEX_RIDGE - ANNEX_EAVE) * fanZ / f;
+  g.add(box(0.75, 0.3, 0.75, C.vent, fanX, roofY + 0.05, fanZ));
+  const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.25, 14), toonMaterial(C.vent));
+  fan.position.set(fanX, roofY + 0.33, fanZ); fan.castShadow = true; g.add(fan);
+  const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.48, 0.2, 14), toonMaterial(C.vent));
+  hood.position.set(fanX, roofY + 0.55, fanZ); hood.castShadow = true; g.add(hood);
+  return mount(SIDE, (ANNEX_U0 + ANNEX_U1) / 2, 0, g);
+}
+
+/** A rounded planting clump: a squashed low-poly ball. */
+function clump(color: number, x: number, y: number, z: number, rx: number, ry: number, rz: number): THREE.Mesh {
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), toonMaterial(color));
+  m.scale.set(rx, ry, rz); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+/** Shrubs along the planter: [color, x, z, rx, ry, rz], sitting on the soil. */
+const PLANTER_SHRUBS: readonly (readonly [color: number, x: number, z: number, rx: number, ry: number, rz: number])[] = [
+  [C.juniper, -4.4, 1.0, 0.5, 0.32, 0.45],
+  [C.juniperGold, -3.1, 1.15, 0.55, 0.3, 0.4],
+  [C.juniper, -2.4, 0.6, 0.75, 0.55, 0.55],
+  [PALETTE.green.leaf, -1.9, 1.3, 0.45, 0.25, 0.3],
+  [C.juniper, -1.4, 1.0, 0.7, 0.45, 0.55],
+  [PALETTE.green.hedge, -0.6, 0.5, 0.6, 0.6, 0.45],
+  [C.juniper, 0.2, 1.15, 0.7, 0.4, 0.45],
+  [PALETTE.green.leaf, 1.0, 1.25, 0.5, 0.3, 0.35],
+  [C.juniper, 4.0, 0.9, 0.55, 0.35, 0.5],
+  [PALETTE.green.hedge, 4.6, 0.45, 0.4, 0.7, 0.35],
+];
+
+/** The purple-flowered groundcover heaped in the middle and spilling over the front: [x, y, z, rx, ry, rz]. */
+const SPILL_MOUNDS: readonly (readonly [x: number, y: number, z: number, rx: number, ry: number, rz: number])[] = [
+  [1.7, PLANTER_SOIL + 0.2, 1.15, 0.75, 0.5, 0.6],
+  [2.5, PLANTER_SOIL + 0.25, 1.25, 0.85, 0.6, 0.65],
+  [3.3, PLANTER_SOIL + 0.18, 1.05, 0.7, 0.5, 0.6],
+  [2.2, 0.62, 1.85, 0.6, 0.42, 0.32],
+  [2.95, 0.48, 1.9, 0.55, 0.48, 0.3],
+  [2.6, 0.25, 2.0, 0.42, 0.24, 0.26],
+];
+
+/**
+ * The long raised planter along the side wall: board-formed concrete on a
+ * low footing under a pink sandstone cap, packed with junipers and a purple
+ * flowering groundcover that spills onto the paving. A grey electrical box,
+ * a green utility box and the gas service manifold sit at the back against
+ * the brick. Built along the wall (x) and out from it (z).
+ */
+function createPlanter(): THREE.Group {
+  const g = new THREE.Group(); g.name = "CooperSmith's side planter";
+  const L = PLANTER_U1 - PLANTER_U0; const D = PLANTER_DEPTH; const half = L / 2;
+  const capY = 0.71; const capT = 0.12; const capW = 0.34;
+  g.add(box(L + 0.1, 0.05, D + 0.06, C.planterFooting, 0, 0.025, D / 2 + 0.03));
+  g.add(box(L, 0.6, D, C.planterConcrete, 0, 0.35, D / 2));
+  g.add(box(L - 0.5, 0.04, D - 0.32, C.soil, 0, PLANTER_SOIL - 0.02, (D - 0.32) / 2 + 0.02));
+  // Sandstone cap: separate slabs along the front, one per end.
+  const slabs = Math.round(L / 1.3);
+  for (let i = 0; i < slabs; i++) {
+    const x = -half + 0.04 + (i + 0.5) * (L + 0.08) / slabs;
+    g.add(box((L + 0.08) / slabs - 0.025, capT, capW, C.planterCap, x, capY, D - capW / 2 + 0.04));
+  }
+  for (const side of [-1, 1]) g.add(box(capW, capT, D - capW + 0.06, C.planterCap, side * (half - capW / 2 + 0.04), capY, (D - capW + 0.06) / 2));
+
+  for (const [color, x, z, rx, ry, rz] of PLANTER_SHRUBS) g.add(clump(color, x, PLANTER_SOIL + ry * 0.55, z, rx, ry, rz));
+  // A young feathery tree between the shrubs.
+  g.add(bar([-1.0, PLANTER_SOIL, 0.45], [-0.95, 2.0, 0.45], 0.05, PALETTE.earth.pathShade));
+  for (const [y, s] of [[1.35, 0.32], [1.75, 0.28], [2.1, 0.2]] as const) g.add(clump(PALETTE.green.leaf, -0.95, y, 0.45, s * 0.8, s * 1.3, s * 0.8));
+
+  for (const [x, y, z, rx, ry, rz] of SPILL_MOUNDS) g.add(clump(C.sage, x, y, z, rx, ry, rz));
+  // Purple blooms scattered over the groundcover's upper surface.
+  let seed = 21;
+  const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const blooms: THREE.Matrix4[] = []; const probe = new THREE.Object3D();
+  for (const [x, y, z, rx, ry, rz] of SPILL_MOUNDS) {
+    for (let i = 0; i < 12; i++) {
+      const around = random() * Math.PI * 2; const tilt = random() * 1.25;
+      probe.position.set(x + Math.cos(around) * Math.sin(tilt) * rx, y + Math.cos(tilt) * ry, z + Math.sin(around) * Math.sin(tilt) * rz);
+      probe.updateMatrix(); blooms.push(probe.matrix.clone());
+    }
+  }
+  const bloomMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.05, 0), toonMaterial(C.bloom), blooms.length);
+  blooms.forEach((matrix, i) => bloomMesh.setMatrixAt(i, matrix));
+  g.add(bloomMesh);
+
+  // Utility boxes on the soil against the wall: grey near the glass room, green past the meters.
+  g.add(box(0.55, 0.62, 0.4, C.utilityGrey, -3.85, PLANTER_SOIL + 0.31, 0.3));
+  g.add(box(0.5, 0.04, 0.44, C.utilityGrey, -3.85, PLANTER_SOIL + 0.64, 0.3));
+  g.add(box(0.5, 0.78, 0.4, C.utilityGreen, 3.1, PLANTER_SOIL + 0.39, 0.25));
+
+  // Gas service: a stepped header across the brick feeding three meters and a regulator.
+  const GM = PALETTE.gasMeter; const pz = 0.1; const pipe = 0.07;
+  g.add(bar([-0.5, PLANTER_SOIL, pz], [-0.5, 1.9, pz], pipe, GM.pipe));
+  g.add(bar([-0.5, 1.9, pz], [0.45, 1.9, pz], pipe, GM.pipe));
+  g.add(bar([0.45, 1.9, pz], [0.45, 2.1, pz], pipe, GM.pipe));
+  g.add(bar([0.45, 2.1, pz], [2.75, 2.1, pz], pipe, GM.pipe));
+  g.add(bar([2.75, 2.1, pz], [2.75, PLANTER_SOIL, pz], pipe, GM.pipe));
+  for (const x of [-0.1, 1.45, 2.3]) {
+    g.add(bar([x, x < 0.45 ? 1.9 : 2.1, pz], [x, 1.66, pz], 0.045, GM.pipe));
+    g.add(box(0.4, 0.42, 0.3, GM.meterShade, x, 1.45, 0.2));
+    g.add(box(0.2, 0.12, 0.02, GM.dial, x, 1.51, 0.36));
+  }
+  const regulator = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 18), toonMaterial(GM.meter));
+  regulator.rotation.x = Math.PI / 2; regulator.position.set(0.75, 1.72, 0.24); regulator.castShadow = true; g.add(regulator);
+  g.add(bar([0.75, 2.1, pz], [0.75, 1.72, pz], 0.06, GM.pipe));
+  return mount(SIDE, (PLANTER_U0 + PLANTER_U1) / 2, 0, g);
 }
 
 // ---------------------------------------------------------------- patio
@@ -500,6 +739,6 @@ function createSeating(): THREE.Group {
 export function createCoopersmith(): THREE.Group {
   const g = new THREE.Group();
   g.name = "CooperSmith's Pub & Brewing";
-  g.add(createBuilding(), createPergola(), createFence(), createSeating());
+  g.add(createBuilding(), createGlassRoom(), createPlanter(), createPergola(), createFence(), createSeating());
   return g;
 }
