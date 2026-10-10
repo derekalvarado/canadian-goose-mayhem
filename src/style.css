@@ -1177,10 +1177,10 @@ kbd,
 .options-title { margin: 0 0 18px; color: var(--notebook-ink); font: inherit; font-size: 1.25rem; letter-spacing: .06em; text-align: center; text-transform: uppercase; outline: none; }
 .options-title::before { content: "~~~ "; }
 .options-title::after { content: " ~~~"; }
-.options-row { display: grid; grid-template-columns: minmax(0, 1fr) 2.2em minmax(8ch, 12ch) 2.2em; column-gap: 10px; align-items: center; width: 100%; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
+.options-row { display: grid; grid-template-columns: minmax(0, 1fr) 2.2em minmax(10ch, .7fr) 2.2em; column-gap: 10px; align-items: center; width: 100%; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
 .options-row--link { cursor: pointer; }
 .options-row + .options-row--link:not(.options-row--link + .options-row--link) { margin-top: 12px; }
-.options-label { text-align: right; overflow-wrap: anywhere; }
+.options-label { padding-right: 1.5em; text-align: right; overflow-wrap: anywhere; }
 .options-value { padding: 2px 4px; border-radius: 3px; text-align: center; text-transform: uppercase; }
 .options-arrow { display: grid; place-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: center; cursor: pointer; }
 .options-row--link:hover .options-value, .options-row--link:focus-visible .options-value, .options-arrow:hover, .options-arrow:focus-visible { background: var(--notebook-marker); }
@@ -1214,7 +1214,8 @@ kbd,
 }
 @media (max-width: 520px) {
   .options-sheet { padding: 26px 16px 24px 54px; background-position: left 8px top 12px, left 34px top 0, 0 0; font-size: 1rem; }
-  .options-row { grid-template-columns: minmax(0, 1fr) 1.8em minmax(7ch, 9ch) 1.8em; column-gap: 6px; }
+  .options-row { grid-template-columns: minmax(0, 1fr) 1.8em minmax(7ch, .7fr) 1.8em; column-gap: 6px; }
+  .options-label { padding-right: .5em; }
 }
 @media (max-height: 560px) {
   .options-sticky { display: none; }
