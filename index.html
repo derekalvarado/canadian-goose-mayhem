@@ -46,6 +46,7 @@
             <div class="control-item"><kbd>E</kbd><span>Sneak (toggle)</span></div>
             <div class="control-item"><kbd>Ctrl</kbd><span>Threaten (hold)</span></div>
             <div class="control-item"><kbd>F</kbd><span>Use</span></div>
+            <div class="control-item"><kbd>T</kbd><span>To-do list</span></div>
           </div>
           <div class="control-set control-set--gamepad" id="gamepad-controls" hidden>
             <div class="control-item"><span class="stick-icon" id="gamepad-move-key" aria-hidden="true">L</span><span>Move</span></div>
@@ -55,14 +56,19 @@
             <div class="control-item"><span class="button-icon" id="gamepad-sneak-key" aria-hidden="true">Y</span><span>Sneak (toggle)</span></div>
             <div class="control-item"><span class="button-icon" id="gamepad-threat-key" aria-hidden="true">LB</span><span>Threaten (hold)</span></div>
             <div class="control-item"><span class="button-icon" id="gamepad-interact-key" aria-hidden="true">B</span><span>Use</span></div>
+            <div class="control-item"><span class="button-icon" id="gamepad-todo-key" aria-hidden="true">View</span><span>To-do list</span></div>
           </div>
         </section>
 
-        <button id="todo-toggle" class="todo-toggle" type="button" aria-expanded="false" aria-controls="todo-list" aria-keyshortcuts="T">To Do <span id="todo-count" class="todo-count">0</span></button>
+        <button id="todo-toggle" class="todo-toggle" type="button" aria-expanded="false" aria-controls="todo-list" aria-keyshortcuts="T">To Do <span id="todo-count" class="todo-count">0</span><kbd id="todo-key" class="todo-key" aria-hidden="true">T</kbd></button>
 
         <aside class="todo-list" id="todo-list" aria-label="To-do list" aria-live="polite" hidden>
           <p id="todo-title">To do</p>
           <ul id="objective-list"></ul>
+        </aside>
+
+        <aside id="task-strip" class="task-strip" role="status" aria-live="polite" hidden>
+          <span id="task-strip-text" class="task-strip__text"></span>
         </aside>
 
         <section class="chapter-complete all-done" id="all-done" hidden aria-live="polite">

@@ -189,3 +189,31 @@ test("a single right Joy-Con held sideways maps its digital stick and rotated fa
     }
   }
 });
+
+test("a controller's to-do button opens the list once per press", () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const xbox = { index: 0, connected: true, id: "Xbox Wireless Controller", mapping: "standard", axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+  const rightJoyCon = { index: 1, connected: true, id: "Joy-Con (R) Gamepad", mapping: "", axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { addEventListener() {} } });
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { getGamepads: () => [xbox, rightJoyCon] } });
+
+  try {
+    const input = new InputController(() => {});
+    assert.equal(input.consumeTodoPress(), false);
+    xbox.buttons[8]!.pressed = true;
+    assert.equal(input.consumeTodoPress(), true, "View opens the list");
+    assert.equal(input.consumeTodoPress(), false, "holding View does not flicker the list");
+    xbox.buttons[8]!.pressed = false;
+    input.consumeTodoPress();
+    rightJoyCon.buttons[9]!.pressed = true;
+    assert.equal(input.consumeTodoPress(), true, "a lone right Joy-Con uses +");
+  } finally {
+    for (const [name, descriptor] of [["window", originalWindow], ["navigator", originalNavigator]] as const) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else Reflect.deleteProperty(globalThis, name);
+    }
+  }
+});

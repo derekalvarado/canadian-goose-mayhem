@@ -153,6 +153,11 @@ export function sampleGamepad(pad: GamepadLike): GamepadActions {
   };
 }
 
+/** View (Xbox) / − (Switch) opens the to-do list; a lone right Joy-Con only has +. */
+export function todoButtonDown(pad: GamepadLike): boolean {
+  return isDown(pad, gamepadProfile(pad.id).id === "joycon-right-sideways" ? 9 : 8);
+}
+
 export function gamepadHasActivity(pad: GamepadLike): boolean {
   const state = sampleGamepad(pad);
   return Math.hypot(state.moveX, state.moveY) > 0.03
