@@ -39,6 +39,10 @@
   --notebook-ink-faded: rgb(43 42 51 / 58%);
   --notebook-marker: rgb(241 211 139 / 70%);
   --hand-font: "Noteworthy", "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  /* Settings sheet: typed notebook page on a flat blue desk, with sticky notes. */
+  --options-blue: #3c6cd6;
+  --sticky-yellow: #f3e28c;
+  --type-font: "Courier Prime", "Courier New", Courier, monospace;
 }
 
 * {
@@ -1171,4 +1175,55 @@ kbd,
   font: 700 13px/1.2 system-ui, sans-serif;
   white-space: nowrap;
   cursor: pointer;
+}
+
+/* Settings: a hole-punched, typewritten notebook sheet on flat blue. */
+#settings-menu.options-menu { background: var(--options-blue); }
+.options-layout { position: relative; width: min(620px, 100%); max-height: 100%; }
+.options-sheet { max-height: calc(100dvh - 48px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 34px 44px 30px 70px; background: radial-gradient(circle, var(--options-blue) 0 6.5px, transparent 7px) left 14px top 12px / 20px 35px repeat-y, linear-gradient(var(--options-blue) 55%, transparent 0) left 42px top 0 / 2px 9px repeat-y, var(--notebook-paper); background-attachment: local; clip-path: polygon(0 0, calc(100% - 15px) 0, calc(100% - 12px) 6%, calc(100% - 17px) 12%, calc(100% - 11px) 19%, calc(100% - 15px) 25%, calc(100% - 5px) 28%, 100% 30%, 100% 100%, 0 100%); color: var(--notebook-ink); font: italic 400 1.12rem/1.35 var(--type-font); }
+.options-title { margin: 0 0 18px; color: var(--notebook-ink); font: inherit; font-size: 1.25rem; letter-spacing: .06em; text-align: center; text-transform: uppercase; outline: none; }
+.options-title::before { content: "~~~ "; }
+.options-title::after { content: " ~~~"; }
+.options-row { display: grid; grid-template-columns: minmax(0, 1fr) 2.2em minmax(8ch, 12ch) 2.2em; column-gap: 10px; align-items: center; width: 100%; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
+.options-row--link { cursor: pointer; }
+.options-row + .options-row--link:not(.options-row--link + .options-row--link) { margin-top: 12px; }
+.options-label { text-align: right; overflow-wrap: anywhere; }
+.options-value { padding: 2px 4px; border-radius: 3px; text-align: center; text-transform: uppercase; }
+.options-arrow { display: grid; place-items: center; min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: center; cursor: pointer; }
+.options-row--link:hover .options-value, .options-row--link:focus-visible .options-value, .options-arrow:hover, .options-arrow:focus-visible { background: var(--notebook-marker); }
+.options-sheet :focus-visible { outline: 2px dashed var(--notebook-ink); outline-offset: 2px; }
+.options-sheet .options-arrow:focus-visible, .options-sheet .options-row--link:focus-visible { outline: none; }
+.options-row--input { cursor: text; }
+.options-input { grid-column: 3 / 5; min-width: 0; min-height: 40px; padding: 4px 2px; border: 0; border-bottom: 1.5px dashed var(--notebook-ink); border-radius: 0; background: transparent; color: var(--notebook-ink); font: inherit; text-align: center; -webkit-user-select: auto; user-select: auto; }
+.options-subtitle { margin: 22px 0 2px; font: inherit; text-align: center; }
+.options-note { margin: 4px 0; color: var(--notebook-ink-faded); font-size: .92rem; text-align: center; }
+.options-note:empty { display: none; }
+.options-link { display: block; min-height: 40px; margin: 12px auto 0; padding: 0 12px; border: 0; background: transparent; color: var(--notebook-ink); font: inherit; text-align: center; text-decoration: underline 2px; text-underline-offset: 5px; cursor: pointer; }
+.options-link--danger { color: var(--signal-red); }
+#start-over { margin-top: 24px; }
+.options-back { display: block; min-height: 44px; margin: 10px auto 0; padding: 0 16px; border: 0; background: transparent; color: var(--notebook-ink); font: inherit; cursor: pointer; }
+.options-back:hover { background: var(--notebook-marker); }
+.controller-diagnostics summary { list-style: none; }
+.controller-diagnostics summary::-webkit-details-marker { display: none; }
+.controller-diagnostics pre { margin: 10px 0 0; padding: 12px; border-radius: 3px; background: rgb(43 42 51 / 7%); color: var(--notebook-ink); font: normal .78rem/1.45 var(--type-font); white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
+.options-sticky { position: absolute; width: 168px; padding: 22px 16px; background: var(--sticky-yellow); box-shadow: 0 8px 18px rgb(10 20 60 / 22%); color: var(--notebook-ink); font: 400 1rem/1.35 var(--hand-font); text-align: center; }
+.options-sticky--left { top: 110px; left: -118px; transform: rotate(-2.5deg); }
+.options-sticky--right { right: -122px; bottom: 70px; transform: rotate(2deg); }
+#settings-menu:has(#settings-controls:not([hidden])) .options-sticky { display: none; }
+@media (min-width: 901px) and (min-height: 620px) {
+  .options-layout { width: min(700px, 100%); }
+  .options-sheet { padding: 44px 52px 36px 78px; font-size: 1.28rem; }
+}
+@media (max-width: 900px) {
+  .options-layout { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+  .options-sheet { flex: 1 1 100%; max-height: calc(100dvh - 140px); }
+  .options-sticky { position: static; flex: 1 1 140px; max-width: 230px; padding: 12px 14px; font-size: .9rem; }
+}
+@media (max-width: 520px) {
+  .options-sheet { padding: 26px 16px 24px 54px; background-position: left 8px top 12px, left 34px top 0, 0 0; font-size: 1rem; }
+  .options-row { grid-template-columns: minmax(0, 1fr) 1.8em minmax(7ch, 9ch) 1.8em; column-gap: 6px; }
+}
+@media (max-height: 560px) {
+  .options-sticky { display: none; }
+  .options-sheet { max-height: calc(100dvh - 32px); padding-top: 20px; padding-bottom: 16px; }
 }

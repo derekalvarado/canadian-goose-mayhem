@@ -5,7 +5,7 @@ import { WorldView } from "./WorldView";
 import { Goose } from "./Goose";
 import { InputController, type GamepadLayout, type InputDevice, type InputFrame } from "./InputController";
 import { TouchControls } from "./TouchControls";
-import { PauseReasons, parseTouchControlsPreference, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
+import { cycleTouchControlsPreference, PauseReasons, parseTouchControlsPreference, shouldShowTouchControls, TOUCH_CONTROLS_STORAGE_KEY, type TouchControlsPreference } from "./mobileControls";
 import { GameAudio } from "./GameAudio";
 import { Simulation, FIXED_STEP, HURRY_SPEED, WALK_SPEED, type GameplayEvent, type PlayerCommand, type WorldSnapshot } from "./simulation/Simulation";
 import { PALETTE } from "./palette";
@@ -150,7 +150,7 @@ export class Game {
   private readonly installButton = requireElement<HTMLButtonElement>("#install-button");
   private readonly installMenu = requireElement<HTMLElement>("#install-menu");
   private readonly fullscreenButton = requireElement<HTMLButtonElement>("#fullscreen-button");
-  private readonly touchPreferenceSelect = requireElement<HTMLSelectElement>("#touch-controls-preference");
+  private readonly touchPreferenceValue = requireElement<HTMLElement>("#touch-controls-value");
   private readonly controllerDiagnostics = requireElement<HTMLDetailsElement>("#controller-diagnostics");
   private readonly controllerDiagnosticsOutput = requireElement<HTMLPreElement>("#controller-diagnostics-output");
   private readonly controllerLobby = requireElement<HTMLElement>("#controller-lobby");
@@ -1008,8 +1008,8 @@ export class Game {
   private readonly startOver = (): void => {
     if (!this.startOverArmed) {
       this.startOverArmed = true;
-      this.startOverButton.textContent = "Press again to clear your list";
-      window.setTimeout(() => { this.startOverArmed = false; this.startOverButton.textContent = "Start over"; }, 4000);
+      this.startOverButton.textContent = "[press again to clear your list]";
+      window.setTimeout(() => { this.startOverArmed = false; this.startOverButton.textContent = "[start over]"; }, 4000);
       return;
     }
     clearProgress();
@@ -1107,7 +1107,7 @@ export class Game {
 
   private setupMobileControls(): void {
     this.touchPreference = this.loadTouchPreference();
-    this.touchPreferenceSelect.value = this.touchPreference;
+    this.touchPreferenceValue.textContent = this.touchPreference.toUpperCase();
     this.touchControls = new TouchControls(
       requireElement<HTMLElement>("#touch-movement-area"),
       requireElement<HTMLElement>("#touch-stick"),
@@ -1139,7 +1139,8 @@ export class Game {
     this.installButton.addEventListener("click", this.openInstallHelp);
     requireElement<HTMLButtonElement>("#install-close").addEventListener("click", this.closeInstallHelp);
     requireElement<HTMLButtonElement>("#settings-close").addEventListener("click", this.closeSettings);
-    this.touchPreferenceSelect.addEventListener("change", this.updateTouchPreference);
+    requireElement<HTMLButtonElement>("#touch-controls-prev").addEventListener("click", () => this.updateTouchPreference(-1));
+    requireElement<HTMLButtonElement>("#touch-controls-next").addEventListener("click", () => this.updateTouchPreference(1));
     this.fullscreenButton.addEventListener("click", this.toggleFullscreen);
     this.updateTouchControlsVisibility();
     this.syncFullscreenLabel();
@@ -1151,12 +1152,13 @@ export class Game {
     catch { return "auto"; }
   }
 
-  private readonly updateTouchPreference = (): void => {
-    this.touchPreference = parseTouchControlsPreference(this.touchPreferenceSelect.value);
+  private updateTouchPreference(step: 1 | -1): void {
+    this.touchPreference = cycleTouchControlsPreference(this.touchPreference, step);
+    this.touchPreferenceValue.textContent = this.touchPreference.toUpperCase();
     try { window.localStorage.setItem(TOUCH_CONTROLS_STORAGE_KEY, this.touchPreference); } catch { /* Storage is optional. */ }
     this.touchControls?.clear();
     this.updateTouchControlsVisibility();
-  };
+  }
 
   private updateTouchControlsVisibility(): void {
     const showTouchControls = shouldShowTouchControls(this.touchPreference, this.coarseTouchDevice)

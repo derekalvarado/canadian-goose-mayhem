@@ -110,49 +110,55 @@
         </div>
       </aside>
 
-      <section id="settings-menu" class="settings-menu" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
-        <div class="settings-card">
-          <div id="settings-home">
-            <p class="complete-kicker">Game settings</p>
-            <h2 id="settings-title" tabindex="-1">Settings</h2>
-            <button id="settings-controls-row" class="settings-row" type="button" aria-controls="settings-controls">
-              <span><strong>Controls</strong><small>Touch and controller preferences</small></span><span aria-hidden="true">›</span>
-            </button>
-            <button id="settings-play-together" class="settings-row" type="button" aria-haspopup="dialog" aria-controls="multiplayer-menu">
-              <span><strong>Play together</strong><small>Pair another device or use two controllers</small></span><span aria-hidden="true">›</span>
-            </button>
-          <section id="settings-family-pairing" class="settings-family-pairing" hidden>
-            <h3>Paired player</h3>
-            <p id="settings-family-peer" class="settings-help"></p>
-            <label for="settings-family-name">Your player name
-              <input id="settings-family-name" type="text" maxlength="24" autocomplete="nickname" />
-            </label>
-            <button id="settings-family-save-name" type="button">Save player name</button>
-            <p id="settings-family-status" class="settings-help" aria-live="polite"></p>
-            <button id="settings-family-forget" class="settings-danger" type="button">Forget paired player</button>
-          </section>
-          <p class="settings-help">Your crossed-off tasks are saved in this browser.</p>
-          <button id="start-over" class="settings-danger" type="button">Start over</button>
-          <button id="settings-close" type="button">Done</button>
+      <section id="settings-menu" class="settings-menu options-menu" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="options-layout">
+          <div class="options-sheet">
+            <div id="settings-home">
+              <h2 id="settings-title" class="options-title" tabindex="-1">Settings</h2>
+
+              <div class="options-row" role="group" aria-labelledby="touch-controls-label">
+                <span id="touch-controls-label" class="options-label">touch controls</span>
+                <button id="touch-controls-prev" class="options-arrow" type="button" aria-label="Previous touch controls choice">&lt;</button>
+                <span id="touch-controls-value" class="options-value" aria-live="polite">AUTO</span>
+                <button id="touch-controls-next" class="options-arrow" type="button" aria-label="Next touch controls choice">&gt;</button>
+              </div>
+
+              <button id="settings-controls-row" class="options-row options-row--link" type="button" aria-controls="settings-controls">
+                <span class="options-label">controller check</span><span></span><span class="options-value">TEST</span><span class="options-arrow" aria-hidden="true">&gt;</span>
+              </button>
+              <button id="settings-play-together" class="options-row options-row--link" type="button" aria-haspopup="dialog" aria-controls="multiplayer-menu">
+                <span class="options-label">play together</span><span></span><span class="options-value">SET UP</span><span class="options-arrow" aria-hidden="true">&gt;</span>
+              </button>
+
+              <section id="settings-family-pairing" class="options-pairing" hidden aria-labelledby="settings-pairing-title">
+                <h3 id="settings-pairing-title" class="options-subtitle">~ paired player ~</h3>
+                <p id="settings-family-peer" class="options-note"></p>
+                <label class="options-row options-row--input" for="settings-family-name">
+                  <span class="options-label">your name</span><span></span>
+                  <input id="settings-family-name" class="options-input" type="text" maxlength="24" autocomplete="nickname" />
+                </label>
+                <button id="settings-family-save-name" class="options-link" type="button">[save name]</button>
+                <p id="settings-family-status" class="options-note" aria-live="polite"></p>
+                <button id="settings-family-forget" class="options-link options-link--danger" type="button">[forget paired player]</button>
+              </section>
+
+              <button id="start-over" class="options-link options-link--danger" type="button">[start over]</button>
+              <button id="settings-close" class="options-back" type="button">back to game</button>
+            </div>
+
+            <div id="settings-controls" hidden>
+              <h2 id="settings-controls-title" class="options-title" tabindex="-1">Controller check</h2>
+              <details id="controller-diagnostics" class="controller-diagnostics">
+                <summary class="options-link">[show button readout]</summary>
+                <p class="options-note">Press each stick direction and button. This readout works without a developer console.</p>
+                <pre id="controller-diagnostics-output">No controller visible yet. Press a button on each Joy-Con.</pre>
+              </details>
+              <button id="settings-back" class="options-back" type="button">back</button>
+            </div>
           </div>
-          <div id="settings-controls" hidden>
-            <p class="complete-kicker">Game settings</p>
-            <button id="settings-back" class="settings-back" type="button">‹ Settings</button>
-            <h2 id="settings-controls-title" tabindex="-1">Controls</h2>
-            <label for="touch-controls-preference">Touch controls
-              <select id="touch-controls-preference">
-                <option value="auto">Auto</option>
-                <option value="show">Show</option>
-                <option value="hide">Hide</option>
-              </select>
-            </label>
-            <p class="settings-help">Auto shows controls on touch-first devices. Keyboard and controllers remain available.</p>
-            <details id="controller-diagnostics" class="controller-diagnostics">
-              <summary>Controller diagnostics</summary>
-              <p class="settings-help">Press each stick direction and button. This readout works without a developer console.</p>
-              <pre id="controller-diagnostics-output">No controller visible yet. Press a button on each Joy-Con.</pre>
-            </details>
-          </div>
+
+          <aside class="options-sticky options-sticky--left" aria-label="Touch controls note">auto shows touch buttons on phones &amp; tablets</aside>
+          <aside class="options-sticky options-sticky--right" aria-label="Saving note">your crossed-off tasks are saved in this browser</aside>
         </div>
       </section>
 
