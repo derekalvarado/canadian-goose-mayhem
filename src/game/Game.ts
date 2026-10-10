@@ -172,6 +172,8 @@ export class Game {
   private taskStripTimer = 0;
   private readonly startOverButton = requireElement<HTMLButtonElement>("#start-over");
   private highlightedObjectiveId: string | undefined;
+  /** Tasks finished from another level stay on this level's list once they have been shown. */
+  private readonly keptObjectiveIds = new Set<string>();
   private currentGamepadLayout: GamepadLayout = "standard";
   private startOverArmed = false;
   private readonly pauseReasons = new PauseReasons();
@@ -946,6 +948,7 @@ export class Game {
   private celebrateTask(objectiveId: string): void {
     // An open list highlights the line; otherwise the torn strip carries the news.
     if (!this.todoList.hidden) this.highlightedObjectiveId = objectiveId;
+    this.keptObjectiveIds.add(objectiveId);
     this.renderObjectives();
     // Shared progress is saved on the host only; a guest just sees the tick.
     if (this.onlineRole !== "guest") saveProgress(this.simulation.sessionState);
@@ -1031,15 +1034,13 @@ export class Game {
     return objectives.filter((objective) => twoGeese || !objective.needsTwoGeese);
   }
 
-  /** The normal list is local to this level; a just-finished remote task is briefly included for its completion reveal. */
+  /** The list is local to this level, plus any task finished elsewhere that has since been ticked off here. */
   private renderObjectives(): void {
-    const tasks = this.listedObjectives().filter((objective) => !objective.areaId || objective.areaId === this.worldArea.id);
-    const highlightedTask = this.highlightedObjectiveId
-      ? this.listedObjectives().find((objective) => objective.id === this.highlightedObjectiveId)
-      : undefined;
-    const visibleTasks = highlightedTask && !tasks.some((objective) => objective.id === highlightedTask.id)
-      ? [highlightedTask, ...tasks]
-      : tasks;
+    const all = this.listedObjectives();
+    const tasks = all.filter((objective) => !objective.areaId || objective.areaId === this.worldArea.id);
+    const kept = all.filter((objective) => objective.completed && this.keptObjectiveIds.has(objective.id)
+      && !tasks.some((task) => task.id === objective.id));
+    const visibleTasks = [...kept, ...tasks];
     this.todoToggle.hidden = visibleTasks.length === 0;
     if (visibleTasks.length === 0) this.closeTodoList();
     this.todoCount.textContent = String(tasks.filter((objective) => !objective.completed).length);
