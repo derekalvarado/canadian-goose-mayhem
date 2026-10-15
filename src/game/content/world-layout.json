@@ -284,55 +284,11 @@
           }
         },
         {
-          "id": "oldtown.northeast.shop-0",
-          "assetId": "street.building4",
-          "label": "Northeast storefront 1",
+          "id": "oldtown.northeast.miller-block",
+          "assetId": "oldtown.miller-block-row",
+          "label": "Miller Block",
           "transform": {
-            "x": -10,
-            "y": 0,
-            "z": 18,
-            "rotationY": 3.141592653589793
-          }
-        },
-        {
-          "id": "oldtown.northeast.shop-1",
-          "assetId": "street.building1",
-          "label": "Northeast storefront 2",
-          "transform": {
-            "x": -2.5,
-            "y": 0,
-            "z": 18,
-            "rotationY": 3.141592653589793
-          }
-        },
-        {
-          "id": "oldtown.northeast.shop-2",
-          "assetId": "street.building2",
-          "label": "Northeast storefront 3",
-          "transform": {
-            "x": 4.6,
-            "y": 0,
-            "z": 18,
-            "rotationY": 3.141592653589793
-          }
-        },
-        {
-          "id": "oldtown.northeast.shop-3",
-          "assetId": "street.building3",
-          "label": "Northeast storefront 4",
-          "transform": {
-            "x": 11.5,
-            "y": 0,
-            "z": 18,
-            "rotationY": 3.141592653589793
-          }
-        },
-        {
-          "id": "oldtown.northeast.shop-4",
-          "assetId": "street.building1",
-          "label": "Northeast storefront 5",
-          "transform": {
-            "x": 18.2,
+            "x": 4.1,
             "y": 0,
             "z": 18,
             "rotationY": 3.141592653589793

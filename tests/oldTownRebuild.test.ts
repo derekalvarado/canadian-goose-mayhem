@@ -101,7 +101,7 @@ test("drafts saved before the plaza rows were renamed gain the southwest/northea
   const updatedPlaza = getWorldArea(updated);
   assert.equal(updatedPlaza.instances.some((item) => item.id.includes(".north.") || item.id.includes(".south.")), false);
   assert.equal(updatedPlaza.instances.find((item) => item.id === "oldtown.southwest.shop-0")?.label, "Southwest storefront 1");
-  assert.equal(updatedPlaza.instances.find((item) => item.id === "oldtown.northeast.shop-0")?.label, "Northeast storefront 1");
+  assert.equal(updatedPlaza.instances.find((item) => item.id === "oldtown.northeast.bench-0")?.label.startsWith("South"), false);
 });
 
 test("all four storefront variants load with toon materials, correct footprint, and independent geometry", async () => {

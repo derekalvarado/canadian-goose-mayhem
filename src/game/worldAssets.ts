@@ -141,6 +141,7 @@ export const WORLD_ASSETS: readonly WorldAssetDefinition[] = [
   { assetId: "street.building4", label: "Brick arcade", category: "architecture", halfWidth: 3.85, halfDepth: 3.72, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.75, halfDepth: 3.16 }], occludesCamera: true, blocksSight: true },
   { assetId: "street.building5", label: "Sage townhouse", category: "architecture", halfWidth: 3.15, halfDepth: 3.7, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 3.05, halfDepth: 3.16 }], occludesCamera: true, blocksSight: true },
   { assetId: "oldtown.miller-block", label: "Miller Block — historic brick corner", category: "architecture", halfWidth: 8.2, halfDepth: 5.1, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 7.99, halfDepth: 4.07 }], occludesCamera: true, blocksSight: true },
+  { assetId: "oldtown.miller-block-row", label: "Miller Block — five-shop row", category: "architecture", halfWidth: 17.9, halfDepth: 4.3, colliders: [{ shape: "box", x: 0, z: -0.2, halfWidth: 17.55, halfDepth: 3.2 }], occludesCamera: true, blocksSight: true },
   { assetId: "oldtown.coopersmith-block", label: "CooperSmith’s — glazed canopy block", category: "architecture", halfWidth: 8.9, halfDepth: 5.8, colliders: [{ shape: "box", x: 0, z: 0, halfWidth: 8.69, halfDepth: 4.07 }], occludesCamera: true, blocksSight: true },
   { assetId: "oldtown.coopersmith-pub", label: "CooperSmith’s — tapered pub & umbrella patio", category: "architecture", halfWidth: 8.6, halfDepth: 10.8, colliders: [
     // Brick block: the full-width rear, then boxes stepping in under the

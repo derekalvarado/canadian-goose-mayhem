@@ -8,6 +8,7 @@ import { JanitorView } from "./JanitorView.ts";
 import { SplashKidView } from "./SplashKidView.ts";
 import { DeciduousTreeView, deciduousTreeVariantForId } from "./DeciduousTreeView.ts";
 import { Building1View } from "./Building1View.ts";
+import { createMillerBlockRow } from "./MillerBlockView.ts";
 import { TrashCanView } from "./TrashCanView.ts";
 import { BreweryTankView } from "./BreweryTankView.ts";
 import { createCoopersmith } from "./CoopersmithView.ts";
@@ -1183,6 +1184,9 @@ export function createWorldAssetView(assetId: string, groups: OcclusionFadeGroup
     case "oldtown.coopersmith-block": {
       const block = createTownBlock(assetId === "oldtown.miller-block" ? "miller" : "coopersmith");
       groups.register(instanceId, block); return block;
+    }
+    case "oldtown.miller-block-row": {
+      const row = createMillerBlockRow(); groups.register(instanceId, row); return row;
     }
     case "oldtown.coopersmith-pub": {
       const pub = createCoopersmith(); groups.register(instanceId, pub); return pub;
