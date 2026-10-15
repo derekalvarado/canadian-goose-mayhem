@@ -240,8 +240,8 @@ interface PlayerActorView {
 }
 
 export const FIXED_STEP = 1 / 60;
-export const WALK_SPEED = 3.45;
-export const HURRY_SPEED = 5.7;
+export const WALK_SPEED = 2.4;
+export const HURRY_SPEED = 4;
 export const GOOSE_POOP_IDLE_SECONDS = 10;
 export const MAX_GOOSE_POOPS = 10;
 const MAX_STEPS_PER_FRAME = 8;

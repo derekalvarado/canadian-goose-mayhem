@@ -4,10 +4,14 @@ export const GOOSE_ANIMATION = {
   turnBlendSeconds: 0.16,
   lookBlendSeconds: 0.18,
   poseBlendSeconds: 0.2,
+  // How long the held poses take to open fully (and to fold away). Untitled
+  // Goose Game snaps its wings open in about a sixth of a second.
+  heldPoseSeconds: { wings_spread: 0.22, aggressive: 0.3 },
   maxLookYaw: 0.85,
   maxLookPitch: 0.38,
-  // Trims the walk clip's 0.8-2.6 cycles/sec cadence range for a less hurried gait.
-  gaitCadenceScale: 0.875,
+  // Scales the 0.8-2.6 cycles/sec cadence range so walking speed lands on the
+  // ~2.15 strides/sec (about 4.3 steps/sec) measured in Untitled Goose Game footage.
+  gaitCadenceScale: 1.14,
   // Shifts where in the gait cycle the footstep sound fires, as a fraction of
   // one cycle. 0 fires at the walk clip's leg-swing extremes (phase 0/0.5);
   // positive delays the sound, negative fires it earlier. Effective range is

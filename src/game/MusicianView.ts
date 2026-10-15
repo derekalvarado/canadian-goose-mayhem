@@ -66,10 +66,9 @@ export function musicianClipFor(state: Pick<MusicianState, "activity" | "moving"
   if (holding) return state.activity === "playing" ? "play" : "rest";
   switch (state.activity) {
     case "sipping": return "sip";
-    case "reacting": return "startle";
     case "shooing": return "shoo";
     case "puzzled": case "missing": return "shrug";
-    case "eyeing": case "investigating": case "searching": case "looking-around": case "chasing": return "look";
+    case "reacting": case "eyeing": case "investigating": case "searching": case "looking-around": case "chasing": return "look";
     default: return "idle";
   }
 }
@@ -148,7 +147,7 @@ export class MusicianView extends RiggedCharacterView {
     // The strap goes with the guitar; a coffee only while sipping on her break.
     if (this.strap) this.strap.visible = state.heldEntityId !== undefined;
     this.cup.visible = clip === "sip";
-    const open = clip === "startle" || clip === "shoo";
+    const open = clip === "shoo";
     for (const mouth of this.mouths.open) mouth.visible = open;
     for (const mouth of this.mouths.closed) mouth.visible = !open;
   }

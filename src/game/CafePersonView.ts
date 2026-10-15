@@ -42,7 +42,7 @@ export function cafeClipFor(person: Pick<CafePersonState, "activity" | "seated" 
       case "working": return person.variant === "laptop" ? "sit-type" : "sit-read";
       case "sipping": return "sit-sip";
       case "looking-up": return "sit-look";
-      case "startled": return "sit-startle";
+      case "startled": return "sit-look";
       case "dabbing": return "sit-dab";
       case "waiting": return "sit-wait";
       case "shooing": return "sit-shoo";
@@ -60,7 +60,7 @@ export function cafeClipFor(person: Pick<CafePersonState, "activity" | "seated" 
     case "fixing-radio": return "fiddle";
     case "wiping": return "wipe";
     case "shooing": return "shoo";
-    case "startled": return "startle";
+    case "startled": return "look";
     case "puzzled": return "shrug";
     default: return "idle";
   }
@@ -115,7 +115,7 @@ export class CafePersonView extends RiggedCharacterView {
       this.handProp.visible = person.seated;
       if (person.seated && person.activity === "working") this.holdReading(); else this.putReadingDown();
     }
-    const open = person.activity === "startled" || person.activity === "shooing" || person.activity === "calling"
+    const open = person.activity === "shooing" || person.activity === "calling"
       || person.activity === "greeting" || person.activity === "chasing";
     if (!this.mouths && this.activeClip) {
       const mouths = { closed: [] as THREE.Object3D[], open: [] as THREE.Object3D[] };

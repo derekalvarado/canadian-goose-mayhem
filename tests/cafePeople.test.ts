@@ -70,7 +70,7 @@ test("seated clips lower the hips while the feet stay on the floor", async () =>
   }
 });
 
-test("café people pick clips from what they are doing, and open their mouths when startled", async () => {
+test("café people pick clips from what they are doing, and just look up at the goose when startled", async () => {
   const base: CafePersonState = { id: "p", role: "customer", variant: "laptop", position: { x: 0, y: 0, z: 0 }, heading: 0,
     activity: "working", activitySecondsRemaining: 0, seated: true, moving: false };
   assert.equal(cafeClipFor(base, false), "sit-type");
@@ -85,8 +85,8 @@ test("café people pick clips from what they are doing, and open their mouths wh
   const view = new CafePersonView("student", async () => source);
   await view.ready;
   view.setState({ ...base, variant: "student", activity: "startled" });
-  assert.equal(view.activeClip, "sit-startle");
-  assert.equal(view.getObjectByName("cafe-mouth-open")?.visible, true);
-  view.setState({ ...base, variant: "student", activity: "working" });
+  assert.equal(view.activeClip, "sit-look");
   assert.equal(view.getObjectByName("cafe-mouth-open")?.visible, false);
+  view.setState({ ...base, variant: "student", activity: "shooing" });
+  assert.equal(view.getObjectByName("cafe-mouth-open")?.visible, true);
 });

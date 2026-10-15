@@ -180,7 +180,8 @@ export class WorldView extends THREE.Group {
       const person = this.instances.get(held.personId); if (!person) continue;
       const socket = held.socket.getWorldPosition(HAND_POINT);
       this.worldToLocal(socket);
-      const heading = person.rotation.y;
+      const view = this.gameplayViews.get(held.personId);
+      const heading = view instanceof RiggedCharacterView ? view.drawnHeading : person.rotation.y;
       const right = HAND_RIGHT.set(Math.cos(heading), 0, -Math.sin(heading));
       const grip = HAND_GRIPS[held.assetId ?? ""] ?? DEFAULT_HAND_GRIP;
       // How far the hand has come up from the table toward the face.

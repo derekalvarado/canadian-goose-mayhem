@@ -12,7 +12,7 @@ import { TOWNSFOLK_RUNNERS, TOWNSFOLK_WALK_SPEEDS, type TownsfolkLook } from "./
  */
 
 /** Clips borrowed from the café people. */
-const STANDING = new Set(["idle", "look", "shoo", "greet", "startle", "shrug"]);
+const STANDING = new Set(["idle", "look", "shoo", "greet", "shrug"]);
 
 /**
  * The townsfolk walk: the café people's calm gait, carried tall on long legs —
@@ -34,7 +34,7 @@ export function townsfolkWalkStyle(look: TownsfolkLook, legs: LegDimensions, twe
   const k = legs.ankleY / 0.19; const speed = TOWNSFOLK_WALK_SPEEDS[look];
   return { ...TOWNSFOLK_WALK, ...tweak, legs, speed, duration: TOWNSFOLK_STRIDE * k / speed };
 }
-const SEATED = new Set(["sit", "sit-sip", "sit-look", "sit-startle", "sit-shoo", "sit-wait"]);
+const SEATED = new Set(["sit", "sit-sip", "sit-look", "sit-shoo", "sit-wait"]);
 
 /** A light, springy run with a short flight phase and pumping arms. */
 export const TOWNSFOLK_RUN: Omit<WalkStyle, "legs"> = {

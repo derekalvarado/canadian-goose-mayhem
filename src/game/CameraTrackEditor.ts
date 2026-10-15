@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { TransformControls } from "three/addons/controls/TransformControls.js";
 import { cameraDirectorPose, fallbackCameraTrack } from "./cameraDirector.ts";
-import { CAMERA_BASE_FOV, CAMERA_FOCUS_HEIGHT, CAMERA_TRACK_MAX_ZOOM, CAMERA_TRACK_MIN_ZOOM, clampCameraTrackPoint, SampledCameraTrack, type CameraTrack, type CameraTrackPoint } from "./cameraTrack.ts";
+import { CAMERA_BASE_FOV, CAMERA_FOCUS_HEIGHT, CAMERA_PLAY_ZOOM, CAMERA_TRACK_MAX_ZOOM, CAMERA_TRACK_MIN_ZOOM, clampCameraTrackPoint, SampledCameraTrack, type CameraTrack, type CameraTrackPoint } from "./cameraTrack.ts";
 import type { WorldArea } from "./worldLayout.ts";
 import { getWorldGroundHeight } from "./worldLevel.ts";
 
@@ -42,7 +42,7 @@ export class CameraTrackEditor {
   private readonly markers: THREE.Mesh[] = [];
   private readonly markerGeometry = new THREE.SphereGeometry(0.85, 18, 14);
   private readonly cornerGeometry = new THREE.CylinderGeometry(0.7, 0.7, 0.25, 20);
-  private readonly previewCamera = new THREE.PerspectiveCamera(CAMERA_BASE_FOV, 1, 0.5, 20);
+  private readonly previewCamera = new THREE.PerspectiveCamera(CAMERA_BASE_FOV / CAMERA_PLAY_ZOOM, 1, 0.5, 20);
   private readonly previewHelper = new THREE.CameraHelper(this.previewCamera);
   private readonly sightLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ depthTest: false, transparent: true }));
   private readonly standIn = new THREE.Vector3();
@@ -294,7 +294,7 @@ export class CameraTrackEditor {
     this.previewHelper.setColors(color, color, color, color, color);
     (this.sightLine.material as THREE.LineBasicMaterial).color.copy(color);
     this.previewCamera.position.set(pose.x, pose.y, pose.z);
-    this.previewCamera.fov = CAMERA_BASE_FOV / pose.zoom;
+    this.previewCamera.fov = CAMERA_BASE_FOV / (pose.zoom * CAMERA_PLAY_ZOOM);
     this.previewCamera.aspect = this.camera.aspect;
     this.previewCamera.far = this.previewCamera.position.distanceTo(focus) + 1;
     this.previewCamera.lookAt(focus);

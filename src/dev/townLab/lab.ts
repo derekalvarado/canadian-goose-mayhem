@@ -25,7 +25,7 @@ startAnimationLab({
         rig.add(dog);
       }
     }
-    const open = /startle|shoo|call|clap/.test(variant.clip.name);
+    const open = /shoo|call|clap/.test(variant.clip.name);
     rig.getObjectByName("town-mouth")!.visible = !open;
     rig.getObjectByName("town-mouth-open")!.visible = open;
   },

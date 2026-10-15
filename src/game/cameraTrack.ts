@@ -13,6 +13,8 @@ export interface CameraTrack { id: string; label: string; points: CameraTrackPoi
 export interface CameraTrackSample { x: number; y: number; z: number; zoom: number }
 
 export const CAMERA_BASE_FOV = 38;
+// Extra zoom on top of every camera (follow and tracks): play is framed 50% closer.
+export const CAMERA_PLAY_ZOOM = 1.5;
 // The camera aims this far above the goose's feet.
 export const CAMERA_FOCUS_HEIGHT = 0.55;
 // On a track, how far (horizontally) the camera may sit from the goose before leaning in.

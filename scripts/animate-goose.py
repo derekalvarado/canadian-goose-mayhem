@@ -155,21 +155,24 @@ def envelope(t, knots):
 # and the tail swings wide a beat behind with a flick at each footfall.
 # Tune variants in assets/characters/goose/anim-lab.html (src/dev/gooseLab).
 SWAY = dict(body_yaw=0.015, body_roll=0.045, body_sway=0.012, yaw_pivot=0, chest_counter_yaw=0,
-            tail_yaw=0.04, tail_lag=0.5, tail_roll=0, tail_flick=0)
-WADDLE = dict(SWAY, body_yaw=0.08, body_roll=0.07, body_sway=0.02, yaw_pivot=0.26, chest_counter_yaw=1,
-              tail_yaw=0.16, tail_lag=1.1, tail_roll=0.05, tail_flick=0.03)
+            chest_counter_roll=0.014, tail_yaw=0.04, tail_lag=0.5, tail_roll=0, tail_flick=0, toe_flick=0.3)
+# Matched to Untitled Goose Game footage: a deep side-to-side rock under an
+# upright neck, long steps, and a high back-kick that flashes the sole.
+WADDLE = dict(SWAY, body_yaw=0.08, body_roll=0.2, body_sway=0.05, yaw_pivot=0.26, chest_counter_yaw=1,
+              chest_counter_roll=0.12, tail_yaw=0.16, tail_lag=1.1, tail_roll=0.05, tail_flick=0.03,
+              toe_flick=1.2)
 
 
 def gait(t, duration, running=False, sneaking=False):
     phase = t / duration
     wave = math.tau * phase
     s = SWAY if running or sneaking else WADDLE
-    bob = (0.012 if sneaking else 0.022 if running else 0.013) * (1-math.cos(2*wave))
+    bob = (0.012 if sneaking else 0.022 if running else 0.02) * (1-math.cos(2*wave))
     lean = -0.12 if running else -0.065 if sneaking else -0.025
     yaw = s['body_yaw']*math.sin(wave)
     pose('body', (lean, yaw, s['body_roll']*math.cos(wave)),
          (s['body_sway']*math.cos(wave) + s['yaw_pivot']*math.sin(yaw), bob - (0.026 if sneaking else 0), 0))
-    pose('chest', (-lean*0.4, -yaw*s['chest_counter_yaw'], -0.014*math.cos(wave)))
+    pose('chest', (-lean*0.4, -yaw*s['chest_counter_yaw'], -s['chest_counter_roll']*math.cos(wave)))
     for i in range(1, 7):
         # The neck stabilizes the head; each joint follows a little later.
         pose('neck_' + str(i), ((0.008 if sneaking else 0.014)*math.sin(2*wave-i*0.32)
@@ -183,7 +186,7 @@ def gait(t, duration, running=False, sneaking=False):
     for side, sign, shift in [('left', -1, 0), ('right', 1, 0.5)]:
         p = (phase+shift) % 1
         stance = 0.56 if not running else 0.48
-        reach = 0.23 if running else 0.17 if sneaking else 0.2
+        reach = 0.23 if running else 0.17 if sneaking else 0.26
         if p <= stance:
             z = -reach + 2*reach*p/stance
             lift = 0
@@ -196,8 +199,8 @@ def gait(t, duration, running=False, sneaking=False):
                  + (swing**3-2*swing**2+swing)*tangent
                  + (-2*swing**3+3*swing**2)*-reach
                  + (swing**3-swing**2)*tangent)
-            lift = (0.1 if running else 0.055 if sneaking else 0.075)*math.sin(math.pi*swing)**2
-            pitch = -0.3*math.sin(math.tau*swing)*math.sin(math.pi*swing)
+            lift = (0.1 if running else 0.055 if sneaking else 0.12)*math.sin(math.pi*swing)**2
+            pitch = -s['toe_flick']*math.sin(math.tau*swing)*math.sin(math.pi*swing)
         foot_target(side, z, lift, pitch)
         pose(side+'_wing', (-0.035 + 0.018*math.sin(2*wave-0.6),
              sign*0.015*math.sin(wave-0.5), sign*(-0.025-0.014*math.sin(2*wave-0.7))))
@@ -217,7 +220,7 @@ def idle(t):
 
 def gesture(name, t):
     if name in {'wing_flap', 'wing_flutter'}:
-        duration = 1.6 if name == 'wing_flap' else .65
+        duration = .8 if name == 'wing_flap' else .4
         phase = t / duration
         # A quick downstroke, a delayed tip, then a soft recovery and pause.
         # Flutter adds a second small stroke during the usual recovery.
@@ -270,7 +273,7 @@ def gesture(name, t):
 
 clips = [('idle',4.8),('walk',.72),('hurry',.5),('sneak',.96),
          ('honk',.86),('grab',.62),('aggressive',.85),('wings_spread',.94),('spooked',.95),
-         ('wing_flap',1.6),('wing_flutter',.65)]
+         ('wing_flap',.8),('wing_flutter',.4)]
 for name, duration in clips:
     action = bpy.data.actions.new(name)
     action.use_fake_user = True

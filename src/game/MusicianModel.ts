@@ -291,6 +291,6 @@ function createMusicianClips(model: THREE.Group, frame: GuitarFrame, bind: Reado
       const [forward, out, elbow, twist] = mix(cupLow, cupUp, lift);
       return full({ ...hang(), ...arm("right", forward, out, elbow, sipWrist, twist), head: [0.12 * lift, 0, 0], chest: [0.012 * Math.sin(Math.PI * 2 * p), 0, 0] });
     }, bind),
-    ...standingClips(legs, MUSICIAN_TUNING.walkSpeed, bind).filter((clip) => ["idle", "look", "startle", "shrug", "shoo"].includes(clip.name)),
+    ...standingClips(legs, MUSICIAN_TUNING.walkSpeed, bind).filter((clip) => ["idle", "look", "shrug", "shoo"].includes(clip.name)),
   ];
 }

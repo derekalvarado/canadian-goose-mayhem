@@ -53,8 +53,6 @@ export const VARIANTS: Variant[] = [
   card("walk", "jogger", "run", "Jogging laps of the square.", TOWNSFOLK_WALK_SPEEDS.jogger),
   card("walk", "bucket-hat", "carry", "Walking to a table with a coffee.", TOWNSFOLK_WALK_SPEEDS["bucket-hat"]),
   card("walk", "raincoat", "order", "Ordering at the counter."),
-  card("react", "artist", "startle", "Honked at."),
-  card("react", "sunhat-mom", "sit-startle", "Honked at on the bench."),
   card("react", "beard-dad", "sit-shoo", "Waving off a goose that comes too close to the bench."),
   card("react", "cap-dad", "look", "Eyeing the goose after stepping back."),
   card("dog", "dog", "lie", "Lying on the bench, chin on paws."),

@@ -14,7 +14,7 @@ startAnimationLab({
   dress: (rig, variant) => {
     // Seated clips sit on the real café chair; surprised clips open the mouth, as CafePersonView does.
     if (variant.clip.name.startsWith("sit")) rig.add(createCoffeeChair());
-    const open = /startle|shoo|greet/.test(variant.clip.name);
+    const open = /shoo|greet/.test(variant.clip.name);
     rig.getObjectByName("cafe-mouth")!.visible = !open;
     rig.getObjectByName("cafe-mouth-open")!.visible = open;
   },

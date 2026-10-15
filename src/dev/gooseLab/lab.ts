@@ -178,7 +178,7 @@ function frame(): void {
   renderer.clear();
   const phase = (time * CYCLES_PER_SECOND) % 1;
   for (const card of cards) {
-    card.pose(phase);
+    card.pose(card.variant.loopSeconds ? (time / card.variant.loopSeconds) % 1 : phase);
     // The goose walks in place toward -Z; the floor scrolls at game walking speed so foot sliding is visible.
     const travelled = settings.treadmill ? time * WALK_SPEED : 0;
     card.floor.material.map!.offset.y = (travelled / TILE_METRES / 2) % 1;

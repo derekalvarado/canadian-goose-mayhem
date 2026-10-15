@@ -42,27 +42,30 @@ export interface GooseGait {
   stance: number;
   reach: number;
   lift: number;
+  /** How far the foot tips back as it leaves the ground (and forward as it lands), radians: shows the sole on each kick. */
+  toeFlick: number;
 }
 
 /** The walk the game ships today (WADDLE in scripts/animate-goose.py). */
 export const SHIPPED_WALK: GooseGait = {
   duration: 0.72,
-  bob: 0.013,
+  bob: 0.02,
   lean: -0.025,
   bodyYaw: 0.08,
-  bodyRoll: 0.07,
-  bodySway: 0.02,
+  bodyRoll: 0.2,
+  bodySway: 0.05,
   yawPivot: 0.26,
   chestCounterYaw: 1,
-  chestCounterRoll: 0.014,
+  chestCounterRoll: 0.12,
   tailYaw: 0.16,
   tailLag: 1.1,
   tailPitch: 0.035,
   tailFlick: 0.03,
   tailRoll: 0.05,
   stance: 0.56,
-  reach: 0.2,
-  lift: 0.075,
+  reach: 0.26,
+  lift: 0.12,
+  toeFlick: 1.2,
 };
 
 type Angles = readonly [number, number, number];
@@ -127,7 +130,7 @@ export class GooseGaitRig {
           + (-2 * swing ** 3 + 3 * swing ** 2) * -reach
           + (swing ** 3 - swing ** 2) * tangent;
         lift = style.lift * sin(Math.PI * swing) ** 2;
-        pitch = -0.3 * sin(Math.PI * 2 * swing) * sin(Math.PI * swing);
+        pitch = -style.toeFlick * sin(Math.PI * 2 * swing) * sin(Math.PI * swing);
       }
       this.footTarget(side, z, lift, pitch);
       this.pose(`${side}_wing`, [-0.035 + 0.018 * sin(2 * wave - 0.6),

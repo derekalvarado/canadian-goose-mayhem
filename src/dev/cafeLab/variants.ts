@@ -37,7 +37,6 @@ export const VARIANTS: Variant[] = [
   card("seated", "reader", "sit-read", "Reading the paper: absorbed, ignores the goose."),
   card("seated", "reader", "sit-look", "Looking up from the paper: now she notices a goose at her table."),
   card("seated", "student", "sit-sip", "Sipping: honk now and the drink spills."),
-  card("seated", "student", "sit-startle", "Startled in the chair by a honk or flapping wings."),
   card("seated", "student", "sit-dab", "Dabbing at a spill with a napkin."),
   card("seated", "laptop", "sit-wait", "Waiting for an order, drumming fingers and glancing around."),
   card("seated", "reader", "sit-shoo", "Waving the goose off without getting up."),
@@ -52,7 +51,6 @@ export const VARIANTS: Variant[] = [
   card("walk", "barista", "jog", "Chasing a goose with the tip jar.", BARISTA_JOG_SPEED),
   card("walk", "laptop", "walk", "Customer walk to the pickup counter.", CUSTOMER_WALK_SPEED),
   card("walk", "laptop", "carry", "Carrying an order back to the table.", CUSTOMER_WALK_SPEED),
-  card("react", "barista", "startle", "Fumbling a drink when honked at."),
   card("react", "laptop", "shrug", "Order's gone: a puzzled shrug at the pickup counter."),
   card("react", "reader", "look", "Standing look-around."),
 ];

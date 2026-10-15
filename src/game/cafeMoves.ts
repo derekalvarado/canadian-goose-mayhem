@@ -84,13 +84,6 @@ export function seatedClips(s: Seat, bind: ReadonlyMap<string, THREE.Vector3>, s
       ...arm("left", 0.25, -0.5, 0.35, [-0.1, 0, 0], 0.1), ...arm("right", 0.75, -0.55, 0.15, [-0.35 + 0.15 * pulse(p * 6), 0, 0]),
       neck: [0, 0.18 * wave(p), 0], head: [0.04, 0.35 * wave(p), 0],
     }), bind),
-    cycleClip("sit-startle", 1, (p) => {
-      const e = Math.min(1, p / 0.12) * (p > 0.85 ? (1 - p) / 0.15 : 1);
-      return pose({
-        chest: [0.28 * e, 0, 0], spine: [0.1 * e, 0, 0], head: [0.22 * e, 0, 0],
-        ...both(0.25 + 1.9 * e, -0.5 + 1.0 * e, 0.35 + 0.3 * e, [0, 0, 0], 0.1 - 0.1 * e),
-      });
-    }, bind),
     // Leaning in to dab a spill on the table.
     cycleClip("sit-dab", 0.9, (p) => pose({
       spine: [-0.26, 0, 0], chest: [-0.12, 0, 0], head: [-0.25, 0, 0],
@@ -164,11 +157,6 @@ export function standingClips(legs: LegDimensions, walkSpeed: number, bind: Read
       ...arm("left", 0.05, 0, 0.15), head: [0.1, 0.1 * wave(p), 0], chest: [0.05, 0, 0],
       ...arm("right", 2.5, 0.05 + 0.25 * wave(p * 2), 0.35 + 0.25 * wave(p * 2, 0.25), [0, 0, 0], 0.4),
     }), bind),
-    cycleClip("startle", 1, (p) => {
-      const e = Math.min(1, p / 0.12) * (p > 0.85 ? (1 - p) / 0.15 : 1);
-      return upright({ chest: [0.26 * e, 0, 0], head: [0.2 * e, 0, 0],
-        ...arm("left", 0.05 + 1.4 * e, 0.6 * e, 0.15 + 1.1 * e), ...arm("right", 0.05 + 1.4 * e, 0.6 * e, 0.15 + 1.1 * e) }, 0.06 * e);
-    }, bind),
     cycleClip("shrug", 1.6, (p) => {
       const e = envelope(p, 0.3, 0.3);
       return upright({ head: [0, 0.3 * wave(p), 0.18 * e], neck: [0, 0, 0.06 * e],

@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { clone } from "three/addons/utils/SkeletonUtils.js";
 import { GOOSE_COLORS } from "./GooseModel.ts";
 import { toonMaterial } from "./toonMaterial.ts";
-import { GooseAnimationState, type GooseLocomotion } from "./GooseAnimation.ts";
+import { GOOSE_ANIMATION, GooseAnimationState, type GooseLocomotion } from "./GooseAnimation.ts";
 
 const MODEL_URL = new URL("../../assets/characters/goose/models/canada-goose.glb", import.meta.url).href;
 const HELD_CLIPS = ["wings_spread", "aggressive"] as const;
@@ -195,7 +195,7 @@ export class Goose extends THREE.Group {
     if (!action) return;
     const target = held ? 1 : 0;
     const duration = action.getClip().duration;
-    const step = duration > 0 ? delta / duration : 1;
+    const step = delta / GOOSE_ANIMATION.heldPoseSeconds[name];
     this.poseProgress[name] = target > this.poseProgress[name]
       ? Math.min(target, this.poseProgress[name] + step)
       : Math.max(target, this.poseProgress[name] - step);

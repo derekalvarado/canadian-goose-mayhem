@@ -14,7 +14,7 @@ import { COFFEE_SHOP_AREA_ID, getWorldArea, loadWorldLayout, resolveStartAreaId 
 import { createWorldRules } from "./worldLevel";
 import { GooseOcclusionFader } from "./GooseOcclusionFader";
 import { toonMaterial, STORYBOOK_LIGHTING } from "./toonMaterial";
-import { CAMERA_BASE_FOV, CAMERA_FOCUS_HEIGHT, CAMERA_TRACK_MAX_REACH, limitCameraReach } from "./cameraTrack";
+import { CAMERA_BASE_FOV, CAMERA_FOCUS_HEIGHT, CAMERA_PLAY_ZOOM, CAMERA_TRACK_MAX_REACH, limitCameraReach } from "./cameraTrack";
 import { CAMERA_TRACK_BLEND_SECONDS, CameraTrackDirector } from "./cameraDirector";
 import { SubjectFraming } from "./cameraFraming";
 import { ControlHeadingLock } from "./controlHeading";
@@ -96,7 +96,7 @@ export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly sunShadow = new ViewSunShadow();
-  private readonly camera = new THREE.PerspectiveCamera(CAMERA_BASE_FOV, 1, 0.1, 300);
+  private readonly camera = new THREE.PerspectiveCamera(CAMERA_BASE_FOV / CAMERA_PLAY_ZOOM, 1, 0.1, 300);
   private readonly query = new URLSearchParams(window.location.search);
   private readonly overviewMode = this.query.has("overview");
   private readonly editorMode = this.query.has("edit");
@@ -847,7 +847,7 @@ export class Game {
   }
 
   private setCameraZoom(zoom: number): void {
-    const fov = CAMERA_BASE_FOV / zoom;
+    const fov = CAMERA_BASE_FOV / (zoom * CAMERA_PLAY_ZOOM);
     if (Math.abs(this.camera.fov - fov) < 0.001) return;
     this.camera.fov = fov;
     this.camera.updateProjectionMatrix();

@@ -55,11 +55,11 @@ export function createTakeawayCup(): THREE.Group {
 
 const SEATED_CLIPS: Partial<Record<TownActivity, string>> = {
   "sit-looking": "sit-look", "sit-phoning": "sit-phone", "sit-sipping": "bench-sip", "sit-relaxing": "sit-relax", "sit-petting": "sit-pet",
-  startled: "sit-startle", shooing: "sit-shoo", eyeing: "sit-look",
+  startled: "sit-look", shooing: "sit-shoo", eyeing: "sit-look",
 };
 const STANDING_CLIPS: Partial<Record<TownActivity, string>> = {
   walking: "walk", running: "run", "stepping-back": "walk", watching: "watch", clapping: "clap", calling: "call", filming: "film",
-  phoning: "phone", waving: "greet", looking: "look", startled: "startle", eyeing: "look", shooing: "shoo",
+  phoning: "phone", waving: "greet", looking: "look", startled: "look", eyeing: "look", shooing: "shoo",
 };
 /** Picks a clip from what the simulation says the person is doing. Presentation only. */
 export function townClipFor(person: Pick<TownspersonState, "activity" | "seated">): string {
@@ -73,13 +73,13 @@ export function patronClipFor(person: Pick<CafePersonState, "activity" | "seated
       case "sipping": return "sit-sip";
       case "looking-up": return "sit-look";
       case "working": return "sit-phone";
-      case "startled": return "sit-startle";
+      case "startled": return "sit-look";
       case "shooing": return "sit-shoo";
       default: return "sit";
     }
   }
   if (person.activity === "ordering") return "order";
-  if (person.activity === "startled") return "startle";
+  if (person.activity === "startled") return "look";
   if (person.moving) return person.activity === "leaving" || person.activity === "walking-to-seat" ? "carry" : "walk";
   return "idle";
 }
@@ -159,13 +159,13 @@ export class TownspersonView extends RiggedCharacterView {
     const walked = townClipFor(person);
     // Runners stay at a run when they swerve round the goose.
     const clip = walked === "walk" && TOWNSFOLK_RUNNERS.includes(this.look) ? "run" : walked;
-    this.present(clip, /startle|shoo|call|clap/.test(clip), person.hidden);
+    this.present(clip, /shoo|call|clap/.test(clip), person.hidden);
   }
 
   setPatronState(person: CafePersonState): void {
     this.userData.gameplayState = person.activity;
     const clip = patronClipFor(person);
-    this.present(clip, /startle|shoo/.test(clip), person.activity === "away", person.seated);
+    this.present(clip, /shoo/.test(clip), person.activity === "away", person.seated);
   }
 }
 
