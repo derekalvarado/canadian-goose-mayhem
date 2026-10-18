@@ -2,7 +2,8 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 export type Point = [number, number, number];
-export type Weight = (position: THREE.Vector3) => [number, number, number];
+/** Bone `a`, blended toward bone `b` by `amount`, and optionally toward a third bone `c` by `cAmount`. */
+export type Weight = (position: THREE.Vector3) => [a: number, b: number, amount: number, c?: number, cAmount?: number];
 
 /** The head every adult shares, in janitor coordinates: face details are placed on its surface. */
 export const HEAD_CENTER: Point = [0, 2.19, -0.035];
@@ -63,9 +64,9 @@ export function createPersonRig<Slot extends string>(name: string, k: number, de
     const indices: number[] = [], weights: number[] = [];
     for (let i = 0; i < positions.count; i++) {
       p.fromBufferAttribute(positions, i);
-      const [a, b, amount] = weight(p);
-      indices.push(a, b, 0, 0);
-      weights.push(1 - amount, amount, 0, 0);
+      const [a, b, amount, c = 0, cAmount = 0] = weight(p);
+      indices.push(a, b, c, 0);
+      weights.push(1 - amount - cAmount, amount, cAmount, 0);
     }
     geometry.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(indices, 4));
     geometry.setAttribute("skinWeight", new THREE.Float32BufferAttribute(weights, 4));
@@ -91,10 +92,17 @@ export function createPersonRig<Slot extends string>(name: string, k: number, de
     geometry.scale(...radii).rotateX(rx).rotateY(ry).rotateZ(rz).translate(...center);
     add(geometry, slot, weight);
   }
-  function garment(slot: Slot, profile: [number, number][], depth: number, center: Point, weight: Weight, phiStart = 0, phiLength = Math.PI * 2): void {
+  /** `depth` squashes it front to back; give it per height for a piece whose depth changes along its length. */
+  function garment(slot: Slot, profile: [number, number][], depth: number | ((y: number) => number), center: Point, weight: Weight, phiStart = 0, phiLength = Math.PI * 2): void {
     const curve = new THREE.SplineCurve(profile.map(([y, radius]) => new THREE.Vector2(radius, y)));
     const geometry = new THREE.LatheGeometry(curve.getPoints(facets(32, 12)), facets(32, 16), phiStart, phiLength);
-    geometry.scale(1, 1, depth).translate(...center);
+    if (typeof depth === "number") geometry.scale(1, 1, depth);
+    else {
+      const positions = geometry.getAttribute("position");
+      for (let i = 0; i < positions.count; i++) positions.setZ(i, positions.getZ(i) * depth(positions.getY(i)));
+      geometry.computeVertexNormals();
+    }
+    geometry.translate(...center);
     add(geometry, slot, weight);
   }
   function tube(slot: Slot, from: Point, to: Point, radius: number, weight: Weight): void {

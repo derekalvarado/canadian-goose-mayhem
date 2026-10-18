@@ -252,6 +252,20 @@ export function drawTownsperson(name: string, spec: Look) {
     const shoulders = (lift: number): [number, number][] => [[1.58, 0.39 + bulky + lift], [1.65, 0.38 + bulky + lift], [1.79, 0.326 + bulky * 0.6 + lift], [1.86, 0.215 + lift]];
     garment("town-skin", [...shoulders(0), [1.89, 0]], 0.722, [0, 0, 0], torsoWeight);
     for (const side of [-1, 1]) add(shoulderStrap(shoulders(0), 0.722, side * 0.19, 0.075, 0.018), "town-top", torsoWeight);
+  } else if (longTop) {
+    // Body and tails in one piece, so no gap opens at the waist. The tails hang from the hips and follow
+    // both thighs equally toward the knee-length hem: a stride swings the legs underneath without tearing
+    // the hem apart, and sitting drapes it over the lap and tucks the back under them.
+    const waist = 1.06, coatHem = 0.6, flare = 0.02 + bulky;
+    const tails: Weight = (p) => {
+      const down = 1 - THREE.MathUtils.smoothstep(p.y, coatHem, waist);
+      const share = down * 0.5;
+      return [rig.bones.indexOf(hips), rig.bones.indexOf(left.thigh), share, rig.bones.indexOf(right.thigh), share];
+    };
+    garment("town-top", [[coatHem, 0.45 + flare], [coatHem + 0.12, 0.45 + flare * 0.6], [(coatHem + waist) / 2, 0.445 + flare * 0.25], [waist, 0.425 + bulky],
+      [1.38, 0.43 + bulky], [1.65, 0.385 + bulky], [1.79, 0.33 + bulky * 0.6], [1.86, 0.22], [1.89, 0]],
+      (y) => THREE.MathUtils.lerp(0.78, 0.73, THREE.MathUtils.smoothstep(y, waist, 1.2)), [0, 0, 0],
+      (p) => p.y >= waist ? torsoWeight(p) : tails(p));
   } else {
     garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.65, 0.385 + bulky],
       [1.79, 0.33 + bulky * 0.6], [1.86, 0.22], [1.89, 0]], 0.73, [0, 0, 0], torsoWeight);
@@ -283,8 +297,7 @@ export function drawTownsperson(name: string, spec: Look) {
     for (const side of [-1, 1]) tube("town-top", [side * 0.035, 1.42, -0.37], [side * 0.17, 1.84, -0.26], 0.04, torsoWeight);
     oval("town-shoes", [0, 1.36, -0.37], [0.02, 0.02, 0.012], torsoWeight);
   } else if (longTop) {
-    // Coat tails to the knee, a double row of buttons, and a collar (a hood for the raincoat).
-    skirt("town-top", 1.06, 0.6, 0.02 + bulky);
+    // A double row of buttons, and a collar (a hood for the raincoat).
     for (const x of [-0.11, 0.11]) for (let index = 0; index < 4; index += 1) oval("town-trim", [x, 1.66 - index * 0.15, -0.34 + index * 0.004], [0.02, 0.02, 0.012], torsoWeight);
     if (spec.top === "raincoat") oval("town-top", [0, 1.86, 0.2], [0.28, 0.15, 0.16], blendY(chest, neck, 1.8, 1.95));
     else for (const side of [-1, 1]) oval("town-top", [side * 0.15, 1.82, -0.18], [0.14, 0.06, 0.1], torsoWeight, [0.4, side * 0.6, side * -0.4]);
