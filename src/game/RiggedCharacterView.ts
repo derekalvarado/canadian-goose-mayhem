@@ -60,7 +60,9 @@ export class RiggedCharacterView extends THREE.Group {
           if (!material) {
             const color = options.palette[source.name];
             if (color === undefined) throw new Error(`Unknown ${options.errorLabel} material: ${source.name}`);
-            material = toonMaterial(color, { transparent: preview, opacity: preview ? 0.45 : 1 });
+            // A painted slot keeps its picture, which already holds its colours.
+            const map = (source as THREE.MeshStandardMaterial).map ?? null;
+            material = toonMaterial(map ? 0xffffff : color, { map, transparent: preview, opacity: preview ? 0.45 : 1 });
             material.name = source.name;
             materials.set(source.name, material);
           }

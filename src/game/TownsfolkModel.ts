@@ -10,7 +10,9 @@ export { TOWNSFOLK_LOOKS } from "./townsfolkTuning.ts";
 
 export type TownSlot =
   | "town-skin" | "town-hair" | "town-eyes" | "town-eye-shine" | "town-mouth" | "town-mouth-open" | "town-cheeks"
-  | "town-top" | "town-accent" | "town-bottom" | "town-shoes" | "town-trim" | "town-hat" | "town-bag" | "town-glasses";
+  | "town-top" | "town-accent" | "town-bottom" | "town-shoes" | "town-trim" | "town-hat" | "town-bag" | "town-glasses"
+  /** Carries its own painted colours (a running vest over bare shoulders). */
+  | "town-painted";
 
 type Hair = "buzz" | "crop" | "bob" | "long" | "curly" | "balding" | "bald" | "braids" | "wavy" | "topknot";
 type Hat = "sunhat" | "cap" | "flatcap" | "bucket" | "headband";
@@ -86,7 +88,7 @@ export function lookColors(spec: Look): Readonly<Record<TownSlot, number>> {
   const c = spec.colors;
   return { "town-skin": c.skin, "town-hair": c.hair, "town-eyes": C.eyes, "town-eye-shine": C.eyeShine, "town-mouth": C.mouth,
     "town-mouth-open": C.mouthOpen, "town-cheeks": C.cheeks, "town-top": c.top, "town-accent": c.accent, "town-bottom": c.bottom,
-    "town-shoes": c.shoes, "town-trim": c.trim, "town-hat": c.hat, "town-bag": c.bag, "town-glasses": c.glasses };
+    "town-shoes": c.shoes, "town-trim": c.trim, "town-hat": c.hat, "town-bag": c.bag, "town-glasses": c.glasses, "town-painted": 0xffffff };
 }
 export const TOWNSFOLK_COLORS: Readonly<Record<TownsfolkLook, Readonly<Record<TownSlot, number>>>> =
   Object.fromEntries(Object.keys(TOWNSFOLK).map((look) => [look, townsfolkColors(look as TownsfolkLook)])) as Record<TownsfolkLook, Record<TownSlot, number>>;
@@ -144,6 +146,47 @@ function shoulderStrap(profile: [number, number][], depth: number, x: number, wi
 }
 
 /**
+ * The picture wrapped round a running vest's body piece (`profile` as for `garment`):
+ * the vest up to a scooped neckline, an even-width strap over each shoulder, white
+ * piping down the front, and bare skin everywhere else.
+ */
+function runningVestTexture(profile: [number, number][], colors: Look["colors"]): THREE.DataTexture {
+  const curve = new THREE.SplineCurve(profile.map(([y, radius]) => new THREE.Vector2(radius, y)));
+  const width = 512, height = 256, samples = 3;
+  const rgb = (hex: number) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
+  const skin = rgb(colors.skin), vest = rgb(colors.top), piping = rgb(colors.trim);
+  const strapX = 0.19, strapHalf = 0.0375, pipingX = 0.2, pipingHalf = 0.015;
+  const colorAt = (x: number, y: number, front: boolean) => {
+    const side = Math.abs(x);
+    const neckline = front ? 1.63 - 0.07 * (1 - Math.min(1, side / strapX) ** 2) : 1.63;
+    if (y > neckline) return Math.abs(side - strapX) < strapHalf ? vest : skin;
+    if (front && Math.abs(side - pipingX) < pipingHalf && y > 1.15) return piping;
+    return vest;
+  };
+  const data = new Uint8Array(width * height * 4);
+  for (let row = 0; row < height; row++) {
+    // Several samples per pixel keep the strap edges smooth.
+    const points = Array.from({ length: samples }, (_, b) => curve.getPoint((row + (b + 0.5) / samples) / height));
+    for (let column = 0; column < width; column++) {
+      const sum = [0, 0, 0];
+      for (let a = 0; a < samples; a++) {
+        const phi = ((column + (a + 0.5) / samples) / width) * Math.PI * 2;
+        // The lathe places each point at x = r·sin φ, z = r·cos φ; the front faces -Z.
+        for (const point of points) colorAt(point.x * Math.sin(phi), point.y, Math.cos(phi) < 0).forEach((value, channel) => { sum[channel] += value; });
+      }
+      const at = (row * width + column) * 4;
+      for (let channel = 0; channel < 3; channel++) data[at + channel] = Math.round(sum[channel] / (samples * samples));
+      data[at + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter; texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
  * A townsperson on the janitor's rig, drawn with the same kit as the café people
  * at a lighter facet count (there are many of them on screen at once).
  */
@@ -195,7 +238,13 @@ export function drawTownsperson(name: string, spec: Look) {
   const longTop = spec.top === "coat" || spec.top === "raincoat";
   const hem = spec.top === "tank" || spec.top === "dress" ? 0.98 : spec.top === "hoodie" ? 0.92 : spec.top === "waistcoat" ? 1.02 : 0.95;
   const sleeveless = spec.top === "tank" || spec.top === "dress";
-  if (sleeveless) {
+  if (spec.top === "tank") {
+    // One piece from hem to neck, with the vest, its straps, and its piping painted on, so nothing sits on the skin to poke through it.
+    const profile: [number, number][] = [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.6, 0.395 + bulky],
+      [1.65, 0.38 + bulky], [1.79, 0.326 + bulky * 0.6], [1.86, 0.215], [1.89, 0]];
+    rig.paint("town-painted", runningVestTexture(profile, spec.colors));
+    garment("town-painted", profile, 0.73, [0, 0, 0], torsoWeight);
+  } else if (sleeveless) {
     // The top stops at the chest; skin follows the same body shape up to the neck, with a strap over each shoulder.
     garment("town-top", [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.6, 0.395 + bulky], [1.68, 0.372 + bulky]],
       0.73, [0, 0, 0], torsoWeight);
@@ -209,8 +258,6 @@ export function drawTownsperson(name: string, spec: Look) {
   }
   if (spec.top === "dress") {
     oval("town-trim", [0, 1.24, -0.04], [0.42 + bulky, 0.03, 0.31], torsoWeight); // tie belt
-  } else if (spec.top === "tank") {
-    for (const side of [-1, 1]) oval("town-trim", [side * 0.2, 1.4, -0.31], [0.015, 0.25, 0.015], torsoWeight); // piping
   } else if (spec.top === "tee" && has("stripes")) {
     for (let band = 0; band < 4; band += 1) {
       const y = 1.1 + band * 0.16;

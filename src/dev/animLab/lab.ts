@@ -59,7 +59,9 @@ export function startAnimationLab(character: LabCharacter, initial: LabVariant[]
         if (!(object instanceof THREE.Mesh)) return;
         const name = (object.material as THREE.Material).name;
         if (palette[name] === undefined) throw new Error(`No lab colour for ${name}`);
-        if (!materials.has(name)) materials.set(name, toonMaterial(palette[name]));
+        // A painted slot keeps its picture, which already holds its colours.
+        const map = (object.material as THREE.MeshStandardMaterial).map ?? null;
+        if (!materials.has(name)) materials.set(name, toonMaterial(map ? 0xffffff : palette[name], { map }));
         object.material = materials.get(name)!;
         object.frustumCulled = false;
       });

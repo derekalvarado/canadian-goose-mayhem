@@ -51,8 +51,13 @@ export function createPersonRig<Slot extends string>(name: string, k: number, de
   const pieces = new Map<Slot, THREE.BufferGeometry[]>();
   const facets = (count: number, minimum: number) => detail === 1 ? count : Math.max(minimum, Math.round(count * detail));
 
+  const maps = new Map<Slot, THREE.Texture>();
+  /** Paints a slot with a picture (drawn over its UVs) instead of its flat palette colour; call before adding its pieces. */
+  function paint(slot: Slot, texture: THREE.Texture): void { maps.set(slot, texture); }
+
   function add(geometry: THREE.BufferGeometry, slot: Slot, weight: Weight): void {
-    geometry.deleteAttribute("uv");
+    // Only painted slots need UVs; dropping the rest lets every piece of a slot merge.
+    if (!maps.has(slot)) geometry.deleteAttribute("uv");
     const p = new THREE.Vector3();
     const positions = geometry.getAttribute("position");
     const indices: number[] = [], weights: number[] = [];
@@ -141,7 +146,8 @@ export function createPersonRig<Slot extends string>(name: string, k: number, de
     for (const [slot, geometries] of pieces) {
       const geometry = mergeGeometries(geometries);
       if (!geometry) throw new Error(`Unable to merge ${slot}`);
-      const material = new THREE.MeshStandardMaterial({ color: colors[slot], roughness: 1, metalness: 0 });
+      const map = maps.get(slot) ?? null;
+      const material = new THREE.MeshStandardMaterial({ color: map ? 0xffffff : colors[slot], map, roughness: 1, metalness: 0 });
       material.name = slot;
       const mesh = new THREE.SkinnedMesh(geometry, material);
       mesh.name = slot;
@@ -155,6 +161,6 @@ export function createPersonRig<Slot extends string>(name: string, k: number, de
   }
   /** Bind positions keyed by bone name, which the clip builders need. */
   const bindPose = () => new Map(bones.map((bone) => [bone.name, bone.position.clone()]));
-  return { model, bones, root, hips, spine, chest, neck, head, joint, rigid, blendY, torsoWeight, add, oval, garment, tube, onFace, hairShell, finish, bindPose };
+  return { model, bones, root, hips, spine, chest, neck, head, joint, rigid, blendY, torsoWeight, add, oval, garment, tube, onFace, hairShell, paint, finish, bindPose };
 }
 export type PersonRig<Slot extends string> = ReturnType<typeof createPersonRig<Slot>>;
