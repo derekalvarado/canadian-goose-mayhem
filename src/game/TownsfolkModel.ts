@@ -147,21 +147,21 @@ function shoulderStrap(profile: [number, number][], depth: number, x: number, wi
 
 /**
  * The picture wrapped round a running vest's body piece (`profile` as for `garment`):
- * the vest up to a scooped neckline, an even-width strap over each shoulder, white
- * piping down the front, and bare skin everywhere else.
+ * the vest up to a scooped neckline, an even-width strap over each shoulder, and
+ * bare skin everywhere else.
  */
 function runningVestTexture(profile: [number, number][], colors: Look["colors"]): THREE.DataTexture {
   const curve = new THREE.SplineCurve(profile.map(([y, radius]) => new THREE.Vector2(radius, y)));
   const width = 512, height = 256, samples = 3;
   const rgb = (hex: number) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
-  const skin = rgb(colors.skin), vest = rgb(colors.top), piping = rgb(colors.trim);
-  const strapX = 0.19, strapHalf = 0.0375, pipingX = 0.2, pipingHalf = 0.015;
+  const skin = rgb(colors.skin), vest = rgb(colors.top);
+  const strapX = 0.19, strapHalf = 0.0375;
   const colorAt = (x: number, y: number, front: boolean) => {
     const side = Math.abs(x);
-    const neckline = front ? 1.63 - 0.07 * (1 - Math.min(1, side / strapX) ** 2) : 1.63;
-    if (y > neckline) return Math.abs(side - strapX) < strapHalf ? vest : skin;
-    if (front && Math.abs(side - pipingX) < pipingHalf && y > 1.15) return piping;
-    return vest;
+    // A shallow scoop at the front neck, and armholes cut deep under each arm.
+    const armhole = 0.17 * THREE.MathUtils.smoothstep(side, strapX + strapHalf, 0.34);
+    const neckline = (front ? 1.75 - 0.05 * (1 - Math.min(1, side / strapX) ** 2) : 1.75) - armhole;
+    return y > neckline && Math.abs(side - strapX) >= strapHalf ? skin : vest;
   };
   const data = new Uint8Array(width * height * 4);
   for (let row = 0; row < height; row++) {
@@ -239,7 +239,7 @@ export function drawTownsperson(name: string, spec: Look) {
   const hem = spec.top === "tank" || spec.top === "dress" ? 0.98 : spec.top === "hoodie" ? 0.92 : spec.top === "waistcoat" ? 1.02 : 0.95;
   const sleeveless = spec.top === "tank" || spec.top === "dress";
   if (spec.top === "tank") {
-    // One piece from hem to neck, with the vest, its straps, and its piping painted on, so nothing sits on the skin to poke through it.
+    // One piece from hem to neck, with the vest and its straps painted on, so nothing sits on the skin to poke through it.
     const profile: [number, number][] = [[hem, 0], [hem + 0.03, 0.33 + bulky], [1.12, 0.41 + bulky], [1.38, 0.43 + bulky], [1.6, 0.395 + bulky],
       [1.65, 0.38 + bulky], [1.79, 0.326 + bulky * 0.6], [1.86, 0.215], [1.89, 0]];
     rig.paint("town-painted", runningVestTexture(profile, spec.colors));
